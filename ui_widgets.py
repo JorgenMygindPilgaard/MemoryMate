@@ -1,10 +1,9 @@
-from PyQt5.QtWidgets import QWidget, QHBoxLayout, QVBoxLayout, QGridLayout, QTreeView, QFileSystemModel, QLabel, QLineEdit, QPlainTextEdit, QDateTimeEdit, QDateEdit, QPushButton, QListWidget, QAbstractItemView, QMenu, QAction, QDialog, QApplication, QCompleter, QSpacerItem,QSizePolicy
-from PyQt5.QtCore import Qt, QDir, QDateTime, QDate, QThread,QObject,QModelIndex,QItemSelection,QTimer, pyqtSignal
+from PyQt5.QtWidgets import QWidget, QHBoxLayout, QVBoxLayout, QGridLayout, QTreeView, QFileSystemModel, QLabel, QLineEdit, QPlainTextEdit, QDateTimeEdit, QDateEdit, QPushButton, QListWidget, QAbstractItemView, QMenu, QAction, QDialog, QCompleter, QSpacerItem,QSizePolicy
+from PyQt5.QtCore import Qt, QDir, QDateTime, QDate, QObject,QModelIndex,QTimer, pyqtSignal
 from PyQt5.QtGui import QPixmap
 import settings
 from file_metadata_util import FileMetadata, StandardizeFilenames, CopyLogicalTags, ConsolidateMetadata
-from util import clearLayout, AutoCompleteList
-from ui_util import ProgressBarWidget
+from ui_util import ProgressBarWidget, AutoCompleteList, clearLayout
 import os
 from file_util import FileRenamer
 
