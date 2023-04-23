@@ -1,11 +1,10 @@
-from PyQt5.QtWidgets import QWidget, QHBoxLayout, QVBoxLayout, QGridLayout, QTreeView, QFileSystemModel, QLabel, QLineEdit, QPlainTextEdit, QDateTimeEdit, QDateEdit, QPushButton, QListWidget, QAbstractItemView, QMenu, QAction, QDialog, QCompleter, QSpacerItem,QSizePolicy
-from PyQt5.QtCore import Qt, QDir, QDateTime, QDate, QObject,QModelIndex,QTimer, pyqtSignal
-from PyQt5.QtGui import QPixmap
+from PyQt5.QtWidgets import QWidget, QHBoxLayout, QVBoxLayout, QTreeView, QFileSystemModel, QLabel, QLineEdit, QPlainTextEdit, QDateTimeEdit, QDateEdit, QPushButton, QListWidget, QAbstractItemView, QMenu, QAction, QDialog, QCompleter, QScrollArea,QSizePolicy
+from PyQt5.QtCore import Qt, QDir, QDateTime, QDate, QModelIndex,QTimer, pyqtSignal,QSize
+from PyQt5.QtGui import QPixmap,QFontMetrics
 import settings
 from file_metadata_util import FileMetadata, StandardizeFilenames, CopyLogicalTags, ConsolidateMetadata
 from ui_util import ProgressBarWidget, AutoCompleteList, clearLayout
 import os
-from file_util import FileRenamer
 
 class FolderTree(QTreeView):
     def __init__(self,dir_path,file_list=None):
@@ -48,14 +47,14 @@ class FolderTree(QTreeView):
         action = self.menu.exec_(self.viewport().mapToGlobal(position))
 
         if action == self.standardize_filenames:
-            index = self.indexAt(position)  # Get index in File-list
+            index = self.indexAt(position)  # Get index in FilePanel-list
             if index.isValid():
                 start_folder_name = self.model.filePath(index)
                 file_name_pattern_dialog = InputFileNamePattern()
                 result = file_name_pattern_dialog.exec_()
                 if result == QDialog.Accepted:
                     # Get the input values
-                    file_name_pattern = file_name_pattern_dialog.get_input()
+                    file_name_pattern = file_name_pattern_dialog.getInput()
                     prefix, num_pattern, suffix = file_name_pattern
 
                     # Rename all files in folders and subfolders
@@ -98,6 +97,21 @@ class FileList(QTreeView):
         self.__setFiletypeFilter(settings.file_types)
         self.hideFilteredFiles()    #Default is to hide filetered files. They can also be shown dimmed
                                     #by calling self.showFilteredFiles()
+
+        self.hideColumn(2)    #Hide File-type
+        self.setColumnWidth(0,260)    #Filename
+        self.setColumnWidth(1,80)    #Filesize
+        self.setColumnWidth(2,150)    #Date modified
+
+
+
+
+
+        column_count = self.model.columnCount()
+
+        # Print the header data for each column
+        for column in range(column_count):
+            header_data = self.model.headerData(column, Qt.Horizontal, Qt.DisplayRole)
 
         #Set root-path
         self.setRootPath(dir_path)
@@ -228,406 +242,479 @@ class FileList(QTreeView):
         previous_path = self.model.filePath((previous))
         if chosen_path != previous_path:
             if not self.current_file == None:
-                self.current_file=File.get_instance(chosen_path)   # Gets file-singleton. At the same time set singleton to chosen file
+                self.current_file=FilePanel.getInstance(chosen_path)   # Gets file-singleton. At the same time set singleton to chosen file
 
-class File(QObject):
-    __instance=None
-    __file_name=''
-                                                          # Widgets for tags updates this with what is in focus
-                                                          # That way, __prepare_metadata_widgets (when metadata has changed)
-                                                          # the focus can be put back on same element.
-                                                          # value exampels:
-                                                          #  data   (date-tag)
-                                                          #  persons.line   (the line below persons list for adding new person)
+class FilePanel(QScrollArea):
+    __instance = None
+    file_metadata = None
+    file_name = ''
+    focus_tag = None        # After refreshing FilePanel, bring focus back to the tag that had focus before
 
-    def __init__(self,file_name=""):
+    def __init__(self):
         super().__init__()
-        # Main Layout for File Pane
-        self.layout = QVBoxLayout()
+        self.setMinimumWidth(350)
 
-        # Add file preview window in file pane
-        self.file_preview = QLabel()
-        self.layout.addWidget(self.file_preview)
-        self.file_preview.setFixedSize(500, 500)
-        self.file_preview.size().width().as_integer_ratio()
-
-        # Add metadata-layout in file-panel
-        self.metadata_layout = QGridLayout()
-        self.layout.addLayout(self.metadata_layout)
-
-        # Connect to file-renamer changesignal
-        self.file_renamer = FileRenamer.get_instance()
-        self.file_renamer.filename_changed_signal.connect(self.filename_changed)
-
-        self.focus_tag = ''
-
-        if file_name!=None and file_name!="":
-            self.prepare_file_panel()
+    def resizeEvent(self, event):
+        super().resizeEvent(event)
+        if event.oldSize().width() != -1:  # ignore first call to resizeEvent
+            if event.oldSize().width()!=event.size().width():
+                self.prepareFilePanel()
 
     @staticmethod
-    def get_instance(file_name):
-        if File.__instance==None:
-            File.__instance=File(file_name)
-        if file_name!=File.__file_name:
-            File.__file_name=file_name
-            File.__instance.prepare_file_panel()
+    def getInstance(file_name):
+        FilePanel.focus_tag = None      #Forget focus-tag when changing to different photo
+        if FilePanel.file_metadata != None and FilePanel.file_name !='':                      #Changing to different picture: Save this pictures metadata
+            FilePanel.file_metadata.save()
+        if FilePanel.__instance==None:
+            FilePanel.__instance=FilePanel()
+            FilePanel.__initializeWidgets()
+        FilePanel.file_name=file_name
+        FilePanel.file_metadata=FileMetadata.getInstance(file_name)
+        FilePanel.file_metadata.change_signal.connect(FilePanel.metadataChanged)    # If a copy-process changes file
+        FilePanel.__instance.prepareFilePanel()
+        return FilePanel.__instance
+    @staticmethod
+    def saveMetadata():
+        if FilePanel.file_metadata != None and FilePanel.file_name !='':
+            FilePanel.file_metadata.save()
 
-        return File.__instance
+    def prepareFilePanel(self,prepare_preview=True):       # Happens each time a new filename is assigned
+        scroll_position = FilePanel.__instance.verticalScrollBar().value()    # Remember scroll-position
+        self.takeWidget()
+        clearLayout(FilePanel.metadata_layout)
+
+        # Prepare file-preview widget
+        if FilePanel.file_name != None and FilePanel.file_name != '' and prepare_preview:
+            clearLayout(FilePanel.main_layout)
+
+            pixmap = QPixmap(FilePanel.file_name)
+            pixmap_width=self.width()-60
+            pixmap_height = int(pixmap_width*9/16)
+
+            if pixmap.width() > 0 and pixmap.height() > 0:
+                pixmap = pixmap.scaled(pixmap_width, pixmap_height,Qt.KeepAspectRatio, Qt.SmoothTransformation)
+
+            FilePanel.file_preview.setPixmap(pixmap)
+            FilePanel.file_preview.setAlignment(Qt.AlignHCenter)
+            FilePanel.main_layout.addWidget(FilePanel.file_preview)
+            dummy_widget_for_width = QWidget()
+            dummy_widget_for_width.setFixedWidth(self.width()-60)
+            FilePanel.main_layout.addWidget(dummy_widget_for_width)
 
 
-
-    def prepare_file_panel(self):       # Happens each time a new filename is assigned
-        # Get metadata-instance, and subscribe to changes
-        self.file_metadata = None
-        self.focus_tag = ''
-        if self.__file_name != '':
-            self.file_metadata = FileMetadata.get_instance(self.__file_name)
-            self.file_metadata.change_signal.connect(self.metadata_changed)
-
-        # Preview
-        self.__prepare_preview()
-
-        # Metadata widgets
-        self.__prepare_metadata_widgets()
-
-    def __prepare_preview(self):
-        # Prepare preview and place in layout
-        self.file_preview.clear()
-        if self.__file_name != None and self.__file_name != '':
-            pixmap = QPixmap(self.__file_name)
-            self.pixmap = pixmap.scaled(self.file_preview.size().width(), self.file_preview.size().height(),
-                                        Qt.KeepAspectRatio, Qt.SmoothTransformation)
-            self.file_preview.setPixmap(self.pixmap)
-            self.file_preview.setAlignment(Qt.AlignHCenter)
-
-    def __prepare_metadata_widgets(self):
-        clearLayout(self.metadata_layout)
-        if self.__file_name != None and self.__file_name != '':
+#        Prepare metadata widgets and place them all in metadata_layout.
+        if FilePanel.file_name != None and FilePanel.file_name != '':
+            FilePanel.metadata_layout.setSizeConstraint(1)   #No constraints
             tags = {}
-            for logical_tag in self.file_metadata.logical_tag_values:
-                tag_labels = settings.logical_tag_descriptions.get(logical_tag)  # All language descriptions of tag
-                tag_label = tag_labels.get(settings.language)  # User-language description of tag
-                tag_type = settings.logical_tags.get(logical_tag)
-                if tag_type == "text_line":
-                    tag_widget = TextLine(self, logical_tag)
-                    tags[logical_tag] = [tag_label, tag_widget]
-                elif tag_type == "text":
-                    tag_widget = Text(self, logical_tag)
-                    tags[logical_tag] = [tag_label, tag_widget]
-                elif tag_type == "reference_tag":
-                    tag_widget = Text(self, logical_tag)
-                    tag_widget.setDisabled(True)
-                    tags[logical_tag] = [tag_label, tag_widget]
-                elif tag_type == "date_time":
-                    tag_widget = DateTime(self, logical_tag)
-                    tags[logical_tag] = [tag_label, tag_widget]
-                elif tag_type == "date":
-                    tag_widget = Date(self, logical_tag)
-                    tags[logical_tag] = [tag_label, tag_widget]
-                elif tag_type == "text_set":
-                    tag_widget = TextSet(self, logical_tag)
-                    tags[logical_tag] = [tag_label, tag_widget]
-                else:
-                    pass
+            for logical_tag in FilePanel.file_metadata.logical_tag_values:
+                tags[logical_tag]=FilePanel.tags.get(logical_tag)
+                tag_widget=FilePanel.tags[logical_tag][1]
+                tag_widget.readFromImage()
 
-
-            # Place all tags in gridlayout
-            grid_row = 0
-            spacerItem = QSpacerItem(40, 20, QSizePolicy.Expanding, QSizePolicy.Minimum)
+            # Place all tags in V-box layout for metadata
+            focus_widget = None
             for logical_tag in tags:
-                label_widget = QLabel(tags[logical_tag][0]+":")
-                label_widget.setStyleSheet("color: #868686;")
-                self.metadata_layout.addWidget(label_widget,grid_row,0)     # Label in column 0 of layout"
-                self.metadata_layout.addWidget(tags[logical_tag][1], grid_row+1, 0)           # Widget in column 1 of layout"
-                self.metadata_layout.addItem(spacerItem, grid_row+2, 0)
-                grid_row += 3
-            grid_row += 1
-
-            # Set focus back to the widget that had focus before
-            if self.focus_tag != None and self.focus_tag != '':
-                tag_components = []
-                tag_components = self.focus_tag.split('.')
-                tag = tag_components[0]
-                subwidget = None
-                if len(tag_components) > 1:
-                    subwidget = tag_components[1]
-                tag_data = tags.get(tag)
-                if tag_data:
-                    if subwidget:
-                        if hasattr(tag_data[1], subwidget):
-                            if subwidget == 'tagInput':
-                                tag_data[1].tagInput.setFocus()
+                FilePanel.metadata_layout.addWidget(tags[logical_tag][0])  # Label-widget
+                FilePanel.metadata_layout.addWidget(tags[logical_tag][1])  # Tag-widget
+                space_label=QLabel(" ")
+                FilePanel.metadata_layout.addWidget(space_label)
+                if logical_tag == FilePanel.focus_tag:
+                    if tags[logical_tag][2] == 'text_set':
+                        focus_widget = tags[logical_tag][1].text_input
                     else:
-                        tag_data[1].setFocus()
+                        focus_widget = tags[logical_tag][1]
+
+
+
+
+            FilePanel.main_layout.addLayout(FilePanel.metadata_layout)
+            FilePanel.main_widget.setFixedWidth(self.width() - 30)
+            FilePanel.main_widget.setLayout(FilePanel.main_layout)
+            self.setWidget(FilePanel.main_widget)
+            if focus_widget:
+                focus_widget.setFocus()
+            FilePanel.__instance.verticalScrollBar().setValue(scroll_position)  # Remember scroll-position
 
     @staticmethod
-    def metadata_changed(file_name):
-        if file_name==File.__file_name:
-            File.__instance.__prepare_metadata_widgets()      # If matadata changed in file shown in panel, then update metadata in panel
+    def __initializeWidgets():
+        FilePanel.main_widget = QWidget()
+        FilePanel.main_widget.setMinimumHeight(5000)   # Ensure that there is enough available place in widget for scroll-area
+        FilePanel.main_layout=QVBoxLayout()
+        FilePanel.main_layout.setSizeConstraint(QVBoxLayout.SetFixedSize)
+        FilePanel.metadata_layout=QVBoxLayout()
+        FilePanel.metadata_layout.setSizeConstraint(QVBoxLayout.SetFixedSize)
+        FilePanel.file_preview = QLabel()
+
+        FilePanel.tags = {}
+        for logical_tag in settings.logical_tags:
+            tag_labels = settings.logical_tag_descriptions.get(logical_tag)  # All language descriptions of tag
+            tag_label = tag_labels.get(settings.language)  # User-language description of tag
+            tag_type = settings.logical_tags.get(logical_tag)
+
+            label_widget = QLabel(tag_label + ":")
+            label_widget.setStyleSheet("color: #868686;")
+            if tag_type == "text_line":
+                tag_widget = TextLine(logical_tag)
+                FilePanel.tags[logical_tag] = [label_widget, tag_widget,tag_type]
+            elif tag_type == "text":
+                tag_widget = Text(logical_tag)
+                FilePanel.tags[logical_tag] = [label_widget, tag_widget,tag_type]
+            elif tag_type == "reference_tag":
+                tag_widget = Text(logical_tag)
+                tag_widget.setDisabled(True)
+                FilePanel.tags[logical_tag] = [label_widget, tag_widget,tag_type]
+            elif tag_type == "date_time":
+                tag_widget = DateTime(logical_tag)
+                FilePanel.tags[logical_tag] = [label_widget, tag_widget,tag_type]
+            elif tag_type == "date":
+                tag_widget = Date(logical_tag)
+                FilePanel.tags[logical_tag] = [label_widget, tag_widget,tag_type]
+            elif tag_type == "text_set":
+                tag_widget = TextSet(logical_tag)
+                FilePanel.tags[logical_tag] = [label_widget, tag_widget,tag_type]
+            else:
+                pass
 
     @staticmethod
-    def filename_changed(old_filename, new_filename):     # reacts on change filename
-        FileMetadata.delete_instance(old_filename)        # file for this instance does not exist anymore
+    def metadataChanged(file_name):
+        if file_name==FilePanel.file_name:
+            FilePanel.__instance.prepareFilePanel(prepare_preview=False)      # If matadata changed in file shown in panel, then update metadata in panel
+
+    @staticmethod
+    def filenemeChanged(old_filename, new_filename):     # reacts on change filename
+        FileMetadata.deleteInstance(old_filename)        # file for this instance does not exist anymore
 
 class TextLine(QLineEdit):
-    def __init__(self,file,logical_tag):
-        self.file = file                                                  #Widget should remember who it serves
-        self.logical_tag = logical_tag                                    #Widget should remember who it serves
+    def __init__(self, logical_tag):
         super().__init__()
-
+        self.logical_tag = logical_tag                                    #Widget should remember who it serves
+        self.setMaximumWidth(1250)
 
         #Get attributes of tag
-        self.tag_attributes = settings.logical_tag_attributes.get(self.logical_tag)
-        if self.tag_attributes.get("Autocomplete"):                       #Enable autocompletion
-            self.auto_complete_list = AutoCompleteList.get_instance(logical_tag)
+        tag_attributes = settings.logical_tag_attributes.get(self.logical_tag)
+        if tag_attributes.get("Autocomplete"):                       #Enable autocompletion
+            self.auto_complete_list = AutoCompleteList.getInstance(logical_tag)
             self.setCompleter(self.auto_complete_list)
             autocompleter_file = os.path.join(settings.app_data_location, "autocomplete_" + self.logical_tag +'.txt')
-            self.auto_complete_list.set_file_name(autocompleter_file)
-        self.__read_from_image()                                          #Puts text in Widget
+            self.auto_complete_list.setFileName(autocompleter_file)
+        self.readFromImage()
         self.editingFinished.connect(self.__edited)
 
-    def __read_from_image(self):
-        self.setText(self.file.file_metadata.logical_tag_values.get(self.logical_tag))
-        if hasattr(self, 'auto_complete_list') and self.text() != "":
-            self.auto_complete_list.collect_item(self.text())    # Collect new entry in auto_complete_list
+    def readFromImage(self):
+        if FilePanel.file_metadata:
+            self.setText(FilePanel.file_metadata.logical_tag_values.get(self.logical_tag))
+            if hasattr(self, 'auto_complete_list') and self.text() != "":
+                self.auto_complete_list.collectItem(self.text())    # Collect new entry in auto_complete_list
 
     def __edited(self):
-        self.file.focus_tag = self.logical_tag                              # File can then refocus after preparing metadata in screen
-        self.file.file_metadata.set_logical_tag_values({self.logical_tag: self.text()})
-        self.file.file_metadata.save()
+        FilePanel.file_metadata.setLogicalTagValues({self.logical_tag: self.text()})
         if hasattr(self, 'auto_complete_list'):
-            self.auto_complete_list.collect_item(self.text())    # Collect new entry in auto_complete_list
+            self.auto_complete_list.collectItem(self.text())    # Collect new entry in auto_complete_list
+        FilePanel.focus_tag=self.logical_tag
 
 class Text(QPlainTextEdit):
-    def __init__(self,file,logical_tag):
-        self.file = file                                                  #Widget should remember who it serves
-        self.logical_tag = logical_tag                                    #Widget should remember who it serves
+    def __init__(self, logical_tag):
         super().__init__()     #Puts text in Widget
+        self.logical_tag = logical_tag                                    #Widget should remember who it serves
+        self.setMinimumHeight(50)
+        self.setMaximumWidth(1250)
+        self.setVerticalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+        self.setFocusPolicy(Qt.ClickFocus)
+
         #Get attributes of tag
-        self.tag_attributes = settings.logical_tag_attributes.get(self.logical_tag)
-        if self.tag_attributes.get("Autocomplete"):                         #Enable autocompletion
-            self.auto_complete_list = AutoCompleteList.get_instance(logical_tag)
+        tag_attributes = settings.logical_tag_attributes.get(self.logical_tag)
+        if tag_attributes.get("Autocomplete"):                         #Enable autocompletion
+            self.auto_complete_list = AutoCompleteList.getInstance(logical_tag)
             self.setCompleter(self.auto_complete_list)
             autocompleter_file = os.path.join(settings.app_data_location, "autocomplete_" + self.logical_tag +'.txt')
-            self.auto_complete_list.set_file_name(autocompleter_file)
+            self.auto_complete_list.setFileName(autocompleter_file)
+        self.readFromImage()
 
-        self.__read_from_image()                                          #Puts text in Widget
-
-
-    def __read_from_image(self):
-        self.setPlainText(self.file.file_metadata.logical_tag_values.get(self.logical_tag))
-        if hasattr(self, 'auto_complete_list') and self.toPlainText() != "":
-            self.auto_complete_list.collect_item(self.toPlainText())    # Collect new entry in auto_complete_list
-
+    def resizeEvent(self, event):
+        super().resizeEvent(event)
+        if event.oldSize().width()!=event.size().width():
+            self.setFixedHeight(self.widgetHeight(event.size().width()))   #Calculates new height from new width
+    def wheelEvent(self, event):
+        # Ignore the wheel event
+        event.ignore()
+    def readFromImage(self):
+        if FilePanel.file_metadata:
+            self.setPlainText(FilePanel.file_metadata.logical_tag_values.get(self.logical_tag))
+            self.setFixedHeight(self.widgetHeight(self.width()))      #Calculates needed height from width and text
+            if hasattr(self, 'auto_complete_list') and self.toPlainText() != "":
+                self.auto_complete_list.collectItem(self.toPlainText())    # Collect new entry in auto_complete_list
     def focusOutEvent(self, event):
         self.__edited()
 
     def __edited(self):
-        self.file.focus_tag = self.logical_tag                              # File can then refocus after preparing metadata in screen
-        self.file.file_metadata.set_logical_tag_values({self.logical_tag: self.toPlainText()})
-        self.file.file_metadata.save()
+        FilePanel.file_metadata.setLogicalTagValues({self.logical_tag: self.toPlainText()})
         if hasattr(self, 'auto_complete_list'):
-            self.auto_complete_list.collect_item(self.toPlainText())    # Collect new entry in auto_complete_list
+            self.auto_complete_list.collectItem(self.toPlainText())    # Collect new entry in auto_complete_list
+        FilePanel.focus_tag=self.logical_tag
+#        FilePanel.file_metadata.save()
+
+    def widgetHeight(self, new_widget_width=-1):
+
+        # Get text from document
+        text=self.toPlainText()
+        text_length = len(text)
+
+        if text_length == 0:
+            return 60
+
+        document = self.document()
+        font = document.defaultFont()
+
+        # Calculate the width of each line of text
+        font_metrics = QFontMetrics(font)
+        text_width = font_metrics.width(self.toPlainText())
+
+
+        if new_widget_width != -1:
+            document_width = new_widget_width
+        else:
+            document_width = self.document().size().width()
+
+        num_lines = text_width / document_width
+
+
+        # Add lines for wasted space at line shift
+        wasted_space_factor = 1 + 5 * num_lines / text_length   # Approx 5 characters wasted at each line
+        num_lines = num_lines * wasted_space_factor
+
+        # Add extra lines for new-line characters
+        for str_ln in range(10, 0, -1):
+            repeat_newline = str_ln * "\n"
+            repeat_newline_count = text.count(repeat_newline)
+            if repeat_newline_count > 0:
+                num_lines = num_lines + repeat_newline_count * ( str_ln - 0.5 )
+                text = text.replace(repeat_newline, "")
+
+        # Add extra space for frame and last line
+        num_lines = num_lines + 5
+
+        # Calculate the height of the text
+        line_height = font_metrics.height()
+        text_height = int(num_lines * line_height)
+
+        return text_height
 
 
 class DateTime(QDateTimeEdit):
-    def __init__(self,file,logical_tag):
-        self.file = file                                                  #Widget should remember who it serves
-        self.logical_tag = logical_tag                                    #Widget should remember who it serves
+    def __init__(self, logical_tag):
         super().__init__()
+        self.logical_tag = logical_tag                                    #Widget should remember who it serves
 
         self.setCalendarPopup(True)
-
+        self.setFixedWidth(250)
 
         #Get attributes of tag
-        self.tag_attributes = settings.logical_tag_attributes.get(self.logical_tag)
-        if self.tag_attributes.get("Autocomplete"):                         #Enable autocompletion
-            self.auto_complete_list = AutoCompleteList.get_instance(logical_tag)
+        tag_attributes = settings.logical_tag_attributes.get(self.logical_tag)
+        if tag_attributes.get("Autocomplete"):                         #Enable autocompletion
+            self.auto_complete_list = AutoCompleteList.getInstance(logical_tag)
             self.setCompleter(self.auto_complete_list)
             autocompleter_file = os.path.join(settings.app_data_location, "autocomplete_" + self.logical_tag +'.txt')
-            self.auto_complete_list.set_file_name(autocompleter_file)
+            self.auto_complete_list.setFileName(autocompleter_file)
 
-        self.__read_from_image()
-        self.dateTimeChanged.connect(self.__edited)
+        self.readFromImage()
+        self.editingFinished.connect(self.__edited)
 
-    def __read_from_image(self):
-        date_time = self.file.file_metadata.logical_tag_values.get(self.logical_tag)
-        self.clear()
-        self.setStyleSheet("color: #D3D3D3;")
-        if date_time != "":  # Data was found
-            date_time = date_time.replace(" ", ":")  # 2022/12/24 13:50:00 --> 2022/12/24:13:50:00
-            date_time = date_time.replace("/", ":")  # 2022/12/24:13:50:00 --> 2022:12:24:13:50:00
-            date_time_parts = date_time.split(":")   # 2022:12:24:13:50:00 --> ["2022", "12", "24", "13", "50", "00"]
-            while len(date_time_parts) < 6:
-                date_time_parts.append("")
-            self.setDateTime(QDateTime(int(date_time_parts[0]), int(date_time_parts[1]), int(date_time_parts[2]),
-                                       int(date_time_parts[3]), int(date_time_parts[4]), int(date_time_parts[5])))
-            self.setStyleSheet("color: black")
-            if hasattr(self, 'auto_complete_list'):
-                self.auto_complete_list.collect_item(date_time)    # Collect new entry in auto_complete_list
+    def wheelEvent(self, event):
+        # Ignore the wheel event
+        event.ignore()
 
 
-    def __edited(self, date_time):
-        self.file.focus_tag = self.logical_tag                              # File can then refocus after preparing metadata in screen
-        date_time_string = date_time.toString("yyyy:MM:dd hh:mm:ss")
-        self.file.file_metadata.set_logical_tag_values({self.logical_tag: date_time_string})
-        self.file.file_metadata.save()
-        self.setStyleSheet("color: black")
+    def readFromImage(self):
+        if FilePanel.file_metadata:
+            date_time = FilePanel.file_metadata.logical_tag_values.get(self.logical_tag)
+            self.clear()
+            self.setStyleSheet("color: #D3D3D3;")
+            if date_time != "":  # Data was found
+                date_time = date_time.replace(" ", ":")  # 2022/12/24 13:50:00 --> 2022/12/24:13:50:00
+                date_time = date_time.replace("/", ":")  # 2022/12/24:13:50:00 --> 2022:12:24:13:50:00
+                date_time_parts = date_time.split(":")   # 2022:12:24:13:50:00 --> ["2022", "12", "24", "13", "50", "00"]
+                while len(date_time_parts) < 6:
+                    date_time_parts.append("")
+                self.setDateTime(QDateTime(int(date_time_parts[0]), int(date_time_parts[1]), int(date_time_parts[2]),
+                                           int(date_time_parts[3]), int(date_time_parts[4]), int(date_time_parts[5])))
+                self.setStyleSheet("color: black")
+                if hasattr(self, 'auto_complete_list'):
+                    self.auto_complete_list.collectItem(date_time)    # Collect new entry in auto_complete_list
+
+
+    def __edited(self):
+        date_time_string = self.dateTime().toString("yyyy:MM:dd hh:mm:ss")
+        FilePanel.file_metadata.setLogicalTagValues({self.logical_tag: date_time_string})
         if hasattr(self, 'auto_complete_list'):
-            self.auto_complete_list.collect_item(date_time)    # Collect new entry in auto_complete_list
+            self.auto_complete_list.collectItem(self.dateTime())    # Collect new entry in auto_complete_list
+        self.setStyleSheet("color: black")
+        FilePanel.focus_tag=self.logical_tag
+
 
 
 
 class Date(QDateEdit):
-    def __init__(self,file,logical_tag):
-        self.file = file                                                  #Widget should remember who it serves
-        self.logical_tag = logical_tag                                    #Widget should remember who it serves
+    def __init__(self, logical_tag):
         super().__init__()
+        self.logical_tag = logical_tag                                    #Widget should remember who it serves
 
         self.setCalendarPopup(True)
+        self.setFixedWidth(250)
 
         #Get attributes of tag
-        self.tag_attributes = settings.logical_tag_attributes.get(self.logical_tag)
-        if self.tag_attributes.get("Autocomplete"):                         #Enable autocompletion
-            self.auto_complete_list = AutoCompleteList.get_instance(logical_tag)
+        tag_attributes = settings.logical_tag_attributes.get(self.logical_tag)
+        if tag_attributes.get("Autocomplete"):                         #Enable autocompletion
+            self.auto_complete_list = AutoCompleteList.getInstance(logical_tag)
             self.setCompleter(self.auto_complete_list)
             autocompleter_file = os.path.join(settings.app_data_location, "autocomplete_" + self.logical_tag +'.txt')
-            self.auto_complete_list.set_file_name(autocompleter_file)
+            self.auto_complete_list.setFileName(autocompleter_file)
 
-        self.__read_from_image()
-        self.dateChanged.connect(self.__edited)
+        self.readFromImage()
+        self.editingFinished.connect(self.__edited)
 
-    def __read_from_image(self):
-        date = self.file.file_metadata.logical_tag_values.get(self.logical_tag)
-        self.setDate(QDate(1752,1,1))
-        if date !="":
-            date = date.replace("/", ":")          # 2022/12/24 --> 2022:12:24
-            date_parts = date.split(":")           # 2022:12:24 --> ["2022", "12", "24"]
-            while len(date_parts) < 3:
-                date_parts.append("")
-            self.setDate(QDate(int(date_parts[0]), int(date_parts[1]), int(date_parts[2])))
-            if hasattr(self, 'auto_complete_list'):
-                self.auto_complete_list.collect_item(date)  # Collect new entry in auto_complete_list
+    def wheelEvent(self, event):
+        # Ignore the wheel event
+        event.ignore()
 
-    def __edited(self, date):
-        self.file.focus_tag = self.logical_tag                              # File can then refocus after preparing metadata in screen
-        date_string = date.toString("yyyy:MM:dd")
-        self.file.file_metadata.set_logical_tag_values({self.logical_tag: date_string})
-        self.file.file_metadata.save()
+    def readFromImage(self):
+        if FilePanel.file_metadata:
+            date = FilePanel.file_metadata.logical_tag_values.get(self.logical_tag)
+            self.setDate(QDate(1752,1,1))
+            if date !="":
+                date = date.replace("/", ":")          # 2022/12/24 --> 2022:12:24
+                date_parts = date.split(":")           # 2022:12:24 --> ["2022", "12", "24"]
+                while len(date_parts) < 3:
+                    date_parts.append("")
+                self.setDate(QDate(int(date_parts[0]), int(date_parts[1]), int(date_parts[2])))
+                if hasattr(self, 'auto_complete_list'):
+                    self.auto_complete_list.collectItem(date)  # Collect new entry in auto_complete_list
+
+    def __edited(self):
+        date_string = self.date().toString("yyyy:MM:dd")
+        FilePanel.file_metadata.setLogicalTagValues({self.logical_tag: date_string})
         if hasattr(self, 'auto_complete_list'):
-            self.auto_complete_list.collect_item(date)    # Collect new entry in auto_complete_list
+            self.auto_complete_list.collectItem(self.date())    # Collect new entry in auto_complete_list
+        FilePanel.focus_tag=self.logical_tag
+
 
 
 class TextSet(QWidget):
-    def __init__(self, file,logical_tag):
-        class TextList(QListWidget):
-            drag_drop_signal = pyqtSignal()
-            def __init__(self,text_set):
-                super().__init__()
-                self.text_set=text_set
 
-            def dropEvent(self, event):
-                super().dropEvent(event)
-                self.text_set.file.focus_tag = self.text_set.logical_tag  # File can then refocus after preparing metadata in screen
-                self.drag_drop_signal.emit()
-
-        self.file = file                                      # Widget should remember who it serves
-        self.logical_tag = logical_tag
-        self.tagList = TextList(self)
+    def __init__(self, logical_tag):
         super().__init__()
-        self.__initUI()
 
-        self.__read_from_image()
+        self.logical_tag = logical_tag  # Widget should remember who it serves
+        self.text_list = self.TextList()
+        self.text_list.setFixedWidth(300)
+
+        self.text_input = self.TextInput('Tast navn')
+        self.__initUI()
+        self.readFromImage()
 
     def __initUI(self):
-        # Prepare tagList
-        self.tagList.setSelectionMode(QAbstractItemView.ExtendedSelection)
-        self.tagList.setDragDropMode(QListWidget.InternalMove)
-
-        # Prepare tagInput with completer
-        self.tagInput = QLineEdit()
-
+        # Prepare text_input with completer
         # Get attributes of tag
-        self.tag_attributes = settings.logical_tag_attributes.get(self.logical_tag)
+        tag_attributes = settings.logical_tag_attributes.get(self.logical_tag)
         self.auto_complete_list = None
-        if self.tag_attributes.get("Autocomplete"):                         #Enable autocompletion
-            self.auto_complete_list = AutoCompleteList.get_instance(self.logical_tag)
-            self.tagInput.setCompleter(self.auto_complete_list)
-            QTimer.singleShot(0, self.tagInput.clear)
+        if tag_attributes.get("Autocomplete"):                         #Enable autocompletion
+            self.auto_complete_list = AutoCompleteList.getInstance(self.logical_tag)
+            self.text_input.setCompleter(self.auto_complete_list)
+            QTimer.singleShot(0, self.text_input.clear)
             autocompleter_file = os.path.join(settings.app_data_location, "autocomplete_" + self.logical_tag +'.txt')
-            self.auto_complete_list.set_file_name(autocompleter_file)
+            self.auto_complete_list.setFileName(autocompleter_file)
 
         # Set up layout
         layout = QVBoxLayout()
-        layout.addWidget(self.tagList)
-        layout.addWidget(self.tagInput)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.addWidget(self.text_list)
+        layout.addWidget(self.text_input)
+        layout.setSizeConstraint(QVBoxLayout.SetFixedSize)
         self.setLayout(layout)
 
         # Connect buttons to functions
-        self.tagInput.returnPressed.connect(self.__on_return_pressed)
-        self.tagList.drag_drop_signal.connect(self.__edited)
+        self.text_input.returnPressed.connect(self.__onReturnPressed)
+        self.text_list.edit_signal.connect(self.__edited)
         if self.auto_complete_list != None:
-            self.auto_complete_list.activated.connect(self.__on_completer_activated)
+           self.auto_complete_list.activated.connect(self.__onCompleterActivated)
 
-    def __on_return_pressed(self):
-        if self.auto_complete_list.currentCompletion():    # Return pressed in completer-list
-            pass  #Return pressed from completer
-        else:
-            self.__addTag()  #Return pressed from QLineEdit
-
-    def __on_completer_activated(self,text=''):
-        self.__addTag()
-
-    def keyPressEvent(self, event):
-        if event.key() == Qt.Key_Delete:
-            self.__removeTag()
-            print('Delete pressed')
-        else:
-            super().keyPressEvent(event)
-
-    def __read_from_image(self):
-        text_list = self.file.file_metadata.logical_tag_values.get(self.logical_tag)
-        if type(text_list) == str:
-            self.text_list = [text_list]
-        else:
-            self.text_list = text_list
-        if hasattr(self, 'auto_complete_list'):
-            self.auto_complete_list.collect_items(self.text_list)
-
-        for text in self.text_list:
-            self.tagList.addItem(text)
-
-    def __addTag(self,completer_text=''):
-        self.file.focus_tag = self.logical_tag+'.tagInput'                              # File can then refocus after preparing metadata in screen
-        text = self.tagInput.text()
-        if completer_text:                                  #Text selected from completer
-            if self.auto_complete_list.completionMode() == QCompleter.InlineCompletion:         #Enter-key
-                text = ''         #Enter-event already handled in text-line
-
-        QTimer.singleShot(0, self.tagInput.clear)
-        if text:
-            self.tagList.addItem(text)
+    def readFromImage(self):
+        if FilePanel.file_metadata:
+            tags = FilePanel.file_metadata.logical_tag_values.get(self.logical_tag)
+            if type(tags) == str:
+                tag_list = [tags]
+            else:
+                tag_list = tags
             if hasattr(self, 'auto_complete_list'):
-                self.auto_complete_list.collect_item(text)    # Collect new entry in auto_complete_list
-            self.__edited()
-
-    def __removeTag(self):
-        self.file.focus_tag = self.logical_tag                              # File can then refocus after preparing metadata in screen
-        items = self.tagList.selectedItems()
-        if items:
-            for item in items:
-                self.tagList.takeItem(self.tagList.row(item))
-            self.__edited()
+                self.auto_complete_list.collectItems(tag_list)
+            self.text_list.clear()
+            for tag in tag_list:
+                self.text_list.addItem(tag)
+            self.text_list.setFixedHeight(self.text_list.widgetHeight())  # Calculates needed height for the number of items
 
     def __edited(self):
         items = []
-        count = self.tagList.count()
+        count = self.text_list.count()
         for index in range(count):
-            item = self.tagList.item(index)
+            item = self.text_list.item(index)
             text = item.text()
             items.append(text)
-        self.file.file_metadata.set_logical_tag_values({self.logical_tag: items})
-        self.file.file_metadata.save()
+        FilePanel.file_metadata.setLogicalTagValues({self.logical_tag: items})
+        FilePanel.focus_tag=self.logical_tag
+
+    def __onReturnPressed(self):
+        if self.auto_complete_list.currentCompletion():  # Return pressed in completer-list
+            pass  # Return pressed from completer
+        else:
+            self.text_list.addTag(self.text_input.text())  # Return pressed from QLineEdit
+            self.auto_complete_list.collectItem(self.text_input.text())
+            self.text_input.clear()
+
+    def __onCompleterActivated(self, text):
+        self.text_list.addTag(text)
+        QTimer.singleShot(0, self.text_input.clear)
+
+    class TextList(QListWidget):
+        edit_signal = pyqtSignal()
+
+        def __init__(self,text_set=None):
+            super().__init__()
+            self.text_set=text_set    #Remember who you are serving
+            self.setSelectionMode(QAbstractItemView.ExtendedSelection)
+            self.setDragDropMode(QListWidget.InternalMove)
+
+        def dropEvent(self, event):
+            super().dropEvent(event)
+            self.edit_signal.emit()
+
+        def keyPressEvent(self, event):
+            super().keyPressEvent(event)
+            if event.key() == Qt.Key_Delete:
+                self.__removeTag()
+
+        def __removeTag(self):
+            items = self.selectedItems()
+            if items:
+                for item in items:
+                    self.takeItem(self.row(item))
+                self.edit_signal.emit()
+
+        def addTag(self,text):
+            self.addItem(text)
+            self.edit_signal.emit()
+
+        def widgetHeight(self):
+            item_height = self.sizeHintForRow(0)
+            num_items = self.count()
+            list_height = num_items * item_height + 60
+            return list_height
+
+    class TextInput(QLineEdit):
+        def __init__(self, text_set=None):
+            super().__init__()
+            self.text_set=text_set    #Remember who you are serving
+            self.setPlaceholderText('Tast navn')
+
+
 
 class InputFileNamePattern(QDialog):
     def __init__(self):
@@ -664,7 +751,7 @@ class InputFileNamePattern(QDialog):
         cancel_button.clicked.connect(self.reject)
         button_layout.addWidget(cancel_button)
 
-    def get_input(self):
+    def getInput(self):
         # Return the input values as a tuple
         return (self.prefix.text(), self.num_pattern.text(), self.suffix.text())
 
