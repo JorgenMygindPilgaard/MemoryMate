@@ -6,7 +6,7 @@ from PyQt5.QtCore import QObject,pyqtSignal
 class FileRenameError(Exception):
     pass
 
-def get_file_list(root_folder='',recursive=False, pattern='*.*'):
+def getFileList(root_folder='',recursive=False, pattern='*.*'):
     start_folder = root_folder.replace('/','\\')
     if type(pattern) == str:
         file_patterns = [pattern]
@@ -47,7 +47,7 @@ class FileRenamer(QObject):
         self.files=files
 
     @staticmethod
-    def get_instance(files=[]):
+    def getInstance(files=[]):
         if FileRenamer.__instance==None:
             FileRenamer.__instance=FileRenamer(files)
         elif files!=[]:

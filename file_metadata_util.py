@@ -14,39 +14,39 @@ class FileMetadata(QObject):
     exif_configuration = os.path.join(settings.app_data_location, 'exiftool.cfg')
     if not os.path.isfile(exif_configuration):
         exif_configuration=''
-    get_instance_active = False  # To be able to give error when instantiated directly, outside get_instance
+    getInstance_active = False  # To be able to give error when instantiated directly, outside getInstance
     instance_index = {}
     change_signal = pyqtSignal(str)
 
     def __init__(self, file_name=""):
         super().__init__()
-        # Check that instantiation is called from get_instance-method
-        if not FileMetadata.get_instance_active:
-            raise Exception('Please use get_instance method')
+        # Check that instantiation is called from getInstance-method
+        if not FileMetadata.getInstance_active:
+            raise Exception('Please use getInstance method')
         # Check existence of image_file. Raise exception if not existing
 
         # Set data for filename
         self.file_name = file_name
-        split_file_name = self.__get_splitted_file_name()     # ["c:\pictures\", "my_picture", "jpg"]
+        split_file_name = self.__getSplittedFileName()     # ["c:\pictures\", "my_picture", "jpg"]
         self.path = split_file_name[0]                        # "c:\pictures\"
         self.name_alone = split_file_name[1]                  # "my_picture"
         self.type = split_file_name[2]                        # "jpg"
 
         # Initialize data for logical tags
-        self.logical_tag_values = self.__get_logical_tag_values()
+        self.logical_tag_values = self.__getLogicalTagValues()
         self.saved_logical_tag_values = copy.deepcopy(self.logical_tag_values)
 
     @staticmethod
-    def get_instance(file_name):
+    def getInstance(file_name):
         file_metadata = FileMetadata.instance_index.get(file_name)
         if file_metadata is None:
-            FileMetadata.get_instance_active = True
+            FileMetadata.getInstance_active = True
             file_metadata = FileMetadata(file_name)
-            FileMetadata.get_instance_active = False
+            FileMetadata.getInstance_active = False
             FileMetadata.instance_index[file_name] = file_metadata  # Add new instance to instance-index
         return file_metadata
 
-    def __get_splitted_file_name(self):
+    def __getSplittedFileName(self):
         file_type = self.file_name.split(".")[-1]
         short_file_name = self.file_name.split("\\")[-1]   #Take last part of string splitted at ""
         short_file_name = short_file_name.split("/")[-1]    #Take last part of string splitted at "/"
@@ -54,7 +54,7 @@ class FileMetadata(QObject):
         file_path = rreplace(self.file_name,short_file_name,"")
         return [file_path, short_file_name_ex_type,file_type]
 
-    def __get_logical_tag_values(self):
+    def __getLogicalTagValues(self):
         #Get names of tags in tags for the filetype from settings
         logical_tags_tags = settings.file_type_tags.get(self.type.lower())  #Logical_tags for filetype with corresponding tags
         if logical_tags_tags is None:    # Filename blank or unknown filetype
@@ -67,7 +67,7 @@ class FileMetadata(QObject):
 
         # Now get values for these tags using exif-tool
         with ExifTool(executable=self.exif_executable,configuration=self.exif_configuration) as ex:
-            exif_data = ex.get_tags(self.file_name, tags)
+            exif_data = ex.getTags(self.file_name, tags)
         tag_values = {}
         for tag in tags:
             tag_value = exif_data[0].get(tag)
@@ -93,7 +93,7 @@ class FileMetadata(QObject):
                     break
         return logical_tag_values
 
-    def __update_reference_tags(self):
+    def __updateReferenceTags(self):
         first = True
         for logical_tag in settings.reference_tag_content:
             logical_tag_value = ''
@@ -129,7 +129,7 @@ class FileMetadata(QObject):
             self.logical_tag_values[logical_tag]=logical_tag_value
 
 
-    def set_logical_tag_values(self,logical_tag_values,overwrite=True):
+    def setLogicalTagValues(self,logical_tag_values,overwrite=True):
         for logical_tag in logical_tag_values:
             old_logical_tag_value = self.logical_tag_values.get(logical_tag)
             if old_logical_tag_value != logical_tag_values[logical_tag]:
@@ -147,7 +147,7 @@ class FileMetadata(QObject):
                                 self.logical_tag_values[logical_tag] = logical_tag_values[logical_tag]
 
     def save(self,force_rewrite=False):
-        self.__update_reference_tags()
+        self.__updateReferenceTags()
         if self.logical_tag_values != self.saved_logical_tag_values or force_rewrite:
             logical_tags_tags = settings.file_type_tags.get(self.type.lower())
             tag_values = {}
@@ -159,11 +159,11 @@ class FileMetadata(QObject):
                         tag_values[tag] = self.logical_tag_values[logical_tag]
             if tag_values != {} and tag_values != None:
                 with ExifTool(executable=self.exif_executable,configuration=self.exif_configuration) as ex:
-                    ex.set_tags(self.file_name,tag_values)
+                    ex.setTags(self.file_name,tag_values)
                 self.change_signal.emit(self.file_name)
 
     @staticmethod
-    def delete_instance(filename):     # reacts on change filename signal from
+    def deleteInstance(filename):     # reacts on change filename signal from
         instance = FileMetadata.instance_index.get(filename)
         if instance != None:
             del FileMetadata.instance_index[filename]
@@ -199,7 +199,7 @@ class StandardizeFilenames(QObject):
         file_name_pattern=[]
         for filetype in settings.file_types:
             file_name_pattern.append(filetype)
-        file_names=file_util.get_file_list(self.start_folder,True,file_name_pattern)
+        file_names=file_util.getFileList(self.start_folder,True,file_name_pattern)
 
         file_count=len(file_names)*2     # What takes time is 1. Read metadata for files, 2. Write original filename to metadata
 
@@ -208,7 +208,7 @@ class StandardizeFilenames(QObject):
         self.progress_init_signal.emit(file_count)
         for index, file_name in enumerate(file_names):
             self.progress_signal.emit(index+1)
-            file_metadata = FileMetadata.get_instance(file_name)
+            file_metadata = FileMetadata.getInstance(file_name)
             files.append({"file_name": file_name, "path": file_metadata.path, "name_alone": file_metadata.name_alone, "type": file_metadata.type, "date": file_metadata.logical_tag_values.get("date")})
 
         # Try find date on at least one of the files (Raw or jpg) and copy to the other
@@ -219,10 +219,10 @@ class StandardizeFilenames(QObject):
             if file.get('date') == '':   # Missing date
                 if file.get('name_alone') == previous_name_alone:
                     file['date'] = previous_date
-                    file_metadata = FileMetadata.get_instance(file.get('file_name'))
+                    file_metadata = FileMetadata.getInstance(file.get('file_name'))
                     # if previous_date !='':
                     #     logical_tags = {'date': previous_date}
-                    #     file_metadata.set_logical_tag_values(logical_tags)
+                    #     file_metadata.setLogicalTagValues(logical_tags)
                     #     file_metadata.save()
             previous_name_alone = file.get('name_alone')
             previous_date = file.get('date')
@@ -281,11 +281,11 @@ class StandardizeFilenames(QObject):
                 self.progress_signal.emit(index+1)
                 file_name = file.get('file_name')
                 if file_name != '' and file_name != None:
-                    file_metadata = FileMetadata.get_instance(file_name)
+                    file_metadata = FileMetadata.getInstance(file_name)
                     new_name_alone = file.get('new_name_alone')
                     if new_name_alone !='' and new_name_alone != None:
                         logical_tags = {'original_filename': new_name_alone}
-                        file_metadata.set_logical_tag_values(logical_tags)
+                        file_metadata.setLogicalTagValues(logical_tags)
                         file_metadata.save()
 
         # Rename files
@@ -296,7 +296,7 @@ class StandardizeFilenames(QObject):
             if new_file_name != file_name:
                 files_for_renaming.append({'old_name': file_name, 'new_name': new_file_name})
         if files_for_renaming != []:
-            renamer=file_util.FileRenamer.get_instance(files_for_renaming)
+            renamer=file_util.FileRenamer.getInstance(files_for_renaming)
             renamer.start()
         self.done_signal.emit()
 
@@ -315,19 +315,19 @@ class CopyLogicalTags(QObject):
             self.start()
 
     def start(self):
-        source_file = FileMetadata.get_instance(self.source_file_name)
+        source_file = FileMetadata.getInstance(self.source_file_name)
         target_file_count=len(self.target_file_names)
         self.progress_init_signal.emit(target_file_count)
         for index, target_file_name in enumerate(self.target_file_names):
             self.progress_signal.emit(index + 1)
-            target_file = FileMetadata.get_instance(target_file_name)
+            target_file = FileMetadata.getInstance(target_file_name)
             target_tag_values = {}
             for logical_tag in self.logical_tags:
                 source_tag_value = None
                 source_tag_value = source_file.logical_tag_values.get(logical_tag)
                 if source_tag_value != None:
                     target_tag_values[logical_tag] = source_tag_value
-            target_file.set_logical_tag_values(target_tag_values, self.overwrite)
+            target_file.setLogicalTagValues(target_tag_values, self.overwrite)
             target_file.save()
         self.done_signal.emit()
 
@@ -356,9 +356,9 @@ class ConsolidateMetadata(QObject):
         file_names = []
         if isinstance(self.target, list):
             for file_path in self.target:
-                file_names.extend(file_util.get_file_list(root_folder=file_path,recursive=True,pattern=file_name_pattern))
+                file_names.extend(file_util.getFileList(root_folder=file_path,recursive=True,pattern=file_name_pattern))
         else:
-            file_names.extend(file_util.get_file_list(root_folder=self.target, recursive=True, pattern=file_name_pattern))
+            file_names.extend(file_util.getFileList(root_folder=self.target, recursive=True, pattern=file_name_pattern))
         file_count = len(file_names)*2
 
         #Instanciate file metadata instances for all files
@@ -366,7 +366,7 @@ class ConsolidateMetadata(QObject):
         self.progress_init_signal.emit(file_count)
         for index, file_name in enumerate(file_names):
             self.progress_signal.emit(index+1)
-            file_metadata = FileMetadata.get_instance(file_name)
+            file_metadata = FileMetadata.getInstance(file_name)
             files.append({"file_name": file_name, "name_alone": file_metadata.name_alone})
 
         # Sync logical tags between files with same name (only filling gabs, no overwriting of logical tags)
@@ -382,7 +382,7 @@ class ConsolidateMetadata(QObject):
         for file in sorted_files:
             index+=1
             self.progress_signal.emit(index+1)
-            file_metadata = FileMetadata.get_instance(file.get('file_name'))
+            file_metadata = FileMetadata.getInstance(file.get('file_name'))
             file_metadata.save(force_rewrite=True)
         self.done_signal.emit()
 

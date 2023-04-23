@@ -64,7 +64,7 @@ class ExifTool(object):
             output += os.read(fd, 4096).decode('utf-8')
         return output[:-len(self.sentinel)]
 
-    def get_tags(self, filenames, tags=[]):           #Gets all metadata of files if tags is empty or not supplied
+    def getTags(self, filenames, tags=[]):           #Gets all metadata of files if tags is empty or not supplied
         args = []
         for tag in tags:
             if tag[0]!='-':
@@ -81,7 +81,7 @@ class ExifTool(object):
 
         return json.loads(self.execute(args))
 
-    def set_tags(self, filenames, tag_values={}):
+    def setTags(self, filenames, tag_values={}):
         if tag_values=={}:
             pass                                    #Quick return if no tags to set
         args = []

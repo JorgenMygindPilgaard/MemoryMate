@@ -29,8 +29,8 @@ class ProgressBarWidget(QWidget):
             self.show()
             self.thread = QThread()
             self.worker.moveToThread(self.thread)
-            self.worker.progress_init_signal.connect(self.init_progress)
-            self.worker.progress_signal.connect(self.update_progress)
+            self.worker.progress_init_signal.connect(self.initProgress)
+            self.worker.progress_signal.connect(self.updateProgress)
             self.worker.done_signal.connect(self.thread.quit)
             self.worker.done_signal.connect(self.worker.deleteLater)
             self.worker.done_signal.connect(self.close)
@@ -38,27 +38,29 @@ class ProgressBarWidget(QWidget):
             self.thread.finished.connect(self.thread.deleteLater)
             self.thread.start()
 
-    def update_progress(self, count):
+    def updateProgress(self, count):
         self.current_count = count
         self.left_count = self.end_count - self.current_count
         self.progress_bar.setValue(self.current_count)
         self.left_count = self.end_count - self.current_count
         self.progress_label.setText(str(self.left_count))
 
-    def init_progress(self, count):
+    def initProgress(self, count):
         self.end_count = count
         self.progress_bar.setRange(0, self.end_count)
 
 
 # Clear all content of layout and sublayouts and deletes widgets placed in layout
-def clearLayout(layout):
+def clearLayout(layout,delete_widgets=False):
+
     count = layout.count()
     for i in reversed(range(count)):
-        item = layout.itemAt(i)
-        if item != None:
-            if item.widget() != None:
-                item.widget().deleteLater()
-        layout.removeItem(item)
+        item = layout.takeAt(i)
+        if delete_widgets:
+            widget = item.widget()
+            if widget is not None:
+                widget.deleteLater()
+        del item
 
 class AutoCompleteList(QCompleter):
     get_instance_active = False  # To be able to give error when instantiated directly, outside get_instance
@@ -78,7 +80,7 @@ class AutoCompleteList(QCompleter):
         self.setModel(self.model)
 
     @staticmethod
-    def get_instance(list_name):
+    def getInstance(list_name):
         auto_complete_list = AutoCompleteList.instance_index.get(list_name)
         if auto_complete_list is None:
             AutoCompleteList.get_instance_active = True
@@ -112,14 +114,14 @@ class AutoCompleteList(QCompleter):
         # Rebuild the completer
         self.setModel(model)
 
-    def collect_item(self,list_item):
+    def collectItem(self,list_item):
         if not list_item in self.list:
             self.list.append(list_item)
             self.model.setStringList(self.list)
             if self.file_name != "":
-                self.__append_file([list_item])
+                self.__appendFile([list_item])
 
-    def collect_items(self,list_items=[]):
+    def collectItems(self,list_items=[]):
         appended_list_items = []
         for list_item in list_items:
             if not list_item in self.list:
@@ -129,30 +131,30 @@ class AutoCompleteList(QCompleter):
         if appended_list_items != []:
             self.model.setStringList(self.list)
             if self.file_name != None:
-                self.__append_file(appended_list_items)
+                self.__appendFile(appended_list_items)
 
-    def set_file_name(self,file_name):          # Optional to use. If set, file will be loaded at start, and kept updated
+    def setFileName(self,file_name):          # Optional to use. If set, file will be loaded at start, and kept updated
         if file_name != self.file_name:
             self.file_name = file_name
-            self.__prepare_file()      # Check that file exist. Create it, if no
+            self.__prepareFile()      # Check that file exist. Create it, if no
 
-    def __prepare_file(self):
+    def __prepareFile(self):
         if os.path.isfile(self.file_name):             #File exist. Merge current list with file list.
             list_in_memory = self.list
-            self.list = self.__load_from_file()
-            self.collect_items(list_in_memory)
+            self.list = self.__loadFromFile()
+            self.collectItems(list_in_memory)
             self.model.setStringList(self.list)
         else:                                          #File does not exist: Create it, and save list to it
             with open(self.file_name, "w") as outfile:
                 for list_item in self.list:
                     outfile.write(list_item + '\n')
 
-    def __append_file(self,list_items):
+    def __appendFile(self,list_items):
         with open(self.file_name, 'a') as outfile:
             for list_item in list_items:
                 outfile.write(list_item + '\n')
 
-    def __load_from_file(self):
+    def __loadFromFile(self):
         list = []
         with open(self.file_name, 'r') as infile:
             for list_item in infile:
