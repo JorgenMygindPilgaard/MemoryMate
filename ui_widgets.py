@@ -5,6 +5,7 @@ import settings
 from file_metadata_util import FileMetadata, StandardizeFilenames, CopyLogicalTags, ConsolidateMetadata
 from ui_util import ProgressBarWidget, AutoCompleteList, clearLayout
 import os
+from file_preview_util import FilePreview
 
 class FolderTree(QTreeView):
     def __init__(self,dir_path,file_list=None):
@@ -287,13 +288,14 @@ class FilePanel(QScrollArea):
         if FilePanel.file_name != None and FilePanel.file_name != '' and prepare_preview:
             clearLayout(FilePanel.main_layout)
 
-            pixmap = QPixmap(FilePanel.file_name)
-            pixmap_width=self.width()-60
-            pixmap_height = int(pixmap_width*9/16)
 
-            if pixmap.width() > 0 and pixmap.height() > 0:
-                pixmap = pixmap.scaled(pixmap_width, pixmap_height,Qt.KeepAspectRatio, Qt.SmoothTransformation)
-
+            # pixmap = QPixmap(FilePanel.file_name)
+            # pixmap_width=self.width()-60
+            # pixmap_height = int(pixmap_width*9/16)
+            #
+            # if pixmap.width() > 0 and pixmap.height() > 0:
+            #     pixmap = pixmap.scaled(pixmap_width, pixmap_height,Qt.KeepAspectRatio, Qt.SmoothTransformation)
+            pixmap = FilePreview.getInstance(FilePanel.file_name,self.width()-60).pixmap
             FilePanel.file_preview.setPixmap(pixmap)
             FilePanel.file_preview.setAlignment(Qt.AlignHCenter)
             FilePanel.main_layout.addWidget(FilePanel.file_preview)
