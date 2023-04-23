@@ -3,7 +3,7 @@ import os
 #
 # Make location for Application, if missing
 #
-app_data_location = os.path.join(os.environ.get("ProgramData"),"Metadata Editor")
+app_data_location = os.path.join(os.environ.get("ProgramData"),"Memory Mate")
 if not os.path.isdir(app_data_location):
     os.mkdir(app_data_location)
 
@@ -264,4 +264,30 @@ if not os.path.isfile(settings_path):
     with open(settings_path, "w") as outfile:
         outfile.write(settings_json_object)
 
+# Make exiftool.cfg file if it is missing
+exiftool_cfg_path = os.path.join(app_data_location,"exiftool.cfg")
+if not os.path.isfile(exiftool_cfg_path):
+    exiftool_cfg = ["# A new XMP-namespace (jmp_mde) is added to Main XMP-table:",
+                    "%Image::ExifTool::UserDefined = (",
+                    "    'Image::ExifTool::XMP::Main' => {",
+                    "        jmp_mde => {",
+                    "            SubDirectory => {",
+                    "                TagTable => 'Image::ExifTool::UserDefined::jmp_mde',",
+                    "            },",
+                    "        },",
+                    "    },",
+                    ");",
+                    "",
+                    "# New tags are added to XMP-jmp_mde namespace:",
+                    "%Image::ExifTool::UserDefined::jmp_mde = (",
+                    "    GROUPS => { 0 => 'XMP', 1 => 'XMP-jmp_mde', 2 => 'Image' },",
+                    "    NAMESPACE => { 'jmp_mde' => 'https://jorgenpilgaard.dk/namespace/jmp_mde/' },",
+                    "    WRITABLE => 'string', # (default to string-type tags)",
+                    "    DescriptionOnly => { Writable => 'lang-alt' },",
+                    "    #AnotherTag => { Writable => 'lang-alt' },",
+                    ");"]
 
+    with open(exiftool_cfg_path, "w") as outfile:
+        # Loop through the list and write each string to a new line in the file
+        for item in exiftool_cfg:
+            outfile.write(item + "\n")
