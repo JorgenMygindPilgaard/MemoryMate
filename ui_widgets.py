@@ -3,7 +3,7 @@ from PyQt5.QtCore import Qt, QDir, QDateTime, QDate, QModelIndex,QTimer, pyqtSig
 from PyQt5.QtGui import QPixmap,QFontMetrics
 import settings
 from file_metadata_util import FileMetadata, StandardizeFilenames, CopyLogicalTags, ConsolidateMetadata
-from ui_util import ProgressBarWidget, AutoCompleteList, clearLayout
+from ui_util import ProgressBarWidget, AutoCompleteList
 import os
 from file_preview_util import FilePreview
 
@@ -268,12 +268,12 @@ class FilePanel(QScrollArea):
             FilePanel.file_metadata.save()
         if FilePanel.__instance==None:
             FilePanel.__instance=FilePanel()
-            FilePanel.__initializeWidgets()
         FilePanel.file_name=file_name
         FilePanel.file_metadata=FileMetadata.getInstance(file_name)
         FilePanel.file_metadata.change_signal.connect(FilePanel.metadataChanged)    # If a copy-process changes file
         FilePanel.__instance.prepareFilePanel()
         return FilePanel.__instance
+
     @staticmethod
     def saveMetadata():
         if FilePanel.file_metadata != None and FilePanel.file_name !='':
@@ -282,19 +282,12 @@ class FilePanel(QScrollArea):
     def prepareFilePanel(self,prepare_preview=True):       # Happens each time a new filename is assigned
         scroll_position = FilePanel.__instance.verticalScrollBar().value()    # Remember scroll-position
         self.takeWidget()
-        clearLayout(FilePanel.metadata_layout)
+
+        if FilePanel.file_name != None and FilePanel.file_name != '':
+            FilePanel.__initializeWidgets()
 
         # Prepare file-preview widget
         if FilePanel.file_name != None and FilePanel.file_name != '' and prepare_preview:
-            clearLayout(FilePanel.main_layout)
-
-
-            # pixmap = QPixmap(FilePanel.file_name)
-            # pixmap_width=self.width()-60
-            # pixmap_height = int(pixmap_width*9/16)
-            #
-            # if pixmap.width() > 0 and pixmap.height() > 0:
-            #     pixmap = pixmap.scaled(pixmap_width, pixmap_height,Qt.KeepAspectRatio, Qt.SmoothTransformation)
             pixmap = FilePreview.getInstance(FilePanel.file_name,self.width()-60).pixmap
             FilePanel.file_preview.setPixmap(pixmap)
             FilePanel.file_preview.setAlignment(Qt.AlignHCenter)
