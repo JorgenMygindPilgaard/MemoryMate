@@ -32,7 +32,8 @@ In settings.json, logical tags are mapped to one or more physical image-tags per
             ],
             "date": [
                 "XMP:Date"
-```...........
+               
+```
                
 ### Functionalities
 #### Edit Logical Tags
@@ -41,3 +42,54 @@ Just select a file and start typing. The data is saved when you navigate away fr
 Do you have images with Title, description etc. not written to all logical tags. No problem. Right-click the selected file/files/filder/folders and select "Consolidate metadata. The program will then make sure to "spread" the logical tags to all corresponding logical tags. It will also find files with same filename (e.g my_file,jpg and my_file.cr2 or my_file.jpg in folder and subfolder) and and synchronize logical and physical tags across files, filling gaps.
 #### Copy metadata
 Right-click source-image and select "Copy Metadata". Then select target file/files/filder/folders, right-click, tick the tags you want to paste (take care not pasting all tags. Can't be regretted), and select "Paste Metadata".
+#### Reference tags
+The *Full description* logical tag is a special type of tag called a reference-tag in the application. The reference tag is *always* a read-only tag on the screen, but it is still mapped to one or more physical tags, just like the normal logical tags.
+The content of a reference tag is defined in the settings.json file. You can configure the reference tag to one or more of the following components:
+* A logical tag with label
+* A logical tag without label
+* A fixed text (can be an empty string, if you need a blank line)
+
+Here you see the configuration of content for the *Full description* reference tag:
+```json
+    "reference_tag_content": {
+        "description": [
+            {
+                "type": "tag",
+                "tag_name": "title",
+                "tag_label": false
+            },
+            {
+                "type": "tag",
+                "tag_name": "description_only",
+                "tag_label": false
+            },
+            {
+                "type": "text_line",
+                "text": ""
+            },
+            {
+                "type": "tag",
+                "tag_name": "persons",
+                "tag_label": true
+            },
+            {
+                "type": "tag",
+                "tag_name": "source",
+                "tag_label": true
+            },
+            {
+                "type": "tag",
+                "tag_name": "photographer",
+                "tag_label": true
+            },
+            {
+                "type": "tag",
+                "tag_name": "original_filename",
+                "tag_label": true
+            }
+        ]
+    },
+```
+
+
+In the default settings, *all* other logical tags are referenced in the *Full Description*. The *Full Description* reference tag is saved commenly used physical tags for image-description, as you can see in settings.json, so that you will be sure to be able to see all information, also in programs only capable of showing one of the physical tags for description.
