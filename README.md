@@ -34,7 +34,7 @@ In settings.json, logical tags are mapped to one or more physical image-tags per
                
 ### Functionalities
 #### Edit Logical Tags
-Just select a file and start typing. The data is saved whe you navigate away from image or close application,
+Just select a file and start typing. The data is saved when you navigate away from image or close application,
 #### Consolidate metadata
 Do you have images with Title, description etc. not written to all logical tags. No problem. Right-click the selected file/files/filder/folders and select "Consolidate metadata. The program will then make sure to "spread" the logical tags to all corresponding logical tags. It will also find files with same filename (e.g my_file,jpg and my_file.cr2 or my_file.jpg in folder and subfolder) and and synchronize logical and physical tags across files, filling gaps.
 #### Copy metadata
