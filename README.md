@@ -7,6 +7,11 @@ Greetings from passed times. I want to put these greetings on "the back" of our 
 ## How does it look
 
 ![The UI is kept simple...](MemoryMateUI.jpg)
+## Installation
+### Installation package
+The easiest way to get the application running on your computer is to use the installation-package......will follow later....
+### Source-code
+You can use the souce-code from repsitory freely, suggest changes etc. the source code is built using 
 
 ## How does it work
 The application wrappes the amazing [ExifTool by Phil Harvey. ](https://exiftool.org/)
