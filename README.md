@@ -8,3 +8,17 @@ Greatings from passed times. I want to put these greetings on "the back" of our 
 
 ![The UI is kept simple...](MemoryMateUI.jpg)
 
+## How does it work
+The application wrappes the amazing [ExifTool by Phil Harvey](https://exiftool.org/)
+The application works with *logical tags*. The defaults are:
+* Tille
+* Date
+* Description
+* People
+* Photographer
+* Source
+* Original Filename
+* Full Description
+
+First time program launches, it generates a settings.json file in \ProgramData\Memeory Mate folder on your computer. Future launches, the program will use settings.json file. You can create a new logical tags in the settings.json, if you would like the program to have more tags in addition to the defaults.
+In settings.json, logical tags are mapped to one or more physical image-tags per image/video file type. 
