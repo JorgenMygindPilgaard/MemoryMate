@@ -41,7 +41,7 @@ def getFileList(root_folder='',recursive=False, pattern='*.*'):
 class FileRenamer(QObject):
     __instance = None
     filename_changed_signal = pyqtSignal(str, str)
-
+# En rettelse
     def __init__(self, files=[]):
         super().__init__()
         self.files=files
