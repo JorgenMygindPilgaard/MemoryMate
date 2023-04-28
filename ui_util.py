@@ -49,19 +49,6 @@ class ProgressBarWidget(QWidget):
         self.end_count = count
         self.progress_bar.setRange(0, self.end_count)
 
-
-# Clear all content of layout and sublayouts and deletes widgets placed in layout
-def clearLayout(layout,delete_widgets=False):
-
-    count = layout.count()
-    for i in reversed(range(count)):
-        item = layout.takeAt(i)
-        if delete_widgets:
-            widget = item.widget()
-            if widget is not None:
-                widget.deleteLater()
-        del item
-
 class AutoCompleteList(QCompleter):
     get_instance_active = False  # To be able to give error when instantiated directly, outside get_instance
     instance_index = {}
