@@ -6,5 +6,5 @@ Greatings from passed times. I want to put these greetings on "the back" of our 
 
 ## How does it look
 
-![The UI is kept simple...](/Memory Mate UI.jpg)
+![The UI is kept simple...](MemoryMateUI.jpg)
 
