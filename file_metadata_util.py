@@ -88,6 +88,8 @@ class FileMetadata(QObject):
 
             for tag in logical_tag_tags:
                 tag_value = tag_values.get(tag)
+                if logical_tag_type != 'text_set' and isinstance(tag_value, list):     #E.g. Author contains multiple entries. Concatenate ti a string then
+                    tag_value = ', '.join(tag_value)
                 if tag_value != None and tag_value != "":
                     logical_tag_values[logical_tag] = tag_value
                     break
@@ -152,11 +154,14 @@ class FileMetadata(QObject):
             logical_tags_tags = settings.file_type_tags.get(self.type.lower())
             tag_values = {}
             for logical_tag in self.logical_tag_values:
+                logical_tag_type = settings.logical_tags.get(logical_tag)
                 if self.logical_tag_values[logical_tag] != self.saved_logical_tag_values.get(logical_tag) or force_rewrite:   #New value to be saved
                     self.saved_logical_tag_values[logical_tag] = self.logical_tag_values[logical_tag]
                     tags = logical_tags_tags.get(logical_tag)    #All physical tags for logical tag"
                     for tag in tags:
-                        tag_values[tag] = self.logical_tag_values[logical_tag]
+                        tag_value = self.logical_tag_values[logical_tag]
+                        tag_values[tag] = tag_value
+
             if tag_values != {} and tag_values != None:
                 with ExifTool(executable=self.exif_executable,configuration=self.exif_configuration) as ex:
                     ex.setTags(self.file_name,tag_values)

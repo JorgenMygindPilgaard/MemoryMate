@@ -2,6 +2,7 @@ import subprocess
 import os
 import json
 import locale
+import unicodedata
 import settings
 
 class ExifTool(object):
@@ -55,8 +56,17 @@ class ExifTool(object):
         args.append('-overwrite_original')
         args.append("-execute\n")
         args_tuple = tuple(args)
-        test_str = str.join("\n", args_tuple )
-        self.process.stdin.write(str.join("\n", args_tuple))
+        file_args = str.join("\n", args_tuple)
+
+        #---------------------------------------------------
+        # This will remove combining "ring above a" characters with pre-composed å character in UTF.
+        # Python translates to system-encoding (CP1252) before passing string to system. Python can't
+        # translate the combining characters to system-encoding (CP1252). It needs to be normalized.
+        # All combined characters will be replaced with pre-composed characters that can be translated.
+        file_args = unicodedata.normalize("NFC", file_args)
+        #-----------------------------------------------------
+
+        self.process.stdin.write(file_args)
         self.process.stdin.flush()
         output = ""
         fd = self.process.stdout.fileno()
