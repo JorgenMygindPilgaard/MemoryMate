@@ -22,6 +22,7 @@ The application works with *logical tags*. These are tags that only the applicat
 
 First time program launches, it generates a settings.json file in "\Windows\ProgramData\Memeory Mate"-folder on your computer. At future launches, the program will use settings.json file. You can add or remove logical tags in the settings.json, if you would like the program to work with other logical tags that the defaults.
 In settings.json, logical tags are mapped to one or more physical image-tags per image/video file type. Here is a snipit from the settings.json showing in which physical tags the program stores the Title:
+```json
     "file_type_tags": {
         "jpg": {
             "title": [
@@ -30,7 +31,8 @@ In settings.json, logical tags are mapped to one or more physical image-tags per
                 "IPTC:ObjectName"
             ],
             "date": [
-                "XMP:Date",...........
+                "XMP:Date"
+```...........
                
 ### Functionalities
 #### Edit Logical Tags
