@@ -27,7 +27,7 @@ class FileMetadata(QObject):
 
         # Set data for filename
         self.file_name = file_name
-        split_file_name = self.__getSplittedFileName()     # ["c:\pictures\", "my_picture", "jpg"]
+        split_file_name = file_util.splitFileName(file_name)  # ["c:\pictures\", "my_picture", "jpg"]
         self.path = split_file_name[0]                        # "c:\pictures\"
         self.name_alone = split_file_name[1]                  # "my_picture"
         self.type = split_file_name[2]                        # "jpg"
@@ -45,14 +45,6 @@ class FileMetadata(QObject):
             FileMetadata.getInstance_active = False
             FileMetadata.instance_index[file_name] = file_metadata  # Add new instance to instance-index
         return file_metadata
-
-    def __getSplittedFileName(self):
-        file_type = self.file_name.split(".")[-1]
-        short_file_name = self.file_name.split("\\")[-1]   #Take last part of string splitted at ""
-        short_file_name = short_file_name.split("/")[-1]    #Take last part of string splitted at "/"
-        short_file_name_ex_type = rreplace(short_file_name,"."+file_type,"") #Remove .jpg
-        file_path = rreplace(self.file_name,short_file_name,"")
-        return [file_path, short_file_name_ex_type,file_type]
 
     def __getLogicalTagValues(self):
         #Get names of tags in tags for the filetype from settings
@@ -190,9 +182,9 @@ class StandardizeFilenames(QObject):
     progress_signal = pyqtSignal(int)    # Sends number of processed records
     done_signal = pyqtSignal()
 
-    def __init__(self,start_folder, prefix='', number_pattern='nnn', suffix='',await_start_signal=False):
+    def __init__(self,target, prefix='', number_pattern='nnn', suffix='',await_start_signal=False):
         super().__init__()
-        self.start_folder=start_folder
+        self.target=target
         self.prefix=prefix
         self.number_pattern=number_pattern
         self.suffix=suffix
@@ -204,14 +196,20 @@ class StandardizeFilenames(QObject):
         file_name_pattern=[]
         for filetype in settings.file_types:
             file_name_pattern.append(filetype)
-        file_names=file_util.getFileList(self.start_folder,True,file_name_pattern)
 
-        file_count=len(file_names)*2     # What takes time is 1. Read metadata for files, 2. Write original filename to metadata
+        self.target_file_names = []
+        if isinstance(self.target, list):
+            for file_path in self.target:
+                self.target_file_names.extend(file_util.getFileList(root_folder=file_path,recursive=True,pattern=file_name_pattern))
+        else:
+            self.target_file_names.extend(file_util.getFileList(root_folder=self.target, recursive=True, pattern=file_name_pattern))
+
+        file_count=len(self.target_file_names)*2     # What takes time is 1. Read metadata for files, 2. Write original filename to metadata
 
         #Instanciate file metadata instances for all files
         files = []
         self.progress_init_signal.emit(file_count)
-        for index, file_name in enumerate(file_names):
+        for index, file_name in enumerate(self.target_file_names):
             self.progress_signal.emit(index+1)
             file_metadata = FileMetadata.getInstance(file_name)
             files.append({"file_name": file_name, "path": file_metadata.path, "name_alone": file_metadata.name_alone, "type": file_metadata.type, "date": file_metadata.logical_tag_values.get("date")})
@@ -310,22 +308,50 @@ class CopyLogicalTags(QObject):
     progress_signal = pyqtSignal(int)    # Sends number of processed records
     done_signal = pyqtSignal()
 
-    def __init__(self, source_file_name, target_file_names, logical_tags, overwrite=True, await_start_signal=False):
+    def __init__(self, source, target, logical_tags, match_file_name=False, overwrite=True, await_start_signal=False):
         super().__init__()
-        self.source_file_name=source_file_name
-        self.target_file_names=target_file_names
+
+#       Source and target converted to list of files
+        file_name_pattern=[]
+        for filetype in settings.file_types:
+            file_name_pattern.append(filetype)
+        self.source_file_names = []
+        if isinstance(source, list):
+            for file_path in source:
+                self.source_file_names.extend(file_util.getFileList(root_folder=file_path,recursive=True,pattern=file_name_pattern))
+        else:
+            self.source_file_names.extend(file_util.getFileList(root_folder=self.target, recursive=True, pattern=file_name_pattern))
+
+        self.target_file_names = []
+        if isinstance(target, list):
+            for file_path in target:
+                self.target_file_names.extend(file_util.getFileList(root_folder=file_path,recursive=True,pattern=file_name_pattern))
+        else:
+            self.target_file_names.extend(file_util.getFileList(root_folder=self.target, recursive=True, pattern=file_name_pattern))
+
         self.logical_tags=logical_tags
-        self.overwrite=overwrite
+        self.overwrite = overwrite
+        self.match_file_name = match_file_name
         if not await_start_signal:
             self.start()
 
     def start(self):
-        source_file = FileMetadata.getInstance(self.source_file_name)
-        target_file_count=len(self.target_file_names)
-        self.progress_init_signal.emit(target_file_count)
-        for index, target_file_name in enumerate(self.target_file_names):
+        if len(self.source_file_names)>1 and not self.match_file_name:   # Not possible to copy from many files to many files
+            return
+        # Find all source - targety combinations to copy
+        source_targets=[]
+        for source_file_name in self.source_file_names:
+            for target_file_name in self.target_file_names:
+                if self.match_file_name and file_util.splitFileName(target_file_name)[1] != file_util.splitFileName(source_file_name)[1]:
+                    continue
+                source_targets.append([source_file_name,target_file_name])
+        copy_file_count=len(source_targets)
+        self.progress_init_signal.emit(copy_file_count)
+
+        for index, source_target in enumerate(source_targets):
+            source_file = FileMetadata.getInstance(source_target[0])
+            target_file = FileMetadata.getInstance(source_target[1])
             self.progress_signal.emit(index + 1)
-            target_file = FileMetadata.getInstance(target_file_name)
             target_tag_values = {}
             for logical_tag in self.logical_tags:
                 source_tag_value = None
@@ -337,14 +363,10 @@ class CopyLogicalTags(QObject):
         self.done_signal.emit()
 
 class ConsolidateMetadata(QObject):
-    # This class scans the files start-folder(s) deep, and reads logical tags for all files.
-    # The logical tags in twin-files (e.g. raw and jpg-file with same name) are spread to both files (filling gaps,
-    # but not overwriting existing logical tags).
-    # As the last thing, the logical tags are re-written to the files. This ensures that the logical tags are written
-    # to all the corresponding physical tags in the file
+# This class force-saves logical tags to all physical tags in files
 
     progress_init_signal = pyqtSignal(int)       # Sends number of entries to be processed
-    progress_signal = pyqtSignal(int)    # Sends number of processed records
+    progress_signal = pyqtSignal(int)            # Sends number of processed records
     done_signal = pyqtSignal()
 
     def __init__(self,target, await_start_signal=False):
@@ -364,32 +386,40 @@ class ConsolidateMetadata(QObject):
                 file_names.extend(file_util.getFileList(root_folder=file_path,recursive=True,pattern=file_name_pattern))
         else:
             file_names.extend(file_util.getFileList(root_folder=self.target, recursive=True, pattern=file_name_pattern))
-        file_count = len(file_names)*2
-
-        #Instanciate file metadata instances for all files
-        files = []
+        file_count = len(file_names)
         self.progress_init_signal.emit(file_count)
-        for index, file_name in enumerate(file_names):
-            self.progress_signal.emit(index+1)
-            file_metadata = FileMetadata.getInstance(file_name)
-            files.append({"file_name": file_name, "name_alone": file_metadata.name_alone})
 
-        # Sync logical tags between files with same name (only filling gabs, no overwriting of logical tags)
-        sorted_files = sorted(files, key=lambda x: (x['name_alone']))
-        previous_file = {'name_alone': ''}
-        for file in sorted_files:
-            if previous_file.get('name_alone') == file.get('name_alone'):
-                CopyLogicalTags(previous_file.get('file_name'),[file.get('file_name')], list(settings.logical_tags.keys()),overwrite=False)
-                CopyLogicalTags(file.get('file_name'), [previous_file.get('file_name')],list(settings.logical_tags.keys()),overwrite=False)
-            previous_file = file
-
-        # Consolidate metadata by force-saving logical tags to all places in metadata:
-        for file in sorted_files:
-            index+=1
+        # Consolidate file metadata force-saving
+        for index, file in enumerate(file_names):
             self.progress_signal.emit(index+1)
-            file_metadata = FileMetadata.getInstance(file.get('file_name'))
+            file_metadata = FileMetadata.getInstance(file)
             file_metadata.save(force_rewrite=True)
         self.done_signal.emit()
+
+
+        # files = []
+        # self.progress_init_signal.emit(file_count)
+        # for index, file_name in enumerate(file_names):
+        #     self.progress_signal.emit(index+1)
+        #     file_metadata = FileMetadata.getInstance(file_name)
+        #     files.append({"file_name": file_name, "name_alone": file_metadata.name_alone})
+        #
+        # # Sync logical tags between files with same name (only filling gabs, no overwriting of logical tags)
+        # sorted_files = sorted(files, key=lambda x: (x['name_alone']))
+        # previous_file = {'name_alone': ''}
+        # for file in sorted_files:
+        #     if previous_file.get('name_alone') == file.get('name_alone'):
+        #         CopyLogicalTags(previous_file.get('file_name'),[file.get('file_name')], list(settings.logical_tags.keys()),overwrite=False)
+        #         CopyLogicalTags(file.get('file_name'), [previous_file.get('file_name')],list(settings.logical_tags.keys()),overwrite=False)
+        #     previous_file = file
+        #
+        # # Consolidate metadata by force-saving logical tags to all places in metadata:
+        # for file in sorted_files:
+        #     index+=1
+        #     self.progress_signal.emit(index+1)
+        #     file_metadata = FileMetadata.getInstance(file.get('file_name'))
+        #     file_metadata.save(force_rewrite=True)
+        # self.done_signal.emit()
 
 
 

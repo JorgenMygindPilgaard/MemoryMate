@@ -15,62 +15,9 @@ class FolderTree(QTreeView):
         self.setModel(self.model)
         self.setRootPath(dir_path)
         self.file_list=file_list
-        self.setSelectionMode(QAbstractItemView.ExtendedSelection)
-        self.setSelectionBehavior(QAbstractItemView.SelectItems)
 
-#        self.selectionModel().SelectCurrent
         for column_index in range(1,self.model.columnCount()):
             self.hideColumn(column_index)
-
-        # Prepare context menu
-        self.setContextMenuPolicy(Qt.CustomContextMenu)
-        self.customContextMenuRequested.connect(self.openMenu)
-
-    def createMenu(self, position):
-        # Create the context menu
-        self.menu = QMenu()
-
-        # Add actions to the menu
-        action_texts = settings.folder_context_menu_actions.get("standardize_filenames")  # All language descriptions of action
-        action_text  = action_texts.get(settings.language)
-        self.standardize_filenames = self.menu.addAction(action_text)
-
-        action_texts = settings.folder_context_menu_actions.get("consolidate_metadata")  # All language descriptions of action
-        action_text = action_texts.get(settings.language)
-        self.consolidate_metadata = self.menu.addAction(action_text)
-
-    def openMenu(self, position):
-        if not hasattr(self,'menu'):    # First time clicked: Create context-menu
-            self.createMenu(position)
-        if self.menu == None:
-            self.createMenu(position)
-
-        action = self.menu.exec_(self.viewport().mapToGlobal(position))
-
-        if action == self.standardize_filenames:
-            index = self.indexAt(position)  # Get index in FilePanel-list
-            if index.isValid():
-                start_folder_name = self.model.filePath(index)
-                file_name_pattern_dialog = InputFileNamePattern()
-                result = file_name_pattern_dialog.exec_()
-                if result == QDialog.Accepted:
-                    # Get the input values
-                    file_name_pattern = file_name_pattern_dialog.getInput()
-                    prefix, num_pattern, suffix = file_name_pattern
-
-                    # Rename all files in folders and subfolders
-                    self.file_list.unselectAll()
-                    self.standardizer=StandardizeFilenames(start_folder_name,prefix,num_pattern,suffix,await_start_signal=True)  # worker-instance
-                    self.progress_bar=ProgressBarWidget('Standardize',self.standardizer)   # Progress-bar will start worker
-
-        elif action == self.consolidate_metadata:
-            index = self.indexAt(position)  # Get index in File-list
-            if index.isValid():
-                start_folder_names = []
-                for index in self.selectedIndexes():
-                    start_folder_names.append(self.model.filePath(index))
-                self.consolidator=ConsolidateMetadata(target=start_folder_names, await_start_signal=True)
-                self.progress_bar=ProgressBarWidget('Consolidate',self.consolidator)   # Progress-bar will start worker
 
     def setRootPath(self, dir_path):
         self.model.setRootPath(dir_path)
@@ -93,7 +40,8 @@ class FileList(QTreeView):
 
         # Only show image- and video-files
         self.model = QFileSystemModel()
-        self.model.setFilter(QDir.NoDotAndDotDot | QDir.Files )
+        self.model.setFilter(QDir.NoDotAndDotDot | QDir.AllDirs | QDir.Files )
+
         self.setModel(self.model)
         self.__setFiletypeFilter(settings.file_types)
         self.hideFilteredFiles()    #Default is to hide filetered files. They can also be shown dimmed
@@ -103,9 +51,6 @@ class FileList(QTreeView):
         self.setColumnWidth(0,260)    #Filename
         self.setColumnWidth(1,80)    #Filesize
         self.setColumnWidth(2,150)    #Date modified
-
-
-
 
 
         column_count = self.model.columnCount()
@@ -123,14 +68,17 @@ class FileList(QTreeView):
         self.customContextMenuRequested.connect(self.openMenu)
 
     def createMenu(self, position):
-        # Create the context menu
+
         self.menu = QMenu()
-
-
+      
         # Add actions to the menu
         action_texts = settings.file_context_menu_actions.get("consolidate_metadata")  # All language descriptions of action
         action_text = action_texts.get(settings.language)
         self.consolidate_metadata = self.menu.addAction(action_text)
+
+        action_texts = settings.folder_context_menu_actions.get("standardize_filenames")  # All language descriptions of action
+        action_text  = action_texts.get(settings.language)
+        self.standardize_filenames = self.menu.addAction(action_text)
 
         action_texts = settings.file_context_menu_actions.get("copy_metadata")  # All language descriptions of action
         action_text  = action_texts.get(settings.language)
@@ -139,6 +87,18 @@ class FileList(QTreeView):
         action_texts = settings.file_context_menu_actions.get("paste_metadata")  # All language descriptions of action
         action_text  = action_texts.get(settings.language)
         self.paste_metadata = self.menu.addAction(action_text)
+
+        action_texts = settings.file_context_menu_actions.get("patch_metadata")  # All language descriptions of action
+        action_text  = action_texts.get(settings.language)
+        self.patch_metadata = self.menu.addAction(action_text)
+
+        action_texts = settings.file_context_menu_actions.get("paste_by_filename")  # All language descriptions of action
+        action_text  = action_texts.get(settings.language)
+        self.paste_by_filename = self.menu.addAction(action_text)
+
+        action_texts = settings.file_context_menu_actions.get("patch_by_filename")  # All language descriptions of action
+        action_text  = action_texts.get(settings.language)
+        self.patch_by_filename = self.menu.addAction(action_text)
 
         self.menu.addSeparator()
         action_texts = settings.file_context_menu_actions.get("choose_tags_to_paste")  # All language descriptions of action
@@ -149,6 +109,8 @@ class FileList(QTreeView):
         # Ad checkable actions for each logical tag
         self.logical_tag_actions = {}
         for logical_tag in settings.logical_tags:
+            if settings.logical_tags.get(logical_tag)=='reference_tag':    #Can't copy-paste a reference tag. It is derrived from the other tags
+                continue
             tag_labels = settings.logical_tag_descriptions.get(logical_tag)  # All language descriptions of tag
             tag_label = tag_labels.get(settings.language)  # User-language description of tag
             tag_action = QAction(tag_label, self, checkable=True)
@@ -159,54 +121,154 @@ class FileList(QTreeView):
             tag_action.triggered.connect(self.toggleAction)
 
     def openMenu(self, position):
-        if not hasattr(self,'menu'):    # First time clicked: Create context-menu
-            self.createMenu(position)
-        if self.menu == None:
+        if not hasattr(self, 'menu'):
             self.createMenu(position)
 
+        if not hasattr(self, 'source'):
+            self.source=[]
+            self.source_is_single_file=False
+
+        if self.source_is_single_file:
+            self.paste_metadata.setEnabled(True)
+            self.patch_metadata.setEnabled(True)
+            self.paste_by_filename.setEnabled(True)
+            self.patch_by_filename.setEnabled(True)
+        elif len(self.source) >= 1:
+            self.paste_metadata.setEnabled(False)
+            self.patch_metadata.setEnabled(False)
+            self.paste_by_filename.setEnabled(True)
+            self.patch_by_filename.setEnabled(True)
+        else:
+            self.paste_metadata.setEnabled(False)
+            self.patch_metadata.setEnabled(False)
+            self.paste_by_filename.setEnabled(False)
+            self.patch_by_filename.setEnabled(False)
+
         action = self.menu.exec_(self.viewport().mapToGlobal(position))
+
         if action == self.consolidate_metadata:
             index = self.indexAt(position)  # Get index in File-list
             if index.isValid():
-                file_names = []
+                target = []
                 for index in self.selectedIndexes():
-                    file_names.append(self.model.filePath(index))
-                self.consolidator = ConsolidateMetadata(file_names)
+                    target.append(self.model.filePath(index))   #Can be both files and folders
+                self.consolidator = ConsolidateMetadata(target,await_start_signal=True)
                 self.progress_bar = ProgressBarWidget('Consolidate', self.consolidator)  # Progress-bar will start worker
 
-                for file_name in file_names:
-                    ConsolidateMetadata(file_name)
+        if action == self.standardize_filenames:
+            index = self.indexAt(position)  # Get index in File-list
+            if index.isValid():
+                target = []
+                for index in self.selectedIndexes():
+                    target.append(self.model.filePath(index))   #Can be both files and folders
+                file_name_pattern_dialog = InputFileNamePattern()
+                result = file_name_pattern_dialog.exec_()
+                if result == QDialog.Accepted:
+                    # Get the input values
+                    file_name_pattern = file_name_pattern_dialog.getInput()
+                    prefix, num_pattern, suffix = file_name_pattern
 
+                    # Rename all files in folders and subfolders
+                    self.unselectAll()
+                    self.standardizer=StandardizeFilenames(target,prefix,num_pattern,suffix,await_start_signal=True)  # worker-instance
+                    self.progress_bar=ProgressBarWidget('Standardize',self.standardizer)   # Progress-bar will start worker
 
         elif action == self.copy_metadata:
+            self.source_is_single_file = False
             index = self.indexAt(position)  # Get index in File-list
             # Check if an item was clicked
-            if index.isValid():
-                self.menu.source_file_name = self.model.filePath(index)
+            if index.isValid():    # A valid file was right-clicked
+                self.source = []
+                for index in self.selectedIndexes():
+                    self.source.append(self.model.filePath(index))
+                if len(self.source) == 1:
+                    if os.path.isfile(self.source[0]):
+                        self.source_is_single_file = True
             else:
-                self.menu.source_file_name = None                # No item was clicked
+                self.source = []                # No item was clicked
+
+            # index = self.indexAt(position)  # Get index in File-list
+            # # Check if an item was clicked
+            # if index.isValid():
+            #     self.source = self.model.filePath(index)
+            # else:
+            #     self.source = None                # No item was clicked
         elif action == self.paste_metadata:
             index = self.indexAt(position)  # Get index in File-list
             # Check if an item was clicked
             if index.isValid():    # A valid file was right-clicked
-                target_file_names = []
+                target = []
                 for index in self.selectedIndexes():
-                    target_file_names.append(self.model.filePath(index))
+                    target.append(self.model.filePath(index))
 
                 target_logical_tags = []
                 for logical_tag in self.logical_tag_actions:
                     if self.logical_tag_actions[logical_tag].isChecked():
                         target_logical_tags.append(logical_tag)
 
-                self.copier = CopyLogicalTags(self.menu.source_file_name, target_file_names, target_logical_tags, await_start_signal=True)
+                self.copier = CopyLogicalTags(self.source, target, target_logical_tags, await_start_signal=True)
                 self.progress_bar = ProgressBarWidget('Copy Tags', self.copier)  # Progress-bar will start worker
+                self.source = []
+
+
+
+        elif action == self.paste_by_filename:
+            index = self.indexAt(position)  # Get index in File-list
+            # Check if an item was clicked
+            if index.isValid():  # A valid file was right-clicked
+                target = []
+                for index in self.selectedIndexes():
+                    target.append(self.model.filePath(index))
+
+                target_logical_tags = []
+                for logical_tag in self.logical_tag_actions:
+                    if self.logical_tag_actions[logical_tag].isChecked():
+                        target_logical_tags.append(logical_tag)
+
+                self.copier = CopyLogicalTags(self.source, target, target_logical_tags, match_file_name=True, await_start_signal=True)
+                self.progress_bar = ProgressBarWidget('Copy Tags', self.copier)  # Progress-bar will start worker
+                self.source = []
+
+        elif action == self.patch_metadata:
+            index = self.indexAt(position)  # Get index in File-list
+            # Check if an item was clicked
+            if index.isValid():  # A valid file was right-clicked
+                target = []
+                for index in self.selectedIndexes():
+                    target.append(self.model.filePath(index))
+
+                target_logical_tags = []
+                for logical_tag in self.logical_tag_actions:
+                    if self.logical_tag_actions[logical_tag].isChecked():
+                        target_logical_tags.append(logical_tag)
+                self.copier = CopyLogicalTags(self.source, target, target_logical_tags, overwrite=False, await_start_signal=True)
+                self.progress_bar = ProgressBarWidget('Copy Tags', self.copier)  # Progress-bar will start worker
+                self.source = []
+
+
+        elif action == self.patch_by_filename:
+            index = self.indexAt(position)  # Get index in File-list
+            # Check if an item was clicked
+            if index.isValid():  # A valid file was right-clicked
+                target = []
+                for index in self.selectedIndexes():
+                    target.append(self.model.filePath(index))
+
+                target_logical_tags = []
+                for logical_tag in self.logical_tag_actions:
+                    if self.logical_tag_actions[logical_tag].isChecked():
+                        target_logical_tags.append(logical_tag)
+
+                self.copier = CopyLogicalTags(self.source, target, target_logical_tags, overwrite=False, match_file_name=True, await_start_signal=True)
+                self.progress_bar = ProgressBarWidget('Copy Tags', self.copier)  # Progress-bar will start worker
+                self.source = []
 
             else:
                 self.menu.target_file_name = None                # No item was clicked
         elif action == None:
             pass
         else:
-            self.openMenu(position)    # Toggle one of te logical tags was chosen
+            self.openMenu(position)    # Toggle one of the logical tags was chosen
 
     def unselectAll(self):
         self.selectionModel().clearSelection()  # Unselect any file, as soon selection will be renamed
@@ -243,7 +305,8 @@ class FileList(QTreeView):
         previous_path = self.model.filePath((previous))
         if chosen_path != previous_path:
             if not self.current_file == None:
-                self.current_file=FilePanel.getInstance(chosen_path)   # Gets file-singleton. At the same time set singleton to chosen file
+                if os.path.isfile(chosen_path):
+                    self.current_file=FilePanel.getInstance(chosen_path)   # Gets file-singleton. At the same time set singleton to chosen file
 
 class FilePanel(QScrollArea):
     __instance = None

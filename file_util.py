@@ -1,7 +1,7 @@
 import os
 from fnmatch import fnmatch
 from PyQt5.QtCore import QObject,pyqtSignal
-
+from util import rreplace
 
 class FileRenameError(Exception):
     pass
@@ -37,6 +37,14 @@ def getFileList(root_folder='',recursive=False, pattern='*.*'):
                         break
     all_files = [file.replace('\\', '/') for file in all_files]
     return all_files
+
+def splitFileName(file_name):
+    file_type = file_name.split(".")[-1]
+    short_file_name = file_name.split("\\")[-1]  # Take last part of string splitted at ""
+    short_file_name = short_file_name.split("/")[-1]  # Take last part of string splitted at "/"
+    short_file_name_ex_type = rreplace(short_file_name, "." + file_type, "")  # Remove .jpg
+    file_path = rreplace(file_name, short_file_name, "")
+    return [file_path, short_file_name_ex_type, file_type]
 
 class FileRenamer(QObject):
     __instance = None
