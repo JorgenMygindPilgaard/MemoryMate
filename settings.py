@@ -35,7 +35,7 @@ if not os.path.isfile(settings_path):
     file_types = ["jpg", "png", "cr3", "cr2", "dng", "arw", "heic", "tif", "gif", "mp4", "mov", "avi"]
     languages = {"DA": "Danish",
                  "EN": "English"}
-    language = "DA"
+    language = "EN"
     logical_tags = {"title":             "text_line",
                     "date":              "date_time",
                     "description_only":  "text",
@@ -58,7 +58,7 @@ if not os.path.isfile(settings_path):
                                 "date":              {"DA": "Dato",                "EN": "Date"},
                                 "description":       {"DA": "Fuld beskrivelse",    "EN": "Full Description"},
                                 "description_only":  {"DA": "Beskrivelse",         "EN": "Description"},
-                                "persons":           {"DA": "Personer",            "EN": "Persons"},
+                                "persons":           {"DA": "Personer",            "EN": "People"},
                                 "photographer":      {"DA": "Fotograf",            "EN": "Photographer"},
                                 "source":            {"DA": "Oprindelse",          "EN": "Source"},
                                 "original_filename": {"DA": "Oprindeligt filnavn", "EN": "Original filename"}
@@ -239,8 +239,11 @@ if not os.path.isfile(settings_path):
     file_context_menu_actions = {"consolidate_metadata": {"DA": "Konsolider metadata", "EN": "Consolidate Metadata"},
                                  "copy_metadata": {"DA": "Kopier metadata", "EN": "Copy Metadata"},
                                  "paste_metadata": {"DA": "Indsæt metadata", "EN": "Paste Metadata"},
-                                 "choose_tags_to_paste": {"DA": "Vælg hvad du vil indsætte:",
-                                                          "EN": "Choose what to paste:"}
+                                 "patch_metadata": {"DA": "Udfyld metadata", "EN": "Patch Metadata"},
+                                 "paste_by_filename": {"DA": "Indsæt metadata efter filnavn", "EN": "Paste Metadata by filename"},
+                                 "patch_by_filename": {"DA": "Udfyld metadata efter filnavn", "EN": "Patch Metadata by filename"},
+                                 "choose_tags_to_paste": {"DA": "Vælg hvad du vil overføre:",
+                                                          "EN": "Choose what to transfer:"}
                                  }
 
     folder_context_menu_actions = {"standardize_filenames": {"DA": "Standardiser filnavne", "EN": "Standardize Filenames"},
