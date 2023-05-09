@@ -155,7 +155,7 @@ class FileList(QTreeView):
                 self.consolidator = ConsolidateMetadata(target,await_start_signal=True)
                 self.progress_bar = ProgressBarWidget('Consolidate', self.consolidator)  # Progress-bar will start worker
 
-        if action == self.standardize_filenames:
+        elif action == self.standardize_filenames:
             index = self.indexAt(position)  # Get index in File-list
             if index.isValid():
                 target = []
@@ -342,26 +342,25 @@ class FilePanel(QScrollArea):
         if FilePanel.file_metadata != None and FilePanel.file_name !='':
             FilePanel.file_metadata.save()
 
-    def prepareFilePanel(self,prepare_preview=True):       # Happens each time a new filename is assigned
+    def prepareFilePanel(self):       # Happens each time a new filename is assigned
         scroll_position = FilePanel.__instance.verticalScrollBar().value()    # Remember scroll-position
         self.takeWidget()
 
         if FilePanel.file_name != None and FilePanel.file_name != '':
-            FilePanel.__initializeWidgets()
+            FilePanel.__initializeWidgets()    #Widgets for metadata only
 
-        # Prepare file-preview widget
-        if FilePanel.file_name != None and FilePanel.file_name != '' and prepare_preview:
-            pixmap = FilePreview.getInstance(FilePanel.file_name,self.width()-60).pixmap
-            FilePanel.file_preview.setPixmap(pixmap)
+        if FilePanel.file_name != None and FilePanel.file_name != '':
+            # Prepare file-preview widget
+            FilePanel.file_preview = QLabel()
+            FilePanel.pixmap = FilePreview.getInstance(FilePanel.file_name,self.width()-60).pixmap
+            FilePanel.file_preview.setPixmap(FilePanel.pixmap)
             FilePanel.file_preview.setAlignment(Qt.AlignHCenter)
             FilePanel.main_layout.addWidget(FilePanel.file_preview)
             dummy_widget_for_width = QWidget()
-            dummy_widget_for_width.setFixedWidth(self.width()-60)
+            dummy_widget_for_width.setFixedWidth(self.width() - 60)
             FilePanel.main_layout.addWidget(dummy_widget_for_width)
 
-
-#        Prepare metadata widgets and place them all in metadata_layout.
-        if FilePanel.file_name != None and FilePanel.file_name != '':
+            # Prepare metadata widgets and place them all in metadata_layout.
             FilePanel.metadata_layout.setSizeConstraint(1)   #No constraints
             tags = {}
             for logical_tag in FilePanel.file_metadata.logical_tag_values:
@@ -382,9 +381,6 @@ class FilePanel(QScrollArea):
                     else:
                         focus_widget = tags[logical_tag][1]
 
-
-
-
             FilePanel.main_layout.addLayout(FilePanel.metadata_layout)
             FilePanel.main_widget.setFixedWidth(self.width() - 30)
             FilePanel.main_widget.setLayout(FilePanel.main_layout)
@@ -401,7 +397,6 @@ class FilePanel(QScrollArea):
         FilePanel.main_layout.setSizeConstraint(QVBoxLayout.SetFixedSize)
         FilePanel.metadata_layout=QVBoxLayout()
         FilePanel.metadata_layout.setSizeConstraint(QVBoxLayout.SetFixedSize)
-        FilePanel.file_preview = QLabel()
 
         FilePanel.tags = {}
         for logical_tag in settings.logical_tags:
@@ -436,7 +431,7 @@ class FilePanel(QScrollArea):
     @staticmethod
     def metadataChanged(file_name):
         if file_name==FilePanel.file_name:
-            FilePanel.__instance.prepareFilePanel(prepare_preview=False)      # If matadata changed in file shown in panel, then update metadata in panel
+            FilePanel.__instance.prepareFilePanel()      # If matadata changed in file shown in panel, then update metadata in panel
 
     @staticmethod
     def filenemeChanged(old_filename, new_filename):     # reacts on change filename
@@ -497,7 +492,8 @@ class Text(QPlainTextEdit):
         event.ignore()
     def readFromImage(self):
         if FilePanel.file_metadata:
-            self.setPlainText(FilePanel.file_metadata.logical_tag_values.get(self.logical_tag))
+            text=FilePanel.file_metadata.logical_tag_values.get(self.logical_tag)
+            self.setPlainText(text)
             self.setFixedHeight(self.widgetHeight(self.width()))      #Calculates needed height from width and text
             if hasattr(self, 'auto_complete_list') and self.toPlainText() != "":
                 self.auto_complete_list.collectItem(self.toPlainText())    # Collect new entry in auto_complete_list
