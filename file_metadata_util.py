@@ -33,8 +33,7 @@ class FileMetadata(QObject):
         self.type = split_file_name[2]                        # "jpg"
 
         # Initialize data for logical tags
-        self.logical_tag_values = self.__getLogicalTagValues()
-        self.saved_logical_tag_values = copy.deepcopy(self.logical_tag_values)
+        self.__getLogicalTagValues()
 
     @staticmethod
     def getInstance(file_name):
@@ -63,12 +62,17 @@ class FileMetadata(QObject):
         tag_values = {}
         for tag in tags:
             tag_value = exif_data[0].get(tag)
-            if tag_value != None and tag_value != "":
+            if tag_value != None and tag_value != "" and tag_value != []:
+                if isinstance(tag_value,list):
+                    tag_value = list(map(str, tag_value))   # Convrt any numbers in list ti string
+                else:
+                    tag_value = str(tag_value)
                 tag_values[tag] = tag_value
 
         # Finally map tag_values to logical_tag_values
         logical_tag_values = {}
 #        for logical_tag in settings.logical_tags:
+        logical_tags_missing_value = []
         for logical_tag in logical_tags_tags:
             logical_tag_type = settings.logical_tags.get(logical_tag)
             logical_tag_tags = logical_tags_tags.get(logical_tag)
@@ -78,14 +82,29 @@ class FileMetadata(QObject):
                 tag_value = ""
             logical_tag_values[logical_tag] = tag_value  # Set to empty value to begin with"
 
+            logical_tag_value_found = False
             for tag in logical_tag_tags:
                 tag_value = tag_values.get(tag)
+                if tag_value:
+                    logical_tag_value_found = True
                 if logical_tag_type != 'text_set' and isinstance(tag_value, list):     #E.g. Author contains multiple entries. Concatenate ti a string then
                     tag_value = ', '.join(tag_value)
                 if tag_value != None and tag_value != "":
                     logical_tag_values[logical_tag] = tag_value
                     break
-        return logical_tag_values
+            if not logical_tag_value_found:
+                logical_tags_missing_value.append(logical_tag)
+
+        self.saved_logical_tag_values = copy.deepcopy(logical_tag_values)
+
+        # Read fallback_tag (if assigned) into missing logical tags
+        for logical_tag in logical_tags_missing_value:
+            fallback_tag = settings.logical_tag_attributes.get(logical_tag).get('fallback_tag')
+            if fallback_tag:
+                fallback_tag_value = logical_tag_values.get(fallback_tag)
+                if fallback_tag_value:
+                    logical_tag_values[logical_tag] = fallback_tag_value
+        self.logical_tag_values = copy.deepcopy(logical_tag_values)
 
     def __updateReferenceTags(self):
         first = True
@@ -165,6 +184,8 @@ class FileMetadata(QObject):
         if instance != None:
             del FileMetadata.instance_index[filename]
             instance.deleteLater()
+
+
 
 class StandardizeFilenames(QObject):
     # The purpose of this class is to rename files systematically. The naming pattern in the files will be

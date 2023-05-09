@@ -67,7 +67,7 @@ if not os.path.isfile(settings_path):
     logical_tag_attributes = {"title": {},
                               "date": {},
                               "description": {"hide": False},  #As it is a ref-tag, it can be hidden. It is always write-protected
-                              "description_only": {},
+                              "description_only": {"fallback_tag": "description"},   #the logical tag will be read from fallback_tag, if it NULL (missing in metadata, not the same as blank in metadata)
                               "persons": {"Autocomplete": True},
                               "photographer": {"Autocomplete": True},
                               "source": {"Autocomplete": True},

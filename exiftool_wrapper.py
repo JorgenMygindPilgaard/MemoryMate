@@ -6,6 +6,9 @@ import unicodedata
 import settings
 
 class ExifTool(object):
+    process=None
+    configuration=''
+    executable=None
     sentinel = "{ready}\r\n"
     sys_encoding = locale.getpreferredencoding()
     # when wrapper calls exiftool, it does so throug windows cmp (command prompt). At the same time parameters are
@@ -16,25 +19,37 @@ class ExifTool(object):
     # Exiftool along with the other parameters. (see below in execute-method).
 
     def __init__(self,executable='exiftool', configuration='' ):
-        self.executable = executable
-        self.configuration = configuration
+        ExifTool.executable = executable
+        ExifTool.configuration = configuration
 
     def __enter__(self):
-        if self.configuration != '':
-            self.process = subprocess.Popen(
-                [self.executable, "-config", self.configuration, "-stay_open", "True", "-@", "-"],
-                universal_newlines=True,
-                stdin=subprocess.PIPE, stdout=subprocess.PIPE)
-        else:
-            self.process = subprocess.Popen(
-                [self.executable, "-stay_open", "True",  "-@", "-"],
-                universal_newlines=True,
-                stdin=subprocess.PIPE, stdout=subprocess.PIPE)
+        if ExifTool.process!=None:               #Process created
+            if ExifTool.process.poll()!=None:    #Process not running
+                ExifTool.process=None
+        if ExifTool.process==None:
+            if ExifTool.configuration!='':
+                ExifTool.process = subprocess.Popen([ExifTool.executable, "-config", ExifTool.configuration, "-stay_open", "True", "-@", "-"],
+                                                      universal_newlines=True,
+                                                      stdin=subprocess.PIPE,
+                                                      stdout=subprocess.PIPE,
+                                                      creationflags=subprocess.CREATE_NO_WINDOW)
+            else:
+                ExifTool.process = subprocess.Popen([ExifTool.executable, "-stay_open", "True",  "-@", "-"],
+                                                      universal_newlines=True,
+                                                      stdin=subprocess.PIPE,
+                                                      stdout=subprocess.PIPE,
+                                                      creationflags=subprocess.CREATE_NO_WINDOW)
         return self
 
     def  __exit__(self, exc_type, exc_value, traceback):
-        self.process.stdin.write("-stay_open\nFalse\n")
-        self.process.stdin.flush()
+        ExifTool.process.stdin.flush()
+
+    @staticmethod
+    def close():
+        if ExifTool.process!=None:                 # Process exist
+            if ExifTool.process.poll() == None:    # Proceass is running
+                ExifTool.process.stdin.write("-stay_open\nFalse\n")    #Close process
+                ExifTool.process.stdin.flush()
 
     def execute(self, args):
         args.append('-charset')                        # This and the next line tells exiftool which encoding to expect
@@ -68,10 +83,10 @@ class ExifTool(object):
         file_args = unicodedata.normalize("NFC", file_args)
         #-----------------------------------------------------
 
-        self.process.stdin.write(file_args)
-        self.process.stdin.flush()
+        ExifTool.process.stdin.write(file_args)
+        ExifTool.process.stdin.flush()
         output = ""
-        fd = self.process.stdout.fileno()
+        fd = ExifTool.process.stdout.fileno()
         while not output.endswith(self.sentinel):
             output += os.read(fd, 4096).decode('utf-8')
         return output[:-len(self.sentinel)]

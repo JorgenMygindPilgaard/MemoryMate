@@ -1,7 +1,7 @@
 import sys
 from ui_widgets import *
 from PyQt5.QtWidgets import QWidget,QMainWindow,QApplication
-
+from exiftool_wrapper import ExifTool
 class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
@@ -39,6 +39,7 @@ class MainWindow(QMainWindow):
 
     def closeEvent(self, event):
         FilePanel.saveMetadata()      # Saves metadata if changed
+        ExifTool.close()              # Close exiftool process
         super().closeEvent(event)
 
 app = QApplication(sys.argv)
