@@ -98,12 +98,13 @@ class FileMetadata(QObject):
         self.saved_logical_tag_values = copy.deepcopy(logical_tag_values)
 
         # Read fallback_tag (if assigned) into missing logical tags
-        for logical_tag in logical_tags_missing_value:
-            fallback_tag = settings.logical_tag_attributes.get(logical_tag).get('fallback_tag')
-            if fallback_tag:
-                fallback_tag_value = logical_tag_values.get(fallback_tag)
-                if fallback_tag_value:
-                    logical_tag_values[logical_tag] = fallback_tag_value
+        if not tag_values.get('XMP:MemoryMateSaveDateTime'):     #Memory Mate never wrote to file before. Get fall-back tag-values for missing logical tags that has fall-back tag assigned
+            for logical_tag in logical_tags_missing_value:
+                fallback_tag = settings.logical_tag_attributes.get(logical_tag).get('fallback_tag')
+                if fallback_tag:
+                    fallback_tag_value = logical_tag_values.get(fallback_tag)
+                    if fallback_tag_value:
+                        logical_tag_values[logical_tag] = fallback_tag_value
         self.logical_tag_values = copy.deepcopy(logical_tag_values)
 
     def __updateReferenceTags(self):
