@@ -3,6 +3,7 @@ import os
 import json
 import locale
 import unicodedata
+from datetime import datetime
 import settings
 
 class ExifTool(object):
@@ -93,6 +94,7 @@ class ExifTool(object):
 
     def getTags(self, filenames, tags=[]):           #Gets all metadata of files if tags is empty or not supplied
         args = []
+        tags.append('XMP:MemoryMateSaveDateTime')
         for tag in tags:
             if tag[0]!='-':
                 tag='-'+tag
@@ -111,6 +113,7 @@ class ExifTool(object):
     def setTags(self, filenames, tag_values={}):
         if tag_values=={}:
             pass                                    #Quick return if no tags to set
+        tag_values['XMP:MemoryMateSaveDateTime']=datetime.now().strftime("%Y:%m:%d %H:%M:%S")
         args = []
         for tag in tag_values:
             if isinstance(tag_values[tag],str):
@@ -125,6 +128,7 @@ class ExifTool(object):
                 else:
                     for tag_value_item in tag_values[tag]:
                         args.append('-' + tag + '=' + tag_value_item)               # adds tag_value_items one at the time (e.g. persons)
+
 
         if type(filenames)==str:
             args.append(filenames)

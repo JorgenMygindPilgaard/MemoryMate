@@ -67,7 +67,11 @@ if not os.path.isfile(settings_path):
     logical_tag_attributes = {"title": {},
                               "date": {},
                               "description": {"hide": False},  #As it is a ref-tag, it can be hidden. It is always write-protected
-                              "description_only": {"fallback_tag": "description"},   #the logical tag will be read from fallback_tag, if it NULL (missing in metadata, not the same as blank in metadata)
+
+                              # The logical tag will be defaulted from fallback_tag if missing in image,
+                              # but only until memory-mate saved metadata to image first time.
+                              "description_only": {"fallback_tag": "description"},
+
                               "persons": {"Autocomplete": True},
                               "photographer": {"Autocomplete": True},
                               "source": {"Autocomplete": True},
@@ -287,6 +291,7 @@ if not os.path.isfile(exiftool_cfg_path):
                     "    NAMESPACE => { 'jmp_mde' => 'https://jorgenpilgaard.dk/namespace/jmp_mde/' },",
                     "    WRITABLE => 'string', # (default to string-type tags)",
                     "    DescriptionOnly => { Writable => 'lang-alt' },",
+                    "    MemoryMateSaveDateTime => { Writable => 'lang-alt' },",
                     "    #AnotherTag => { Writable => 'lang-alt' },",
                     ");"]
 
