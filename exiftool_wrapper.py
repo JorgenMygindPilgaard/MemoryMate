@@ -89,7 +89,7 @@ class ExifTool(object):
         output = ""
         fd = ExifTool.process.stdout.fileno()
         while not output.endswith(self.sentinel):
-            output += os.read(fd, 4096).decode('utf-8')
+            output += os.read(fd, 4096).decode('utf-8', errors='replace')
         return output[:-len(self.sentinel)]
 
     def getTags(self, filenames, tags=[]):           #Gets all metadata of files if tags is empty or not supplied
