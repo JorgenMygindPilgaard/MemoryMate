@@ -31,6 +31,7 @@ class FileMetadata(QObject):
         self.path = split_file_name[0]                        # "c:\pictures\"
         self.name_alone = split_file_name[1]                  # "my_picture"
         self.type = split_file_name[2]                        # "jpg"
+        self.is_virgin=False                                  # "Virgin means memory_mate never write metadata to file before. Assume not virgin tll metadata has been read
 
         # Initialize data for logical tags
         self.__getLogicalTagValues()
@@ -64,7 +65,7 @@ class FileMetadata(QObject):
             tag_value = exif_data[0].get(tag)
             if tag_value != None and tag_value != "" and tag_value != []:
                 if isinstance(tag_value,list):
-                    tag_value = list(map(str, tag_value))   # Convrt any numbers in list ti string
+                    tag_value = list(map(str, tag_value))   # Convert any numbers in list ti string
                 else:
                     tag_value = str(tag_value)
                 tag_values[tag] = tag_value
@@ -99,6 +100,7 @@ class FileMetadata(QObject):
 
         # Read fallback_tag (if assigned) into missing logical tags
         if not tag_values.get('XMP:MemoryMateSaveDateTime'):     #Memory Mate never wrote to file before. Get fall-back tag-values for missing logical tags that has fall-back tag assigned
+            self.is_virgin=True
             for logical_tag in logical_tags_missing_value:
                 fallback_tag = settings.logical_tag_attributes.get(logical_tag).get('fallback_tag')
                 if fallback_tag:
@@ -162,12 +164,12 @@ class FileMetadata(QObject):
 
     def save(self,force_rewrite=False):
         self.__updateReferenceTags()
-        if self.logical_tag_values != self.saved_logical_tag_values or force_rewrite:
+        if self.logical_tag_values != self.saved_logical_tag_values or force_rewrite or self.is_virgin:
             logical_tags_tags = settings.file_type_tags.get(self.type.lower())
             tag_values = {}
             for logical_tag in self.logical_tag_values:
                 logical_tag_type = settings.logical_tags.get(logical_tag)
-                if self.logical_tag_values[logical_tag] != self.saved_logical_tag_values.get(logical_tag) or force_rewrite:   #New value to be saved
+                if self.logical_tag_values[logical_tag] != self.saved_logical_tag_values.get(logical_tag) or force_rewrite or self.is_virgin:   #New value to be saved
                     self.saved_logical_tag_values[logical_tag] = self.logical_tag_values[logical_tag]
                     tags = logical_tags_tags.get(logical_tag)    #All physical tags for logical tag"
                     for tag in tags:
@@ -178,7 +180,7 @@ class FileMetadata(QObject):
                 with ExifTool(executable=self.exif_executable,configuration=self.exif_configuration) as ex:
                     ex.setTags(self.file_name,tag_values)
                 self.change_signal.emit(self.file_name)
-
+        self.is_virgin=False
     @staticmethod
     def deleteInstance(filename):     # reacts on change filename signal from
         instance = FileMetadata.instance_index.get(filename)
