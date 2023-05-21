@@ -2,6 +2,8 @@ import sys
 from ui_widgets import *
 from PyQt5.QtWidgets import QWidget,QMainWindow,QApplication
 from exiftool_wrapper import ExifTool
+from file_metadata_util import QueueHost
+
 class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
@@ -37,6 +39,8 @@ class MainWindow(QMainWindow):
 
         main_widget.setLayout(main_layout)
 
+        # Prepare queue-processor
+
     def closeEvent(self, event):
         FilePanel.saveMetadata()      # Saves metadata if changed
         ExifTool.close()              # Close exiftool process
@@ -50,6 +54,9 @@ font_size = str(font.pointSize())+"pt"
 font_weight = str(font.weight())
 app.setStyleSheet(f"* {{ font-family: {font_family}; font-size: {font_size}; font-weight: {font_weight};}}")
 window = MainWindow()
+QueueHost.get_instance().start_queue_worker(delay=0)    #Start Queue-processing
 window.setGeometry(100, 100, 2000, 1000)
 window.show()
+
 app.exec()
+

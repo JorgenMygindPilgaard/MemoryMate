@@ -1,5 +1,6 @@
 import json
 import os
+from file_util import JsonQueue
 #
 # Make location for Application, if missing
 #
@@ -8,6 +9,7 @@ if not os.path.isdir(app_data_location):
     os.mkdir(app_data_location)
 
 settings_path = os.path.join(app_data_location,"settings.json")
+queue_file_path = os.path.join(app_data_location,"queue.json")
 
 #
 # Read settings-file, if it is there
