@@ -7,7 +7,8 @@ from datetime import datetime
 import settings
 
 class ExifTool(object):
-    process=None
+    read_process=None    # Two exiftool-processes runs in memory, one for read and one for write.
+    write_process=None   # ..that way user does not have to wait for background processor to finalize writes from queue
     configuration=''
     executable=None
     sentinel = "{ready}\r\n"
@@ -24,18 +25,37 @@ class ExifTool(object):
         ExifTool.configuration = configuration
 
     def __enter__(self):
-        if ExifTool.process!=None:               #Process created
-            if ExifTool.process.poll()!=None:    #Process not running
-                ExifTool.process=None
-        if ExifTool.process==None:
+        # Prepare read-process of exiftool.exe
+        if ExifTool.read_process!=None:               #Process created
+            if ExifTool.read_process.poll()!=None:    #Process not running
+                ExifTool.read_process=None
+        if ExifTool.read_process==None:
             if ExifTool.configuration!='':
-                ExifTool.process = subprocess.Popen([ExifTool.executable, "-config", ExifTool.configuration, "-stay_open", "True", "-@", "-"],
+                ExifTool.read_process = subprocess.Popen([ExifTool.executable, "-config", ExifTool.configuration, "-stay_open", "True", "-@", "-"],
                                                       universal_newlines=True,
                                                       stdin=subprocess.PIPE,
                                                       stdout=subprocess.PIPE,
                                                       creationflags=subprocess.CREATE_NO_WINDOW)
             else:
-                ExifTool.process = subprocess.Popen([ExifTool.executable, "-stay_open", "True",  "-@", "-"],
+                ExifTool.read_process = subprocess.Popen([ExifTool.executable, "-stay_open", "True",  "-@", "-"],
+                                                      universal_newlines=True,
+                                                      stdin=subprocess.PIPE,
+                                                      stdout=subprocess.PIPE,
+                                                      creationflags=subprocess.CREATE_NO_WINDOW)
+
+#      Prepare write-process of exiftool.exe
+        if ExifTool.write_process!=None:               #Process created
+            if ExifTool.write_process.poll()!=None:    #Process not running
+                ExifTool.write_process=None
+        if ExifTool.write_process==None:
+            if ExifTool.configuration!='':
+                ExifTool.write_process = subprocess.Popen([ExifTool.executable, "-config", ExifTool.configuration, "-stay_open", "True", "-@", "-"],
+                                                      universal_newlines=True,
+                                                      stdin=subprocess.PIPE,
+                                                      stdout=subprocess.PIPE,
+                                                      creationflags=subprocess.CREATE_NO_WINDOW)
+            else:
+                ExifTool.write_process = subprocess.Popen([ExifTool.executable, "-stay_open", "True",  "-@", "-"],
                                                       universal_newlines=True,
                                                       stdin=subprocess.PIPE,
                                                       stdout=subprocess.PIPE,
@@ -43,16 +63,21 @@ class ExifTool(object):
         return self
 
     def  __exit__(self, exc_type, exc_value, traceback):
-        ExifTool.process.stdin.flush()
+        ExifTool.read_process.stdin.flush()
+        ExifTool.write_process.stdin.flush()
 
     @staticmethod
     def close():
-        if ExifTool.process!=None:                 # Process exist
-            if ExifTool.process.poll() == None:    # Proceass is running
-                ExifTool.process.stdin.write("-stay_open\nFalse\n")    #Close process
-                ExifTool.process.stdin.flush()
+        if ExifTool.read_process!=None:                 # Process exist
+            if ExifTool.read_process.poll() == None:    # Proceass is running
+                ExifTool.read_process.stdin.write("-stay_open\nFalse\n")    #Close process
+                ExifTool.read_process.stdin.flush()
+        if ExifTool.write_process!=None:                 # Process exist
+            if ExifTool.write_process.poll() == None:    # Proceass is running
+                ExifTool.write_process.stdin.write("-stay_open\nFalse\n")    #Close process
+                ExifTool.write_process.stdin.flush()
 
-    def execute(self, args):
+    def execute(self, args,process):
         args.append('-charset')                        # This and the next line tells exiftool which encoding to expect
         args.append('filename='+self.sys_encoding)     # in tags. Windows cmd recodes everything to sys-encoding before passing to exiftool.
         args.append('-charset')
@@ -84,10 +109,10 @@ class ExifTool(object):
         file_args = unicodedata.normalize("NFC", file_args)
         #-----------------------------------------------------
 
-        ExifTool.process.stdin.write(file_args)
-        ExifTool.process.stdin.flush()
+        process.stdin.write(file_args)
+        process.stdin.flush()
         output = ""
-        fd = ExifTool.process.stdout.fileno()
+        fd = process.stdout.fileno()
         while not output.endswith(self.sentinel):
             output += os.read(fd, 4096).decode('utf-8', errors='replace')
         return output[:-len(self.sentinel)]
@@ -108,7 +133,7 @@ class ExifTool(object):
         else:
             for filename in filenames:
                 args.append(filename)
-        tags_to_return = self.execute((args))
+        tags_to_return = self.execute((args),ExifTool.read_process)
         return json.loads(tags_to_return)
 
     def setTags(self, filenames, tag_values={}):
@@ -136,7 +161,7 @@ class ExifTool(object):
         else:
             for filename in filenames:
                 args.append(filename)
-        return self.execute(args)
+        return self.execute(args,ExifTool.write_process)
 
 
 
