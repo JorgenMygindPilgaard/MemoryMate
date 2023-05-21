@@ -128,7 +128,7 @@ class FileList(QTreeView):
             self.source=[]
             self.source_is_single_file=False
 
-        if self.source_is_single_file:
+        if self.source_is_single_file and len(self.source) == 1:   #Exactly one field selected
             self.paste_metadata.setEnabled(True)
             self.patch_metadata.setEnabled(True)
             self.paste_by_filename.setEnabled(True)

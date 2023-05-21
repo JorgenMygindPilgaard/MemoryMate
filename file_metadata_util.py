@@ -1,13 +1,12 @@
 import copy
 from PyQt5.QtCore import QThread
-import util
-from util import rreplace
 from exiftool_wrapper import ExifTool
 from PyQt5.QtCore import QObject,pyqtSignal
 import settings
 import  os
 import file_util
 from collections import OrderedDict
+import time
 
 class FileMetadata(QObject):
     exif_executable = os.path.join(settings.app_data_location, 'exiftool.exe')
@@ -109,6 +108,15 @@ class FileMetadata(QObject):
                         logical_tag_values[logical_tag] = fallback_tag_value
         self.logical_tag_values = copy.deepcopy(logical_tag_values)
 
+        # Update logical tags in memory from queue-file (Queue originates from previous run)
+        json_queue = file_util.JsonQueue.getInstance(settings.queue_file_path)
+        for queue_entry in json_queue.queue:
+            if queue_entry.get('file') == self.file_name:
+                queue_logical_tag_values=queue_entry.get('logical_tag_values')
+                if queue_logical_tag_values != None and queue_logical_tag_values != {}:
+                    self.setLogicalTagValues(queue_logical_tag_values)
+
+
     def __updateReferenceTags(self):
         first = True
         for logical_tag in settings.reference_tag_content:
@@ -144,6 +152,39 @@ class FileMetadata(QObject):
                                 logical_tag_value += ', '.join(ref_logical_tag_value)
             self.logical_tag_values[logical_tag]=logical_tag_value
 
+    def __put_in_queue(self,force_rewrite):
+        # Find updated logical tags
+        updated_logical_tag_values = {}
+        for logical_tag in self.logical_tag_values:
+            if self.logical_tag_values[logical_tag] != self.saved_logical_tag_values.get(logical_tag):
+                updated_logical_tag_values[logical_tag]=self.logical_tag_values[logical_tag]
+
+        # Put in queue if something to do
+        if updated_logical_tag_values != {} or force_rewrite:
+            json_queue_file=file_util.JsonQueue.getInstance(settings.queue_file_path)
+            json_queue_file.enqueue({'file': self.file_name, 'logical_tag_values': updated_logical_tag_values, 'force_rewrite': force_rewrite})
+            QueueHost.get_instance().start_queue_worker()    # Make Queue-host instance start Queue-worker, if it is not running
+            self.change_signal.emit(self.file_name)
+
+
+    def __update_file(self, force_rewrite):
+        if self.logical_tag_values != self.saved_logical_tag_values or force_rewrite or self.is_virgin:
+            logical_tags_tags = settings.file_type_tags.get(self.type.lower())
+            tag_values = {}
+            for logical_tag in self.logical_tag_values:
+                #               logical_tag_type = settings.logical_tags.get(logical_tag)
+                if self.logical_tag_values[logical_tag] != self.saved_logical_tag_values.get(
+                        logical_tag) or force_rewrite or self.is_virgin:  # New value to be saved
+                    self.saved_logical_tag_values[logical_tag] = self.logical_tag_values[logical_tag]
+                    tags = logical_tags_tags.get(logical_tag)  # All physical tags for logical tag"
+                    for tag in tags:
+                        tag_value = self.logical_tag_values[logical_tag]
+                        tag_values[tag] = tag_value
+
+            if tag_values != {} and tag_values != None:
+                with ExifTool(executable=self.exif_executable, configuration=self.exif_configuration) as ex:
+                    ex.setTags(self.file_name, tag_values)
+                self.change_signal.emit(self.file_name)
 
     def setLogicalTagValues(self,logical_tag_values,overwrite=True):
         for logical_tag in logical_tag_values:
@@ -162,33 +203,20 @@ class FileMetadata(QObject):
                             if old_logical_tag_value == []:
                                 self.logical_tag_values[logical_tag] = logical_tag_values[logical_tag]
 
-    def save(self,force_rewrite=False):
+    def save(self,force_rewrite=False,put_in_queue=True):
         self.__updateReferenceTags()
-        if self.logical_tag_values != self.saved_logical_tag_values or force_rewrite or self.is_virgin:
-            logical_tags_tags = settings.file_type_tags.get(self.type.lower())
-            tag_values = {}
-            for logical_tag in self.logical_tag_values:
-                logical_tag_type = settings.logical_tags.get(logical_tag)
-                if self.logical_tag_values[logical_tag] != self.saved_logical_tag_values.get(logical_tag) or force_rewrite or self.is_virgin:   #New value to be saved
-                    self.saved_logical_tag_values[logical_tag] = self.logical_tag_values[logical_tag]
-                    tags = logical_tags_tags.get(logical_tag)    #All physical tags for logical tag"
-                    for tag in tags:
-                        tag_value = self.logical_tag_values[logical_tag]
-                        tag_values[tag] = tag_value
-
-            if tag_values != {} and tag_values != None:
-                with ExifTool(executable=self.exif_executable,configuration=self.exif_configuration) as ex:
-                    ex.setTags(self.file_name,tag_values)
-                self.change_signal.emit(self.file_name)
+        if put_in_queue:
+            self.__put_in_queue(force_rewrite)
+        else:
+            self.__update_file(force_rewrite)
         self.is_virgin=False
+
     @staticmethod
     def deleteInstance(filename):     # reacts on change filename signal from
         instance = FileMetadata.instance_index.get(filename)
         if instance != None:
             del FileMetadata.instance_index[filename]
             instance.deleteLater()
-
-
 
 class StandardizeFilenames(QObject):
     # The purpose of this class is to rename files systematically. The naming pattern in the files will be
@@ -272,6 +300,7 @@ class StandardizeFilenames(QObject):
                     del sorted_files_with_date[0]
                     if sorted_files_with_date == []:
                         break
+                    file_with_date = sorted_files_with_date[0]
             sorted_files.append(file_missing_date)
             del sorted_files_missing_date[0]
         sorted_files.extend(sorted_files_with_date)
@@ -300,21 +329,6 @@ class StandardizeFilenames(QObject):
                     file['new_name_alone'] = new_name_alone
                     file['new_file_name'] = new_file_name
 
-
-        # Set original filename tag in all files
-        if settings.logical_tags.get('original_filename'):
-            for file in files:
-                index+=1
-                self.progress_signal.emit(index+1)
-                file_name = file.get('file_name')
-                if file_name != '' and file_name != None:
-                    file_metadata = FileMetadata.getInstance(file_name)
-                    new_name_alone = file.get('new_name_alone')
-                    if new_name_alone !='' and new_name_alone != None:
-                        logical_tags = {'original_filename': new_name_alone}
-                        file_metadata.setLogicalTagValues(logical_tags)
-                        file_metadata.save()
-
         # Rename files
         files_for_renaming = []
         for file in files:
@@ -325,6 +339,21 @@ class StandardizeFilenames(QObject):
         if files_for_renaming != []:
             renamer=file_util.FileRenamer.getInstance(files_for_renaming)
             renamer.start()
+
+        # Set original filename tag in all files
+        if settings.logical_tags.get('original_filename'):
+            for file in files:
+                index+=1
+                self.progress_signal.emit(index+1)
+                file_name = file.get('new_file_name')
+                if file_name != '' and file_name != None:
+                    file_metadata = FileMetadata.getInstance(file_name)
+                    new_name_alone = file.get('new_name_alone')
+                    if new_name_alone !='' and new_name_alone != None:
+                        logical_tags = {'original_filename': new_name_alone}
+                        file_metadata.setLogicalTagValues(logical_tags)
+                        file_metadata.save()
+
         self.done_signal.emit()
 
 class CopyLogicalTags(QObject):
@@ -420,31 +449,64 @@ class ConsolidateMetadata(QObject):
             file_metadata.save(force_rewrite=True)
         self.done_signal.emit()
 
+class QueueWorker(QThread):
+    waiting = pyqtSignal()
+    processing = pyqtSignal()
 
-        # files = []
-        # self.progress_init_signal.emit(file_count)
-        # for index, file_name in enumerate(file_names):
-        #     self.progress_signal.emit(index+1)
-        #     file_metadata = FileMetadata.getInstance(file_name)
-        #     files.append({"file_name": file_name, "name_alone": file_metadata.name_alone})
-        #
-        # # Sync logical tags between files with same name (only filling gabs, no overwriting of logical tags)
-        # sorted_files = sorted(files, key=lambda x: (x['name_alone']))
-        # previous_file = {'name_alone': ''}
-        # for file in sorted_files:
-        #     if previous_file.get('name_alone') == file.get('name_alone'):
-        #         CopyLogicalTags(previous_file.get('file_name'),[file.get('file_name')], list(settings.logical_tags.keys()),overwrite=False)
-        #         CopyLogicalTags(file.get('file_name'), [previous_file.get('file_name')],list(settings.logical_tags.keys()),overwrite=False)
-        #     previous_file = file
-        #
-        # # Consolidate metadata by force-saving logical tags to all places in metadata:
-        # for file in sorted_files:
-        #     index+=1
-        #     self.progress_signal.emit(index+1)
-        #     file_metadata = FileMetadata.getInstance(file.get('file_name'))
-        #     file_metadata.save(force_rewrite=True)
-        # self.done_signal.emit()
+    def __init__(self,delay=5):
+        super().__init__()
+        self.delay = delay
+    def run(self):
+        self.waiting.emit()
+        json_queue_file = file_util.JsonQueue.getInstance(settings.queue_file_path)
+        while True:
+            queue_entry = json_queue_file.dequeue()
+            if queue_entry:
+                self.processing.emit()
+                file = queue_entry.get('file')
+                logical_tag_values = queue_entry.get('logical_tag_values')
+                force_rewrite = queue_entry.get('force_rewrite')
+                file_metadata = FileMetadata.getInstance(file)
+                file_metadata.setLogicalTagValues(logical_tag_values)
+                file_metadata.save(force_rewrite=force_rewrite, put_in_queue=False)
+            else:
+                self.waiting.emit()
+                time.sleep(self.delay)
 
+class QueueHost(QObject):
+    __instance=None
+    def __init__(self):
+        super().__init__()
+        self.queue_worker_running = False
+        self.queue_worker_processing = False
+
+    @staticmethod
+    def get_instance():
+        if QueueHost.__instance == None:
+            QueueHost.__instance = QueueHost()
+        return QueueHost.__instance
+
+    def worker_started(self):
+        self.worker_running = True
+
+    def worker_finished(self):
+        self.queue_worker_running = False
+
+    def worker_waiting(self):
+        self.queue_worker_processing = False
+
+    def worker_processing(self):
+        self.queue_worker_running = True
+
+
+    def start_queue_worker(self,delay=5):
+        if not self.queue_worker_running:
+            self.queue_worker=QueueWorker()
+            self.queue_worker.started.connect(self.worker_started)       # Queueworker runs for the entire app-runtime
+            self.queue_worker.finished.connect(self.worker_finished)     # Shouldn't happen, but just to be safe
+            self.queue_worker.waiting.connect(self.worker_waiting)       # Queue-worker is waiting for something to process
+            self.queue_worker.processing.connect(self.worker_processing) # Queue is being processed. This can be used to show running-indicator in app.
+            self.queue_worker.start()
 
 
 

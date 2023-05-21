@@ -1,7 +1,10 @@
 import os
+import json
 from fnmatch import fnmatch
 from PyQt5.QtCore import QObject,pyqtSignal
 from util import rreplace
+import threading
+import time
 
 class FileRenameError(Exception):
     pass
@@ -93,9 +96,63 @@ class FileRenamer(QObject):
         for file in renamed_files:
             self.filename_changed_signal.emit(file.get('old_name'), file.get('new_name'))
 
+# An instance of the JsonQueue can hold a queue with sets of json-data. The queue-data is stored in the self.queue list,
+# and mirrored in a file (if a filepath is provided).
+# The file-mirror is used to restore queue at start of application (after crash or application-closure)
+class JsonQueue:
+    instances={}
+    def __init__(self, file_path):
+        JsonQueue.instances[file_path]=self
+        self.file_path = file_path
+        self.lock = threading.Lock()
+        self.queue = []  #Queue is empty list
+        self.last_enqueue_time = time.time()-10
 
+        # Create file, if it is missing
+        if not os.path.isfile(file_path):
+            with self.lock:
+                with open(file_path, 'w'):
+                    pass
+        else:
+            with self.lock:
+                with open(file_path, 'r') as file:
+                    lines=file.readlines()
+                    for line in lines:
+                        self.queue.append(json.loads(line))
 
+    @staticmethod
+    def getInstance(file_path):
+        json_queue=JsonQueue.instances.get(file_path.replace('/','\\'))
+        if not json_queue:
+            json_queue=JsonQueue(file_path.replace('/','\\'))
+        return json_queue
 
+    def enqueue(self, data):
+        self.last_enqueue_time = time.time()
+        with self.lock:
+            with open(self.file_path, 'a') as file:
+                self.queue.append(data)                                          # Append data in memory
+                file.write(json.dumps(data).replace('\n','<newline>') + '\n')    # Append data in file
 
+    def dequeue(self):
+        if time.time() - self.last_enqueue_time < 5:
+            data = None                       # Return nothing, if queue has just been written to within the last 5 seconds
+        else:
+            lock_acquired = self.lock.acquire(blocking=True,timeout=0)
+            if not lock_acquired:
+                data = None                   # File is locked in other process: Return nothing
+            else:
+                try:
+                    if len(self.queue)>0:
+                        data = self.queue[0]
+                        del self.queue[0]
+                        lines = [json.dumps(d).replace('\n','<newline>') + '\n' for d in self.queue]
+                        with open(self.file_path, 'w') as file:
+                            file.writelines(lines)
+                    else:
+                        data = None         # Queue is empty: Return nothing
+                finally:
+                    self.lock.release()
+        return data
 
 

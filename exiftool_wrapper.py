@@ -104,11 +104,12 @@ class ExifTool(object):
         args.append('-n')
         if type(filenames)==str:
             args.append(filenames)
+            file_to_return=filenames
         else:
             for filename in filenames:
                 args.append(filename)
-
-        return json.loads(self.execute(args))
+        tags_to_return = self.execute((args))
+        return json.loads(tags_to_return)
 
     def setTags(self, filenames, tag_values={}):
         if tag_values=={}:
