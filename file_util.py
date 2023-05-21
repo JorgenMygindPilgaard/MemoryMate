@@ -106,6 +106,7 @@ class JsonQueue:
         self.file_path = file_path
         self.lock = threading.Lock()
         self.queue = []  #Queue is empty list
+        self.index = 0   #Current index being processed
         self.last_enqueue_time = time.time()-10
 
         # Create file, if it is missing
@@ -154,5 +155,27 @@ class JsonQueue:
                 finally:
                     self.lock.release()
         return data
+
+    # def dequeue_commit(self):
+    #     if time.time() - self.last_enqueue_time < 5:
+    #         return                       # Return, if queue has just been written to within the last 5 seconds
+    #
+    #     if len(self.queue)=0:
+    #         return
+    #
+    #     lock_acquired = self.lock.acquire(blocking=True, timeout=0)
+    #     if not lock_acquired:
+    #         return
+    #     index = self.index
+    #     self.index = 0
+    #     del self.queue[0:index]
+    #             lines = [json.dumps(d).replace('\n','<newline>') + '\n' for d in self.queue]
+    #             with open(self.file_path, 'w') as file:
+    #                 file.writelines(lines)
+    #         else:
+    #             data = None         # Queue is empty: Return nothing
+    #     finally:
+    #         self.lock.release()
+    # return data
 
 
