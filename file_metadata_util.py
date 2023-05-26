@@ -1,5 +1,5 @@
 import copy
-from PyQt5.QtCore import QThread
+from PyQt5.QtCore import QThread, QCoreApplication
 from exiftool_wrapper import ExifTool
 from PyQt5.QtCore import QObject,pyqtSignal
 import settings
@@ -452,12 +452,15 @@ class ConsolidateMetadata(QObject):
 class QueueWorker(QThread):
     waiting = pyqtSignal()
     processing = pyqtSignal()
+    about_to_quit = pyqtSignal()
 
     def __init__(self,delay=5):
         super().__init__()
         self.delay = delay
+
     def run(self):
         self.waiting.emit()
+        self.about_to_quit.connect(self.onAboutToQuit)
         json_queue_file = file_util.JsonQueue.getInstance(settings.queue_file_path)
         while True:
             queue_entry = json_queue_file.dequeue()
@@ -469,9 +472,16 @@ class QueueWorker(QThread):
                 file_metadata = FileMetadata.getInstance(file)
                 file_metadata.setLogicalTagValues(logical_tag_values)
                 file_metadata.save(force_rewrite=force_rewrite, put_in_queue=False)
+                json_queue_file.dequeue_commit()
             else:
                 self.waiting.emit()
                 time.sleep(self.delay)
+            json_queue_file.dequeue_from_file()    # Updates file every 5 seconds if anything to update
+    def onAboutToQuit(self):
+        json_queue_file = file_util.JsonQueue.getInstance(settings.queue_file_path)
+        json_queue_file.dequeue_from_file(delay=0)
+        self.quit()
+
 
 class QueueHost(QObject):
     __instance=None
@@ -486,27 +496,22 @@ class QueueHost(QObject):
             QueueHost.__instance = QueueHost()
         return QueueHost.__instance
 
-    def worker_started(self):
-        self.worker_running = True
-
-    def worker_finished(self):
-        self.queue_worker_running = False
-
     def worker_waiting(self):
+        self.queue_worker_running = True
         self.queue_worker_processing = False
 
     def worker_processing(self):
         self.queue_worker_running = True
+        self.queue_worker_processing = True
 
 
-    def start_queue_worker(self,delay=5):
+    def start_queue_worker(self):
         if not self.queue_worker_running:
             self.queue_worker=QueueWorker()
-            self.queue_worker.started.connect(self.worker_started)       # Queueworker runs for the entire app-runtime
-            self.queue_worker.finished.connect(self.worker_finished)     # Shouldn't happen, but just to be safe
             self.queue_worker.waiting.connect(self.worker_waiting)       # Queue-worker is waiting for something to process
             self.queue_worker.processing.connect(self.worker_processing) # Queue is being processed. This can be used to show running-indicator in app.
             self.queue_worker.start()
+            QCoreApplication.instance().aboutToQuit.connect(self.queue_worker.about_to_quit.emit)
 
 
 
