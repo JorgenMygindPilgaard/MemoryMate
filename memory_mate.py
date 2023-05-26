@@ -54,7 +54,7 @@ font_size = str(font.pointSize())+"pt"
 font_weight = str(font.weight())
 app.setStyleSheet(f"* {{ font-family: {font_family}; font-size: {font_size}; font-weight: {font_weight};}}")
 window = MainWindow()
-QueueHost.get_instance().start_queue_worker(delay=0)    #Start Queue-processing
+QueueHost.get_instance().start_queue_worker()    #Start Queue-processing
 window.setGeometry(100, 100, 2000, 1000)
 window.show()
 

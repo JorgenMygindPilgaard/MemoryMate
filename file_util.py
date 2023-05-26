@@ -105,9 +105,10 @@ class JsonQueue:
         JsonQueue.instances[file_path]=self
         self.file_path = file_path
         self.lock = threading.Lock()
-        self.queue = []  #Queue is empty list
-        self.index = 0   #Current index being processed
-        self.last_enqueue_time = time.time()-10
+        self.queue = []             #Queue is empty list
+        self.index = 0              #Current index to be processed
+        self.committed_index = -1   #Last index for which processing has ended
+        self.last_file_write_time = time.time()-10
 
         # Create file, if it is missing
         if not os.path.isfile(file_path):
@@ -129,53 +130,43 @@ class JsonQueue:
         return json_queue
 
     def enqueue(self, data):
-        self.last_enqueue_time = time.time()
+        self.last_file_write_time = time.time()
         with self.lock:
             with open(self.file_path, 'a') as file:
                 self.queue.append(data)                                          # Append data in memory
-                file.write(json.dumps(data).replace('\n','<newline>') + '\n')    # Append data in file
+                file.write(json.dumps(data).replace('\n','<newline>') + '\n')    # Append data in file instantly (prevent data-loss)
 
     def dequeue(self):
-        if time.time() - self.last_enqueue_time < 5:
-            data = None                       # Return nothing, if queue has just been written to within the last 5 seconds
+        if len(self.queue) > self.index:
+            data = self.queue[self.index]
+            self.index += 1
         else:
-            lock_acquired = self.lock.acquire(blocking=True,timeout=0)
-            if not lock_acquired:
-                data = None                   # File is locked in other process: Return nothing
-            else:
-                try:
-                    if len(self.queue)>0:
-                        data = self.queue[0]
-                        del self.queue[0]
-                        lines = [json.dumps(d).replace('\n','<newline>') + '\n' for d in self.queue]
-                        with open(self.file_path, 'w') as file:
-                            file.writelines(lines)
-                    else:
-                        data = None         # Queue is empty: Return nothing
-                finally:
-                    self.lock.release()
+            data = None
         return data
 
-    # def dequeue_commit(self):
-    #     if time.time() - self.last_enqueue_time < 5:
-    #         return                       # Return, if queue has just been written to within the last 5 seconds
-    #
-    #     if len(self.queue)=0:
-    #         return
-    #
-    #     lock_acquired = self.lock.acquire(blocking=True, timeout=0)
-    #     if not lock_acquired:
-    #         return
-    #     index = self.index
-    #     self.index = 0
-    #     del self.queue[0:index]
-    #             lines = [json.dumps(d).replace('\n','<newline>') + '\n' for d in self.queue]
-    #             with open(self.file_path, 'w') as file:
-    #                 file.writelines(lines)
-    #         else:
-    #             data = None         # Queue is empty: Return nothing
-    #     finally:
-    #         self.lock.release()
-    # return data
+    def dequeue_commit(self):
+        self.committed_index = self.index
+
+    def dequeue_from_file(self, delay=5):
+        if time.time() - self.last_file_write_time < delay:
+            return                       # Prevent storming file with updates
+        if len(self.queue) == 0:   # Queue is already emptied. That means that file is also already empty
+            return
+        if self.committed_index < 0:    # Nothing to remove from file
+            return
+
+        lock_acquired = self.lock.acquire(blocking=True, timeout=0)
+        if not lock_acquired:
+            return
+
+        lines = [json.dumps(d).replace('\n','<newline>') + '\n' for d in self.queue[self.committed_index+1:]]
+        with open(self.file_path, 'w') as file:
+            file.writelines(lines)
+            self.queue = self.queue[self.committed_index+1:]
+            self.index = 0
+            self.committed_index = -1
+            self.last_file_write_time = time.time()
+
+        self.lock.release()
 
 
