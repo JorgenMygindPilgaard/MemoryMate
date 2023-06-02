@@ -1,5 +1,7 @@
 import copy
 from PyQt5.QtCore import QThread, QCoreApplication
+
+import file_preview_util
 from exiftool_wrapper import ExifTool
 from PyQt5.QtCore import QObject,pyqtSignal
 import settings
@@ -9,7 +11,7 @@ from collections import OrderedDict
 import time
 
 class FileMetadata(QObject):
-    exif_executable = os.path.join(settings.app_data_location, 'exiftool.exe')
+    exif_executable = os.path.join(settings.app_data_location, 'exiftool_memory_mate.exe')
     exif_configuration = os.path.join(settings.app_data_location, 'exiftool.cfg')
     if not os.path.isfile(exif_configuration):
         exif_configuration=''
@@ -167,6 +169,7 @@ class FileMetadata(QObject):
             self.change_signal.emit(self.file_name)
 
 
+
     def __update_file(self, force_rewrite):
         if self.logical_tag_values != self.saved_logical_tag_values or force_rewrite or self.is_virgin:
             logical_tags_tags = settings.file_type_tags.get(self.type.lower())
@@ -203,6 +206,16 @@ class FileMetadata(QObject):
                             if old_logical_tag_value == []:
                                 self.logical_tag_values[logical_tag] = logical_tag_values[logical_tag]
 
+    def updateFilename(self, new_file_name):
+        old_file_name = self.file_name
+        self.file_name = new_file_name
+        split_file_name = file_util.splitFileName(new_file_name)  # ["c:\pictures\", "my_picture", "jpg"]
+        self.path = split_file_name[0]                        # "c:\pictures\"
+        self.name_alone = split_file_name[1]                  # "my_picture"
+        self.type = split_file_name[2]                        # "jpg"
+        FileMetadata.instance_index[new_file_name] = self
+        del FileMetadata.instance_index[old_file_name]
+
     def save(self,force_rewrite=False,put_in_queue=True):
         self.__updateReferenceTags()
         if put_in_queue:
@@ -211,12 +224,20 @@ class FileMetadata(QObject):
             self.__update_file(force_rewrite)
         self.is_virgin=False
 
-    @staticmethod
-    def deleteInstance(filename):     # reacts on change filename signal from
-        instance = FileMetadata.instance_index.get(filename)
-        if instance != None:
-            del FileMetadata.instance_index[filename]
-            instance.deleteLater()
+def renameFileInstances(old_file_name, new_file_name):     # reacts on change filename signal from
+    # Rename filename in metadata-instance
+    file_metadata = FileMetadata.getInstance(old_file_name)
+    if file_metadata:
+        file_metadata.updateFilename(new_file_name)
+
+    # Rename filename in preview-instance
+    file_preview = file_preview_util.FilePreview.getInstance(old_file_name)
+    if file_preview:
+        file_preview.updateFilename(new_file_name)
+
+    # Rename file in queue
+    json_queue_file = file_util.JsonQueue.getInstance(settings.queue_file_path)
+    json_queue_file.change_queue(find={'file': old_file_name}, change={'file': new_file_name})
 
 class StandardizeFilenames(QObject):
     # The purpose of this class is to rename files systematically. The naming pattern in the files will be
@@ -338,7 +359,9 @@ class StandardizeFilenames(QObject):
                 files_for_renaming.append({'old_name': file_name, 'new_name': new_file_name})
         if files_for_renaming != []:
             renamer=file_util.FileRenamer.getInstance(files_for_renaming)
+            renamer.filename_changed_signal.connect(renameFileInstances)
             renamer.start()
+
 
         # Set original filename tag in all files
         if settings.logical_tags.get('original_filename'):

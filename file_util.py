@@ -51,7 +51,7 @@ def splitFileName(file_name):
 
 class FileRenamer(QObject):
     __instance = None
-    filename_changed_signal = pyqtSignal(str, str)
+    filename_changed_signal = pyqtSignal(str, str)   # Emits Old filename, New_filename
 
     def __init__(self, files=[]):
         super().__init__()
@@ -74,7 +74,9 @@ class FileRenamer(QObject):
 
         index = 0
         renamed_files = []
-        for file in self.files:
+
+        # Check that entries all have filenames
+        for index, file in enumerate(self.files):
             old_name = file.get('old_name')
             new_name = file.get('new_name')
             if old_name == None or old_name == '':
@@ -87,12 +89,38 @@ class FileRenamer(QObject):
             if new_name == None or new_name == '':
                 __roll_back(renamed_files)
                 raise FileRenameError('new_name is missing in files-entry number ' + str(index))
+
+
+        # Handle collisions (source-name also exist as target)
+        for index, file in enumerate(self.files):
+            old_name = file.get('old_name')
+            new_name = file.get('new_name')
+            if os.path.exists(new_name):
+                # To prevent overwriting files, rename existing new_name files by appending _backup
+                backup_name = new_name + "_backup"
+                try:
+                    os.rename(new_name, backup_name)
+                    renamed_files.append({'old_name': new_name, 'new_name': backup_name})
+                except Exception as e:
+                    __roll_back(renamed_files)
+                    raise FileRenameError('error renaming ' + new_name + ' to ' + backup_name)
+                # If the backup-file is also due for renaming, old_name for the entry
+                for backup_index, backup_file in enumerate(self.files):
+                    if backup_file['old_name'] == new_name:
+                        self.files[backup_index]['old_name'] = backup_name
+
+        # Rename files
+        for index, file in enumerate(self.files):
+            old_name = file.get('old_name')
+            new_name = file.get('new_name')
+
             try:
                 os.rename(old_name, new_name)
                 renamed_files.append(file)
             except Exception as e:
                 __roll_back(renamed_files)
                 raise FileRenameError('error renaming ' + old_name + ' to ' + new_name)
+
         for file in renamed_files:
             self.filename_changed_signal.emit(file.get('old_name'), file.get('new_name'))
 
@@ -109,6 +137,7 @@ class JsonQueue:
         self.index = 0              #Current index to be processed
         self.committed_index = -1   #Last index for which processing has ended
         self.last_file_write_time = time.time()-10
+        self.queue_being_changed=False
 
         # Create file, if it is missing
         if not os.path.isfile(file_path):
@@ -144,6 +173,26 @@ class JsonQueue:
             data = None
         return data
 
+    def change_queue(self, find={}, change={}):
+        if change == {}:
+            return
+
+        while self.queue_being_changed:   # Wait till queue is ready for change
+            pass
+
+        self.queue_being_changed = True
+        for index, queue_entry in enumerate(self.queue):
+            passed_find_filter = True
+            for find_key, find_value in find.items():
+                if not queue_entry.get(find_key) == find_value:
+                    passed_find_filter = False
+                    break
+            if passed_find_filter:
+                for change_key, change_value in change.items():
+                    if self.queue[index].get(change_key):
+                        self.queue[index][change_key] = change_value
+        self.queue_being_changed = False
+
     def dequeue_commit(self):
         self.committed_index = self.index
 
@@ -154,11 +203,14 @@ class JsonQueue:
             return
         if self.committed_index < 0:    # Nothing to remove from file
             return
+        if self.queue_being_changed:
+            return
 
         lock_acquired = self.lock.acquire(blocking=True, timeout=0)
         if not lock_acquired:
             return
 
+        self.queue_being_changed = True
         lines = [json.dumps(d).replace('\n','<newline>') + '\n' for d in self.queue[self.committed_index+1:]]
         with open(self.file_path, 'w') as file:
             file.writelines(lines)
@@ -167,6 +219,7 @@ class JsonQueue:
             self.committed_index = -1
             self.last_file_write_time = time.time()
 
+        self.queue_being_changed = False
         self.lock.release()
 
 

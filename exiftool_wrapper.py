@@ -112,7 +112,23 @@ class ExifTool(object):
         process.stdin.write(file_args)
         process.stdin.flush()
         output = ""
+        message = ""
         fd = process.stdout.fileno()
+
+        message_started = False
+        # while True:
+        #     chunk = os.read(fd, 4096).decode('utf-8', errors='replace')
+        #     if not chunk:
+        #         break
+        #     if message_started:
+        #         message += chunk
+        #     else:
+        #         if chunk.endswith(self.sentinel):
+        #             chunk = chunk[:-len(self.sentinel)]
+        #             message_started = True
+        #         output += chunk
+        # return output, message
+
         while not output.endswith(self.sentinel):
             output += os.read(fd, 4096).decode('utf-8', errors='replace')
         return output[:-len(self.sentinel)]
@@ -133,8 +149,8 @@ class ExifTool(object):
         else:
             for filename in filenames:
                 args.append(filename)
-        tags_to_return = self.execute((args),ExifTool.read_process)
-        return json.loads(tags_to_return)
+        output = self.execute((args),ExifTool.read_process)
+        return json.loads(output)
 
     def setTags(self, filenames, tag_values={}):
         if tag_values=={}:
@@ -161,7 +177,9 @@ class ExifTool(object):
         else:
             for filename in filenames:
                 args.append(filename)
-        return self.execute(args,ExifTool.write_process)
+        output = self.execute(args,ExifTool.write_process)
+        return output
+
 
 
 
