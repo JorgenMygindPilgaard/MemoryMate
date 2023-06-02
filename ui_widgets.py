@@ -584,9 +584,10 @@ class DateTime(QDateTimeEdit):
             self.clear()
             self.setStyleSheet("color: #D3D3D3;")
             if date_time != "":  # Data was found
-                date_time = date_time.replace(" ", ":")  # 2022/12/24 13:50:00 --> 2022/12/24:13:50:00
-                date_time = date_time.replace("/", ":")  # 2022/12/24:13:50:00 --> 2022:12:24:13:50:00
-                date_time_parts = date_time.split(":")   # 2022:12:24:13:50:00 --> ["2022", "12", "24", "13", "50", "00"]
+                date_time = ''.join(date_time.split('+')[:1]) # 2022/12/24 13:50:00+02:00 --> 2022/12/24 13:50:00
+                date_time = date_time.replace(" ", ":")       # 2022/12/24 13:50:00 --> 2022/12/24:13:50:00
+                date_time = date_time.replace("/", ":")       # 2022/12/24:13:50:00 --> 2022:12:24:13:50:00
+                date_time_parts = date_time.split(":")        # 2022:12:24:13:50:00 --> ["2022", "12", "24", "13", "50", "00"]
                 while len(date_time_parts) < 6:
                     date_time_parts.append("")
                 self.setDateTime(QDateTime(int(date_time_parts[0]), int(date_time_parts[1]), int(date_time_parts[2]),
