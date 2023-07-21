@@ -769,6 +769,14 @@ class TextSet(QWidget):
             self.text_set=text_set    #Remember who you are serving
             self.setPlaceholderText('Tast navn')
 
+            default_font = self.font()
+            # Get the font size
+            point_size = default_font.pointSize()
+            pixel_size = default_font.pixelSize()
+#           print("Point Size:", point_size)
+#           print("Pixel Size:", pixel_size)
+
+
 
 
 class InputFileNamePattern(QDialog):

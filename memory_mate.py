@@ -50,6 +50,7 @@ app = QApplication(sys.argv)
 # Set stylesheet for entire app
 font=app.font()   #font from system
 font_family = font.family()
+#font_size = "12pt"
 font_size = str(font.pointSize())+"pt"
 font_weight = str(font.weight())
 app.setStyleSheet(f"* {{ font-family: {font_family}; font-size: {font_size}; font-weight: {font_weight};}}")
