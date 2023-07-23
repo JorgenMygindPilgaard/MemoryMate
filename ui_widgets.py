@@ -6,6 +6,7 @@ from file_metadata_util import FileMetadata, StandardizeFilenames, CopyLogicalTa
 from ui_util import ProgressBarWidget, AutoCompleteList
 import os
 from file_preview_util import FilePreview
+from ui_pick_gps_location import MapView, MapLocationSelector
 
 class FolderTree(QTreeView):
     def __init__(self,dir_path,file_list=None):
@@ -425,6 +426,9 @@ class FilePanel(QScrollArea):
             elif tag_type == "text_set":
                 tag_widget = TextSet(logical_tag)
                 FilePanel.tags[logical_tag] = [label_widget, tag_widget,tag_type]
+            elif tag_type == "geo_location":
+                tag_widget = GeoLocation(logical_tag)
+                FilePanel.tags[logical_tag] = [label_widget, tag_widget,tag_type]
             else:
                 pass
 
@@ -776,6 +780,60 @@ class TextSet(QWidget):
 #           print("Point Size:", point_size)
 #           print("Pixel Size:", pixel_size)
 
+class GeoLocation(MapView):
+    def __init__(self, logical_tag):
+        super().__init__(marker_editable=False, drag_enabled=False, zoom_enabled=False)
+
+        self.logical_tag = logical_tag                                    #Widget should remember who it serves
+        self.setFixedWidth(250)
+        self.setFixedHeight(250)
+
+        #Get attributes of tag
+        tag_attributes = settings.logical_tag_attributes.get(self.logical_tag)
+        if tag_attributes.get("Autocomplete"):                         #Enable autocompletion
+            self.auto_complete_list = AutoCompleteList.getInstance(logical_tag)
+            self.setCompleter(self.auto_complete_list)
+            autocompleter_file = os.path.join(settings.app_data_location, "autocomplete_" + self.logical_tag +'.txt')
+            self.auto_complete_list.setFileName(autocompleter_file)
+        self.readFromImage()
+        self.setLocationZoom(location=self.marker_location, zoom=15)
+        self.setMarkerLocation(self.marker_location)
+
+    def onMarkerLocationChanged(self, marker_location=[]):
+        self.marker_location = marker_location
+        self.setLocationZoom(location=self.marker_location, zoom=15)
+        self.setMarkerLocation(self.marker_location)
+        self.__edited()
+
+    def onLeftButton(self):          #redefined
+        if self.marker_location:
+            self.map_location_selector = MapLocationSelector(location=self.marker_location,marker_location=self.marker_location)
+        else:
+            self.map_location_selector = MapLocationSelector(location=[0,0], zoom=1)
+        self.map_location_selector.marker_location_changed.connect(self.onMarkerLocationChanged)
+        self.map_location_selector.show()
+
+
+    def readFromImage(self):
+        if FilePanel.file_metadata:
+            gps_position_string = FilePanel.file_metadata.logical_tag_values.get(self.logical_tag)    # "50.454545 -0.959595"
+            if gps_position_string != "":
+                gps_position_parts = gps_position_string.split(" ")
+                self.marker_location = [float(gps_position_parts[0]),float(gps_position_parts[1])]
+                if hasattr(self, 'auto_complete_list'):
+                    self.auto_complete_list.collectItem(gps_position_string)  # Collect new entry in auto_complete_list
+            else:
+                self.marker_location = None
+
+    def __edited(self):
+        if self.marker_location:
+            marker_location_string = str(self.marker_location[0])+' '+str(self.marker_location[1])
+        else:
+            marker_location_string = ''
+        FilePanel.file_metadata.setLogicalTagValues({self.logical_tag: marker_location_string})
+        # if hasattr(self, 'auto_complete_list'):
+        #     self.auto_complete_list.collectItem(self.date())    # Collect new entry in auto_complete_list
+        FilePanel.focus_tag=self.logical_tag
 
 
 
