@@ -818,7 +818,10 @@ class GeoLocation(MapView):
         if FilePanel.file_metadata:
             gps_position_string = FilePanel.file_metadata.logical_tag_values.get(self.logical_tag)    # "50.454545 -0.959595"
             if gps_position_string != "":
-                gps_position_parts = gps_position_string.split(" ")
+                if ',' in gps_position_string:
+                    gps_position_parts = gps_position_string.split(",")
+                else:
+                    gps_position_parts = gps_position_string.split(" ")
                 self.marker_location = [float(gps_position_parts[0]),float(gps_position_parts[1])]
                 if hasattr(self, 'auto_complete_list'):
                     self.auto_complete_list.collectItem(gps_position_string)  # Collect new entry in auto_complete_list
@@ -827,7 +830,7 @@ class GeoLocation(MapView):
 
     def __edited(self):
         if self.marker_location:
-            marker_location_string = str(self.marker_location[0])+' '+str(self.marker_location[1])
+            marker_location_string = str(self.marker_location[0])+','+str(self.marker_location[1])
         else:
             marker_location_string = ''
         FilePanel.file_metadata.setLogicalTagValues({self.logical_tag: marker_location_string})
