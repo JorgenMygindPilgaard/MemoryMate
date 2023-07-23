@@ -52,33 +52,57 @@ html = '''
 
 </body>
 <script>
+        var marker_editable = <marker_editable>;   // Python will replace <marker_editable> with true or false
+        var marker_latlng = <marker_latlng>;       // Python will replace <marker_latlng> with "L.latLng(55.7565, 9.4196)" or null
+        var drag_enabled = <drag_enabled>;         // Python will replace <drag_enabled> with true or false  
+        var zoom_enabled = <zoom_enabled>;         // Python will replace <zoom_enabled> with true or false
+        var zoom_level   = <zoom>;                 // Python will replace <zoom> with a zoom-level integer
+        var center_latitude = <latitude>;
+        var center_longitude = <longitude>; 
+        var keyboard_enabled = true;
+        if (!drag_enabled) {
+            keyboard_enabled = false;
+        };    
+        if (!zoom_enabled) {
+            keyboard_enabled = false;
+        };    
+
         var backend;
         new QWebChannel(qt.webChannelTransport, function (channel) {
             backend = channel.objects.backend;
         });
 
-        var map_10752484e8889439d742b34af4230171 = L.map(
-            "map_10752484e8889439d742b34af4230171",
-            {
-                center: [<latitude>, <longitude>],
-                crs: L.CRS.EPSG3857,
-                zoom: <zoom>,
-                zoomControl: true,
-                preferCanvas: false,
-            }
-        );
-
-        var tile_layer_c6e2500ab5a73f09082935d0d8cbb24f = L.tileLayer(
-            "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",
-            {"attribution": "Data by \\u0026copy; \\u003ca target=\\"_blank\\" href=\\"http://openstreetmap.org\\"\\u003eOpenStreetMap\\u003c/a\\u003e, under \\u003ca target=\\"_blank\\" href=\\"http://www.openstreetmap.org/copyright\\"\\u003eODbL\\u003c/a\\u003e.", "detectRetina": false, "maxNativeZoom": 18, "maxZoom": 18, "minZoom": 0, "noWrap": false, "opacity": 1, "subdomains": "abc", "tms": false}
-        ).addTo(map_10752484e8889439d742b34af4230171);
+        if (center_latitude!=null && center_longitude!=null) {
+            var map_10752484e8889439d742b34af4230171 = L.map(
+                "map_10752484e8889439d742b34af4230171",
+                {
+                    center: [center_latitude, center_longitude],
+                    crs: L.CRS.EPSG3857,
+                    preferCanvas: false,
+                    zoom: zoom_level,
+                    zoomControl: zoom_enabled, 
+                    dragging: drag_enabled,
+                    touchZoom: zoom_enabled,
+                    scrollWheelZoom: zoom_enabled,
+                    doubleClickZoom: zoom_enabled,
+                    boxZoom: zoom_enabled,
+                    keyboard: keyboard_enabled,
+                }
+            );
+    
+            var tile_layer_c6e2500ab5a73f09082935d0d8cbb24f = L.tileLayer(
+                "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",
+                {"attribution": "Data by \\u0026copy; \\u003ca target=\\"_blank\\" href=\\"http://openstreetmap.org\\"\\u003eOpenStreetMap\\u003c/a\\u003e, under \\u003ca target=\\"_blank\\" href=\\"http://www.openstreetmap.org/copyright\\"\\u003eODbL\\u003c/a\\u003e.", "detectRetina": false, "maxNativeZoom": 18, "maxZoom": 18, "minZoom": 0, "noWrap": false, "opacity": 1, "subdomains": "abc", "tms": false}
+            ).addTo(map_10752484e8889439d742b34af4230171);
+            map_10752484e8889439d742b34af4230171.on('click',onClick);
+        };
 
         var previous_marker = null;
-        map_10752484e8889439d742b34af4230171.on('click',onClick);
 
-        var marker_latlng = <marker_latlng>;                // Here python will inject position of initial marker, if any, like "L.latLng(55.7565, 9.4196)". If none, it will inject "null"
-//      var marker_latlng = null;                           // After injection, the line will look like this line...                 
-//      var marker_latlng = L.latLng(55.7565, 9.4196);      // ....or like this line                
+        if (center_latitude==null || center_longitude==null) {    //When no map, still react on click
+            document.addEventListener("mousedown", onClick);
+        };    
+
         if (marker_latlng) {
             setMarker(marker_latlng);
             is_init_marker = false;
@@ -95,13 +119,17 @@ html = '''
         };
 
 	    function onMoveMarker(e){		
-            sendMarkerLocationToBackend(e.target.getLatLng()); 
+            var latlng = e.target.getLatLng();
+            var latitude = latlng.lat.toFixed(4),
+                longitude = latlng.lng.toFixed(4);
+            e.target.bindPopup("Latitude: " + latitude + "<br>Longitude: " + longitude );
+            sendMarkerLocationToBackend(latlng); 
 	    };
 
         function sendMarkerLocationToBackend(latlng){
             if (latlng) {
-                var latitude = latlng.lat.toFixed(4),
-                    longitude = latlng.lng.toFixed(4);
+                var latitude = latlng.lat.toFixed(6),
+                    longitude = latlng.lng.toFixed(6);
                 var location_json = JSON.stringify({ latitude, longitude });
             };
             if (latlng == null) {
@@ -110,16 +138,27 @@ html = '''
                     location_json = JSON.stringify({ latitude, longitude });
             };
             backend.jsonSetMarkerLocation(location_json);
-        };                     
+        };
+        
+        function sendEventToBackend(event){
+            var event_json = JSON.stringify({ event });
+            backend.jsonEvent(event_json);
+        };
+                             
 
         function setMarker(latlng){
+            if (previous_marker && !marker_editable) {
+                return;
+            };    
             if (previous_marker) {
                 map_10752484e8889439d742b34af4230171.removeLayer(previous_marker);
             };
             var new_mark = L.marker().setLatLng(latlng).addTo(map_10752484e8889439d742b34af4230171);
-            new_mark.dragging.enable();
-            new_mark.on('dblclick', onDblclickMarker);
-            new_mark.on('dragend', onMoveMarker);
+            if (marker_editable) {
+                new_mark.dragging.enable();
+                new_mark.on('dblclick', onDblclickMarker);
+                new_mark.on('dragend', onMoveMarker);
+            };    
             var latitude = latlng.lat.toFixed(4),
                 longitude = latlng.lng.toFixed(4);
             new_mark.bindPopup("Latitude: " + latitude + "<br>Longitude: " + longitude );
@@ -127,18 +166,21 @@ html = '''
         };
 
         function onClick(e){
-            setMarker(e.latlng);
-            sendMarkerLocationToBackend(e.latlng);
+            if (marker_editable) {
+                setMarker(e.latlng);
+                sendMarkerLocationToBackend(e.latlng);
+            } else {
+                sendEventToBackend('left_button');
+            };    
         };
 </script>
 </html>
 '''
 
-
 class MapLocationSelector(QWidget):
-    location_changed = pyqtSignal(list)
+    marker_location_changed = pyqtSignal(list)
 
-    def __init__(self, location=[55.7565, 9.4196], zoom=17, marker_location=None):
+    def __init__(self, location=None, zoom=15, marker_location=None):
         super().__init__()
         self.setWindowTitle('Search and click Location')
         self.setGeometry(100, 100, 800, 600)
@@ -147,7 +189,7 @@ class MapLocationSelector(QWidget):
         layout = QVBoxLayout(self)
 
         # Create a web view to display the map
-        self.map_view = MapView(location, zoom, marker_location)
+        self.map_view = MapView(location, zoom, marker_location, marker_editable=True, zoom_enabled=True, drag_enabled=True)
 
         # Create a search box widget
         self.search_box = QLineEdit()
@@ -185,19 +227,15 @@ class MapLocationSelector(QWidget):
         geolocation = geolocator.geocode(self.search_box.text())
         if geolocation:
             self.message_label.setText('')
-            self.map_view.html = html
             self.map_view.setLocationZoom([geolocation.latitude, geolocation.longitude])
-            self.map_view.setMarkerLocation(self.map_view.marker_location)
-            self.map_view.setHtml(self.map_view.html)
         else:
             self.message_label.setText('Location not found')
 
     def onOk(self):
-        print(self.map_view.marker_location)
         if self.map_view.marker_location:
-            self.location_changed.emit(self.map_view.marker_location)
+            self.marker_location_changed.emit(self.map_view.marker_location)
         else:
-            self.location_changed.emit([])
+            self.marker_location_changed.emit([])
         self.close()
 
     def onCancel(self):
@@ -205,7 +243,7 @@ class MapLocationSelector(QWidget):
 
 
 class MapView(QWebEngineView):
-    def __init__(self, location=[55.7565, 9.4196], zoom=17, marker_location=None):
+    def __init__(self, location=None, zoom=15, marker_location=None, marker_editable=False, drag_enabled=False, zoom_enabled=False ):
         super().__init__()
 
         # setup channel
@@ -215,15 +253,18 @@ class MapView(QWebEngineView):
 
         self.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
 
+        self.location = location
+        self.zoom = zoom
         self.marker_location = marker_location
-        self.html = html
-        self.setLocationZoom(location, zoom)
+        self.marker_editable = marker_editable
+        self.drag_enabled = drag_enabled
+        self.zoom_enabled = zoom_enabled
+        self.setLocationZoom(self.location, self.zoom)
         self.setMarkerLocation(self.marker_location)
-        self.setHtml(self.html)
 
     @pyqtSlot(str)
-    def jsonSetMarkerLocation(self, result):
-        location_dictionary = json.loads(result)
+    def jsonSetMarkerLocation(self, location_json):
+        location_dictionary = json.loads(location_json)
         if location_dictionary.get('longitude') and location_dictionary.get('latitude'):
             longitude = float(location_dictionary.get('longitude'))
             latitude = float(location_dictionary.get('latitude'))
@@ -231,23 +272,57 @@ class MapView(QWebEngineView):
         else:
             self.marker_location = None
 
+    @pyqtSlot(str)
+    def jsonEvent(self, event_json):
+        event_dictionary = json.loads(event_json)
+        event = event_dictionary.get('event')
+        if event == 'left_button':
+            self.onLeftButton()
+    def onLeftButton(self):     #Redefine this method to react on left button mouse-click
+        pass
+
     def setMarkerLocation(self, marker_location):
-        if marker_location:
+        self.marker_location = marker_location
+        self.__buildHtml()
+
+    def setLocationZoom(self, location, zoom=15):
+        self.location = location
+        self.zoom = zoom
+        self.__buildHtml()
+
+    def __buildHtml(self):
+        if self.marker_location:
             replacement_string = "L.latLng(<latitude>, <longitude>)"
-            replacement_string = replacement_string.replace("<latitude>", str(marker_location[0]), 1)
-            replacement_string = replacement_string.replace("<longitude>", str(marker_location[1]), 1)
+            replacement_string = replacement_string.replace("<latitude>", str(self.marker_location[0]), 1)
+            replacement_string = replacement_string.replace("<longitude>", str(self.marker_location[1]), 1)
         else:
             replacement_string = "null"
-        self.html = self.html.replace("<marker_latlng>", replacement_string, 1)
+        self.html = html.replace("<marker_latlng>", replacement_string, 1)
 
-    def setLocationZoom(self, location, zoom=13):
-        self.html = self.html.replace('<latitude>', str(location[0]), 1)
-        self.html = self.html.replace("<longitude>", str(location[1]), 1)
-        self.html = self.html.replace('<zoom>', str(zoom), 1)
-
+        if self.location:
+            self.html = self.html.replace('<latitude>', str(self.location[0]), 1)
+            self.html = self.html.replace("<longitude>", str(self.location[1]), 1)
+        else:
+            self.html = self.html.replace('<latitude>', 'null', 1)
+            self.html = self.html.replace("<longitude>", 'null', 1)
+        self.html = self.html.replace('<zoom>', str(self.zoom), 1)
+        if self.marker_editable:
+            self.html = self.html.replace('<marker_editable>', 'true', 1)
+        else:
+            self.html = self.html.replace('<marker_editable>', 'false', 1)
+        if self.drag_enabled:
+            self.html = self.html.replace('<drag_enabled>', 'true', 1)
+        else:
+            self.html = self.html.replace('<drag_enabled>', 'false', 1)
+        if self.zoom_enabled:
+            self.html = self.html.replace('<zoom_enabled>', 'true', 1)
+        else:
+            self.html = self.html.replace('<zoom_enabled>', 'false', 1)
+        self.setHtml(self.html)
 
 if __name__ == '__main__':
     app = QApplication(sys.argv)
     widget = MapLocationSelector()
+#    widget = MapView()
     widget.show()
     sys.exit(app.exec_())

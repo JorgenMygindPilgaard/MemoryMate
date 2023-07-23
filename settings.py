@@ -45,7 +45,8 @@ if not os.path.isfile(settings_path):
                     "photographer":      "text_line",
                     "source":            "text_line",
                     "original_filename": "text_line",
-                    "description": "reference_tag"  # Always type text
+                    "geo_location":      "geo_location",
+                    "description":       "reference_tag"  # Always type text
                     }
     reference_tag_content = {"description": [{"type": "tag", "tag_name": "title", "tag_label": False},
                                              {"type": "tag", "tag_name": "description_only", "tag_label": False},
@@ -63,7 +64,8 @@ if not os.path.isfile(settings_path):
                                 "persons":           {"DA": "Personer",            "EN": "People"},
                                 "photographer":      {"DA": "Fotograf",            "EN": "Photographer"},
                                 "source":            {"DA": "Oprindelse",          "EN": "Source"},
-                                "original_filename": {"DA": "Oprindeligt filnavn", "EN": "Original filename"}
+                                "original_filename": {"DA": "Oprindeligt filnavn", "EN": "Original filename"},
+                                "geo_location":      {"DA": "Geo-lokation",        "EN": "Geo-location"}
                                 }
 
     logical_tag_attributes = {"title": {},
@@ -77,7 +79,8 @@ if not os.path.isfile(settings_path):
                               "persons": {"Autocomplete": True},
                               "photographer": {"Autocomplete": True},
                               "source": {"Autocomplete": True},
-                              "original_filename": {}
+                              "original_filename": {},
+                              "geo_location":{}
                               }
 
     tags = {"XMP:Title": {"type": "text_line", "access": "Read/Write"},
@@ -115,7 +118,8 @@ if not os.path.isfile(settings_path):
             "Quicktime:Category": {"type": "text_set", "access": "Read/Write"},
             "Quicktime:Artist": {"type": "text_line", "access": "Read/Write"},
             "RIFF:DateTimeOriginal": {"type": "date_time", "access": "Read"},
-            "File:FileCreateDate": {"type": "date_time", "access": "Read"}
+            "File:FileCreateDate": {"type": "date_time", "access": "Read"},
+            "Composite:GPSPosition": {"type": "geo_location", "access": "Read/Write"}
             }
     file_type_tags = {
         "jpg": {"title": ["XMP:Title", "EXIF:XPTitle", "IPTC:ObjectName"],
@@ -125,6 +129,7 @@ if not os.path.isfile(settings_path):
                 "persons": ["XMP-iptcExt:PersonInImage", "XMP-MP:RegionPersonDisplayName", "XMP:Subject",
                             "EXIF:XPKeywords", "IPTC:Keywords"],
                 "photographer": ["XMP:Creator", "EXIF:Artist", "EXIF:XPAuthor", "IPTC:By-line"],
+                "geo_location": ["Composite:GPSPosition"],
                 "source": ["XMP:Source"],
                 "original_filename": ["XMP:PreservedFileName"],
                 "description": ["XMP:Description", "EXIF:XPComment", "EXIF:UserComment", "EXIF:ImageDescription",
@@ -137,6 +142,7 @@ if not os.path.isfile(settings_path):
                 "persons": ["XMP-iptcExt:PersonInImage", "XMP-MP:RegionPersonDisplayName", "XMP:Subject",
                             "EXIF:XPKeywords", "IPTC:Keywords"],
                 "photographer": ["XMP:Creator", "EXIF:Artist", "EXIF:XPAuthor", "IPTC:By-line"],
+                "geo_location": ["Composite:GPSPosition"],
                 "source": ["XMP:Source"],
                 "original_filename": ["XMP:PreservedFileName"],
                 "description": ["XMP:Description", "EXIF:XPComment", "EXIF:UserComment", "EXIF:ImageDescription",
@@ -149,6 +155,7 @@ if not os.path.isfile(settings_path):
                 "persons": ["XMP-iptcExt:PersonInImage", "XMP-MP:RegionPersonDisplayName", "XMP:Subject",
                             "EXIF:XPKeywords", "IPTC:Keywords"],
                 "photographer": ["XMP:Creator", "EXIF:Artist", "EXIF:XPAuthor", "IPTC:By-line"],
+                "geo_location": ["Composite:GPSPosition"],
                 "source": ["XMP:Source"],
                 "original_filename": ["XMP:PreservedFileName"],
                 "description": ["XMP:Description", "EXIF:XPComment", "EXIF:UserComment", "EXIF:ImageDescription",
@@ -160,6 +167,7 @@ if not os.path.isfile(settings_path):
                 "persons": ["XMP-iptcExt:PersonInImage", "XMP-MP:RegionPersonDisplayName", "XMP:Subject",
                             "EXIF:XPKeywords"],
                 "photographer": ["XMP:Creator", "EXIF:Artist", "EXIF:XPAuthor"],
+                "geo_location": ["Composite:GPSPosition"],
                 "source": ["XMP:Source"],
                 "original_filename": ["XMP:PreservedFileName"],
                 "description": ["XMP:Description", "EXIF:XPComment", "EXIF:UserComment", "EXIF:ImageDescription"]
@@ -171,6 +179,7 @@ if not os.path.isfile(settings_path):
                 "persons": ["XMP-iptcExt:PersonInImage", "XMP-MP:RegionPersonDisplayName", "XMP:Subject",
                             "EXIF:XPKeywords"],
                 "photographer": ["XMP:Creator", "EXIF:Artist", "EXIF:XPAuthor"],
+                "geo_location": ["Composite:GPSPosition"],
                 "source": ["XMP:Source"],
                 "original_filename": ["XMP:PreservedFileName"],
                 "description": ["XMP:Description", "EXIF:XPComment", "EXIF:UserComment", "EXIF:ImageDescription"]
@@ -181,6 +190,7 @@ if not os.path.isfile(settings_path):
                 "persons": ["XMP-iptcExt:PersonInImage", "XMP-MP:RegionPersonDisplayName", "XMP:Subject",
                             "EXIF:XPKeywords"],
                 "photographer": ["XMP:Creator", "EXIF:Artist", "EXIF:XPAuthor"],
+                "geo_location": ["Composite:GPSPosition"],
                 "source": ["XMP:Source"],
                 "original_filename": ["XMP:PreservedFileName"],
                 "description": ["XMP:Description", "EXIF:XPComment", "EXIF:UserComment", "EXIF:ImageDescription"]
@@ -192,6 +202,7 @@ if not os.path.isfile(settings_path):
                 "persons": ["XMP-iptcExt:PersonInImage", "XMP-MP:RegionPersonDisplayName", "XMP:Subject",
                             "EXIF:XPKeywords", "IPTC:Keywords"],
                 "photographer": ["XMP:Creator", "EXIF:Artist", "EXIF:XPAuthor", "IPTC:By-line"],
+                "geo_location": ["Composite:GPSPosition"],
                 "source": ["XMP:Source"],
                 "original_filename": ["XMP:PreservedFileName"],
                 "description": ["XMP:Description", "EXIF:XPComment", "EXIF:UserComment", "EXIF:ImageDescription",
@@ -204,6 +215,7 @@ if not os.path.isfile(settings_path):
                 "persons": ["XMP-iptcExt:PersonInImage", "XMP-MP:RegionPersonDisplayName", "XMP:Subject",
                             "EXIF:XPKeywords", "IPTC:Keywords"],
                 "photographer": ["XMP:Creator", "EXIF:Artist", "EXIF:XPAuthor", "IPTC:By-line"],
+                "geo_location": ["Composite:GPSPosition"],
                 "source": ["XMP:Source"],
                 "original_filename": ["XMP:PreservedFileName"],
                 "description": ["XMP:Description", "EXIF:XPComment", "EXIF:UserComment", "EXIF:ImageDescription",
@@ -215,6 +227,7 @@ if not os.path.isfile(settings_path):
                  "persons": ["XMP-iptcExt:PersonInImage", "XMP-MP:RegionPersonDisplayName", "XMP:Subject",
                              "EXIF:XPKeywords"],
                  "photographer": ["XMP:Creator", "EXIF:Artist", "EXIF:XPAuthor"],
+                 "geo_location": ["Composite:GPSPosition"],
                  "source": ["XMP:Source"],
                  "original_filename": ["XMP:PreservedFileName"],
                  "description": ["XMP:Description", "EXIF:XPComment", "EXIF:UserComment", "EXIF:ImageDescription"]
@@ -226,6 +239,7 @@ if not os.path.isfile(settings_path):
                 "persons": ["XMP-iptcExt:PersonInImage", "XMP-MP:RegionPersonDisplayName", "XMP:Subject",
                             "EXIF:XPKeywords", "IPTC:Keywords"],
                 "photographer": ["XMP:Creator", "EXIF:Artist", "EXIF:XPAuthor", "IPTC:By-line"],
+                "geo_location": ["Composite:GPSPosition"],
                 "source": ["XMP:Source"],
                 "original_filename": ["XMP:PreservedFileName"],
                 "description": ["XMP:Description", "EXIF:XPComment", "EXIF:UserComment", "EXIF:ImageDescription",
@@ -237,6 +251,7 @@ if not os.path.isfile(settings_path):
                 "persons": ["XMP-iptcExt:PersonInImage", "XMP-MP:RegionPersonDisplayName", "XMP:Subject",
                             "EXIF:XPKeywords"],
                 "photographer": ["XMP:Creator", "EXIF:Artist", "EXIF:XPAuthor"],
+                "geo_location": ["Composite:GPSPosition"],
                 "source": ["XMP:Source"],
                 "original_filename": ["XMP:PreservedFileName"],
                 "description": ["XMP:Description", "EXIF:XPComment", "EXIF:UserComment", "EXIF:ImageDescription"]
@@ -248,6 +263,7 @@ if not os.path.isfile(settings_path):
                 "description_only": ["XMP:DescriptionOnly"],
                 "persons": ["XMP:Subject", "Quicktime:Category"],
                 "photographer": ["XMP:Creator", "Quicktime:Artist"],
+                "geo_location": ["Composite:GPSPosition"],
                 "source": ["XMP:Source"],
                 "original_filename": ["XMP:PreservedFileName"],
                 "description": ["XMP:Description", "Quicktime:Comment"]
@@ -259,6 +275,7 @@ if not os.path.isfile(settings_path):
                 "description_only": ["XMP:DescriptionOnly"],
                 "persons": ["XMP:Subject", "Quicktime:Category"],
                 "photographer": ["XMP:Creator", "Quicktime:Artist"],
+                "geo_location": ["Composite:GPSPosition"],
                 "source": ["XMP:Source"],
                 "original_filename": ["XMP:PreservedFileName"],
                 "description": ["XMP:Description", "Quicktime:Comment"]
