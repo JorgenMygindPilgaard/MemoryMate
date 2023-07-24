@@ -226,12 +226,12 @@ class FileMetadata(QObject):
 
 def renameFileInstances(old_file_name, new_file_name):     # reacts on change filename signal from
     # Rename filename in metadata-instance
-    file_metadata = FileMetadata.getInstance(old_file_name)
+    file_metadata = FileMetadata.instance_index.get(old_file_name)
     if file_metadata:
         file_metadata.updateFilename(new_file_name)
 
     # Rename filename in preview-instance
-    file_preview = file_preview_util.FilePreview.getInstance(old_file_name)
+    file_preview = file_preview_util.FilePreview.instance_index.get(old_file_name)
     if file_preview:
         file_preview.updateFilename(new_file_name)
 
