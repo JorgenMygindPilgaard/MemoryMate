@@ -106,7 +106,7 @@ class FileRenamer(QObject):
                     raise FileRenameError('error renaming ' + new_name + ' to ' + backup_name)
                 # If the backup-file is also due for renaming, old_name for the entry
                 for backup_index, backup_file in enumerate(self.files):
-                    if backup_file['old_name'] == new_name:
+                    if backup_file['old_name'].lower() == new_name.lower():
                         self.files[backup_index]['old_name'] = backup_name
 
         # Rename files
