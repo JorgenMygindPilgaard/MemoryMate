@@ -254,6 +254,7 @@ class StandardizeFilenames(QObject):
     progress_init_signal = pyqtSignal(int)       # Sends number of entries to be processed
     progress_signal = pyqtSignal(int)    # Sends number of processed records
     done_signal = pyqtSignal()
+    error_signal = pyqtSignal(Exception, bool)     #Sends exception and retry_allowed (true/false)
 
     def __init__(self,target, prefix='', number_pattern='nnn', suffix='',await_start_signal=False):
         super().__init__()
@@ -360,8 +361,12 @@ class StandardizeFilenames(QObject):
         if files_for_renaming != []:
             renamer=file_util.FileRenamer.getInstance(files_for_renaming)
             renamer.filename_changed_signal.connect(renameFileInstances)
-            renamer.start()
-
+            try:
+                renamer.start()
+            except Exception as e:
+                self.error_signal.emit(e,False)
+                self.done_signal.emit()
+                return
 
         # Set original filename tag in all files
         if settings.logical_tags.get('original_filename'):
@@ -383,6 +388,7 @@ class CopyLogicalTags(QObject):
     progress_init_signal = pyqtSignal(int)       # Sends number of entries to be processed
     progress_signal = pyqtSignal(int)    # Sends number of processed records
     done_signal = pyqtSignal()
+    error_signal = pyqtSignal(Exception, bool)     #Sends exception and retry_allowed (true/false)
 
     def __init__(self, source, target, logical_tags, match_file_name=False, overwrite=True, await_start_signal=False):
         super().__init__()
@@ -444,6 +450,8 @@ class ConsolidateMetadata(QObject):
     progress_init_signal = pyqtSignal(int)       # Sends number of entries to be processed
     progress_signal = pyqtSignal(int)            # Sends number of processed records
     done_signal = pyqtSignal()
+    error_signal = pyqtSignal(Exception, bool)  # Sends exception and retry_allowed (true/false)
+
 
     def __init__(self,target, await_start_signal=False):
         # target is a filename, a foldername, a list of filenames or a list of folder-names
