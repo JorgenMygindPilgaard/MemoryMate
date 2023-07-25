@@ -119,7 +119,7 @@ class FileRenamer(QObject):
                 renamed_files.append(file)
             except Exception as e:
                 __roll_back(renamed_files)
-                raise FileRenameError('error renaming ' + old_name + ' to ' + new_name)
+                raise FileRenameError('Error renaming ' + old_name + ' to ' + new_name + ':\n'+str(e))
 
         for file in renamed_files:
             self.filename_changed_signal.emit(file.get('old_name'), file.get('new_name'))
