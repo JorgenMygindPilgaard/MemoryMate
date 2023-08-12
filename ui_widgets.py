@@ -8,13 +8,16 @@ import os
 from file_preview_util import FilePreview
 from ui_pick_gps_location import MapView, MapLocationSelector
 import json
+import os
 
 
 class UiStatusManager():
     def __init__(self,status_file_name: str=""):
         self.status_file_name = status_file_name
-        with open(self.status_file_name, 'r') as infile:
-            self.status_parameters = json.load(infile)
+        self.status_parameters = {}
+        if os.path.exists(self.status_file_name):
+            with open(self.status_file_name, 'r') as infile:
+                self.status_parameters = json.load(infile)
 
     def setUiStatusParameters(self,status_parameters={}):
         # Write or replace status-parameters in status file
@@ -53,9 +56,14 @@ class FilePanel(QScrollArea):
             FilePanel.file_metadata.save()
         if FilePanel.__instance==None:
             FilePanel.__instance=FilePanel()
-        FilePanel.file_name=file_name
-        FilePanel.file_metadata=FileMetadata.getInstance(file_name)
-        FilePanel.file_metadata.change_signal.connect(FilePanel.metadataChanged)    # If a copy-process changes file
+        if file_name==None or file_name == '':
+            FilePanel.file_name = ''
+            FilePanel.file_metadata = None
+        else:
+            if os.path.isfile(file_name):
+                FilePanel.file_name=file_name
+                FilePanel.file_metadata=FileMetadata.getInstance(FilePanel.file_name)
+                FilePanel.file_metadata.change_signal.connect(FilePanel.metadataChanged)    # If a copy-process changes file
         FilePanel.__instance.prepareFilePanel()
         return FilePanel.__instance
 
@@ -480,22 +488,23 @@ class FileList(QTreeView):
             return self.file_panel.file_name
 
     def setOpenFolders(self, open_folders=[]):
-        for open_folder in open_folders:
-            # Find the QModelIndex corresponding to the folder_path
-            folder_index = self.model.index(open_folder)
-            if folder_index.isValid():  # Check if the folder exists in the model
-                # Expand the folder
-                self.setExpanded(folder_index, True)
+        if open_folders:
+            for open_folder in open_folders:
+                # Find the QModelIndex corresponding to the folder_path
+                folder_index = self.model.index(open_folder)
+                if folder_index.isValid():  # Check if the folder exists in the model
+                    # Expand the folder
+                    self.setExpanded(folder_index, True)
 
     def setSelectedItems(self, selected_items=[]):
         self.clearSelection()
-
-        for selected_item in selected_items:
-            # Find the QModelIndex corresponding to the item_path
-            item_index = self.model.index(selected_item)
-            if item_index.isValid():  # Check if the item exists in the model
-                # Select the item
-                self.selectionModel().select(item_index, self.selectionModel().Select)
+        if selected_items:
+            for selected_item in selected_items:
+                # Find the QModelIndex corresponding to the item_path
+                item_index = self.model.index(selected_item)
+                if item_index.isValid():  # Check if the item exists in the model
+                    # Select the item
+                    self.selectionModel().select(item_index, self.selectionModel().Select)
 
     def setCurrentFile(self, current_file=""):
         self.file_panel=FilePanel.getInstance(current_file)
@@ -641,6 +650,13 @@ class DateTime(QDateTimeEdit):
 
         self.setCalendarPopup(True)
         self.setFixedWidth(250)
+
+        display_format = self.displayFormat()
+        if not 'mm.ss' in display_format.lower():
+            self.setDisplayFormat(display_format+'.ss')
+        display_format = self.displayFormat()
+
+
 
         #Get attributes of tag
         tag_attributes = settings.logical_tag_attributes.get(self.logical_tag)
