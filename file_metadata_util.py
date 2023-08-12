@@ -69,6 +69,8 @@ class FileMetadata(QObject):
                     tag_value = list(map(str, tag_value))   # Convert any numbers in list ti string
                 else:
                     tag_value = str(tag_value)
+                if tag == 'Composite:GPSPosition':
+                    tag_value = tag_value.replace(' ',',',1)    # Hack: ExifTool delivers space-saparated but expect comma-separated on updates
                 tag_values[tag] = tag_value
 
         # Finally map tag_values to logical_tag_values
