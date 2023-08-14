@@ -1,9 +1,9 @@
 import sys
 from ui_widgets import *
-from PyQt5.QtWidgets import QWidget,QMainWindow,QApplication
+from PyQt6.QtWidgets import QWidget,QMainWindow,QApplication
 from exiftool_wrapper import ExifTool
 from file_metadata_util import QueueHost
-from PyQt5.QtGui import QGuiApplication
+
 
 class MainWindow(QMainWindow):
     def __init__(self):
@@ -18,6 +18,7 @@ class MainWindow(QMainWindow):
         #-------------------------------------------------------------------------------------------------------------
         # File (Right part of MainWindow)
         self.file_panel = FilePanel.getInstance(self.ui_status.getStatusParameter('current_file'))
+#        self.file_panel = FilePanel.getInstance('')
 
         # File list (Left part of MainWindow)
         self.file_list = FileList(dir_path='', file_panel=self.file_panel)

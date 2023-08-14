@@ -1,6 +1,6 @@
-from PyQt5.QtWidgets import QWidget, QVBoxLayout, QProgressBar, QLabel,  QCompleter, QAction,QMessageBox
-from PyQt5.QtCore import QThread, QStringListModel, Qt,pyqtSignal
-from PyQt5.QtGui import QIcon
+from PyQt6.QtWidgets import QWidget, QVBoxLayout, QProgressBar, QLabel,  QCompleter, QMessageBox
+from PyQt6.QtCore import QThread, QStringListModel, Qt
+from PyQt6.QtGui import QIcon, QAction
 import os
 
 class ProgressBarWidget(QWidget):
@@ -55,9 +55,9 @@ class ProgressBarWidget(QWidget):
     def errorHandler(self, error, retry_allowed=False):
         msg_box = QMessageBox()
         msg_box.setWindowTitle("Error")
-        msg_box.setIcon(QMessageBox.Critical)
+        msg_box.setIcon(QMessageBox.Icon.Critical)
         msg_box.setText(str(error))
-        msg_box.exec_()
+        msg_box.exec()
 
 class AutoCompleteList(QCompleter):
     get_instance_active = False  # To be able to give error when instantiated directly, outside get_instance
@@ -71,8 +71,8 @@ class AutoCompleteList(QCompleter):
         self.list_name = list_name
         self.file_name = ""
         self.list = []
-#        self.completer = QCompleter()
-        self.setCaseSensitivity(Qt.CaseInsensitive)
+        self.completer = QCompleter()
+        self.setCaseSensitivity(Qt.CaseSensitivity.CaseInsensitive)
         self.model = QStringListModel()
         self.setModel(self.model)
 

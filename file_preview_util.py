@@ -1,5 +1,5 @@
-from PyQt5.QtGui import QPixmap, QImage
-from PyQt5.QtCore import Qt
+from PyQt6.QtGui import QPixmap, QImage
+from PyQt6.QtCore import Qt
 from PIL import Image
 import rawpy
 import pillow_heif
@@ -19,7 +19,7 @@ class FilePreview():
             pixmap = QPixmap(file_name)
 
         height = int(width * 9 / 16)
-        self.pixmap = pixmap.scaled(width, height, Qt.KeepAspectRatio,Qt.SmoothTransformation)
+        self.pixmap = pixmap.scaled(width, height, Qt.AspectRatioMode.KeepAspectRatio,Qt.TransformationMode.SmoothTransformation)
         self.width = width
         FilePreview.instance_index[file_name] = self
 
@@ -29,7 +29,7 @@ class FilePreview():
             pil_image = pil_image.convert("RGB")
         image_data = pil_image.tobytes()
         width, height = pil_image.size
-        image_format = QImage.Format_RGB888
+        image_format = QImage.Format.Format_RGB888
         qimage = QImage(image_data, width, height, image_format)
         return QPixmap.fromImage(qimage)
 

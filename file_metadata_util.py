@@ -1,9 +1,9 @@
 import copy
-from PyQt5.QtCore import QThread, QCoreApplication
+from PyQt6.QtCore import QThread, QCoreApplication
 
 import file_preview_util
 from exiftool_wrapper import ExifTool
-from PyQt5.QtCore import QObject,pyqtSignal
+from PyQt6.QtCore import QObject,pyqtSignal
 import settings
 import  os
 import file_util

@@ -1,9 +1,9 @@
 import sys
 import json
-from PyQt5.QtWidgets import QApplication, QWidget, QHBoxLayout, QVBoxLayout, QLineEdit, QPushButton, QLabel, QSizePolicy
-from PyQt5.QtWebEngineWidgets import QWebEngineView
-from PyQt5.QtCore import pyqtSlot, pyqtSignal
-from PyQt5.QtWebChannel import QWebChannel
+from PyQt6.QtWidgets import QApplication, QWidget, QHBoxLayout, QVBoxLayout, QLineEdit, QPushButton, QLabel, QSizePolicy
+from PyQt6.QtWebEngineWidgets import QWebEngineView
+from PyQt6.QtCore import pyqtSlot, pyqtSignal
+from PyQt6.QtWebChannel import QWebChannel
 from geopy.geocoders import Nominatim
 
 html = '''
@@ -251,7 +251,7 @@ class MapView(QWebEngineView):
         self.channel.registerObject('backend', self)
         self.page().setWebChannel(self.channel)
 
-        self.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
+        self.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
 
         self.location = location
         self.zoom = zoom
@@ -320,9 +320,3 @@ class MapView(QWebEngineView):
             self.html = self.html.replace('<zoom_enabled>', 'false', 1)
         self.setHtml(self.html)
 
-if __name__ == '__main__':
-    app = QApplication(sys.argv)
-    widget = MapLocationSelector()
-#    widget = MapView()
-    widget.show()
-    sys.exit(app.exec_())
