@@ -1,10 +1,9 @@
-from PyQt5.QtWidgets import QWidget, QHBoxLayout, QVBoxLayout, QTreeView, QFileSystemModel, QLabel, QLineEdit, QPlainTextEdit, QDateTimeEdit, QDateEdit, QPushButton, QListWidget, QAbstractItemView, QMenu, QAction, QDialog, QScrollArea
-from PyQt5.QtCore import Qt, QDir, QDateTime, QDate, QModelIndex,QTimer, pyqtSignal
-from PyQt5.QtGui import QFontMetrics
+from PyQt6.QtWidgets import QWidget, QHBoxLayout, QVBoxLayout, QTreeView, QLabel, QLineEdit, QPlainTextEdit, QDateTimeEdit, QDateEdit, QPushButton, QListWidget, QAbstractItemView, QMenu, QDialog, QScrollArea
+from PyQt6.QtCore import Qt, QDir, QDateTime, QDate, QModelIndex,QTimer, pyqtSignal,QItemSelectionModel
+from PyQt6.QtGui import QFontMetrics,QFileSystemModel,QAction
 import settings
 from file_metadata_util import FileMetadata, StandardizeFilenames, CopyLogicalTags, ConsolidateMetadata
 from ui_util import ProgressBarWidget, AutoCompleteList
-import os
 from file_preview_util import FilePreview
 from ui_pick_gps_location import MapView, MapLocationSelector
 import json
@@ -84,14 +83,14 @@ class FilePanel(QScrollArea):
             FilePanel.file_preview = QLabel()
             FilePanel.pixmap = FilePreview.getInstance(FilePanel.file_name,self.width()-60).pixmap
             FilePanel.file_preview.setPixmap(FilePanel.pixmap)
-            FilePanel.file_preview.setAlignment(Qt.AlignHCenter)
+            FilePanel.file_preview.setAlignment(Qt.AlignmentFlag.AlignHCenter)
             FilePanel.main_layout.addWidget(FilePanel.file_preview)
             dummy_widget_for_width = QWidget()
             dummy_widget_for_width.setFixedWidth(self.width() - 60)
             FilePanel.main_layout.addWidget(dummy_widget_for_width)
 
             # Prepare metadata widgets and place them all in metadata_layout.
-            FilePanel.metadata_layout.setSizeConstraint(1)   #No constraints
+            FilePanel.metadata_layout.setSizeConstraint(QVBoxLayout.SizeConstraint.SetNoConstraint)   #No constraints
             tags = {}
             for logical_tag in FilePanel.file_metadata.logical_tag_values:
                 tags[logical_tag]=FilePanel.tags.get(logical_tag)
@@ -124,9 +123,9 @@ class FilePanel(QScrollArea):
         FilePanel.main_widget = QWidget()
         FilePanel.main_widget.setMinimumHeight(5000)   # Ensure that there is enough available place in widget for scroll-area
         FilePanel.main_layout=QVBoxLayout()
-        FilePanel.main_layout.setSizeConstraint(QVBoxLayout.SetFixedSize)
+        FilePanel.main_layout.setSizeConstraint(QVBoxLayout.SizeConstraint.SetFixedSize)
         FilePanel.metadata_layout=QVBoxLayout()
-        FilePanel.metadata_layout.setSizeConstraint(QVBoxLayout.SetFixedSize)
+        FilePanel.metadata_layout.setSizeConstraint(QVBoxLayout.SizeConstraint.SetFixedSize)
 
         FilePanel.tags = {}
         for logical_tag in settings.logical_tags:
@@ -175,13 +174,12 @@ class FileList(QTreeView):
         super().__init__()
 
         # Many files can be selected in one go
-        self.setSelectionMode(QAbstractItemView.ExtendedSelection)
-        self.setSelectionBehavior(QAbstractItemView.SelectItems)
+        self.setSelectionMode(QAbstractItemView.SelectionMode.ExtendedSelection)
+#        self.setSelectionBehavior(QAbstractItemView.SelectItems)   #6-problem guess right
 
         # Only show image- and video-files
         self.model = QFileSystemModel()
-#        self.model.createFavoriteBranch()
-        self.model.setFilter(QDir.NoDotAndDotDot | QDir.AllDirs | QDir.Files )
+        self.model.setFilter(QDir.Filter.NoDotAndDotDot | QDir.Filter.AllDirs | QDir.Filter.Files )
 
         self.setModel(self.model)
         self.__setFiletypeFilter(settings.file_types)
@@ -196,17 +194,13 @@ class FileList(QTreeView):
 
         column_count = self.model.columnCount()
 
-        # Print the header data for each column
-        for column in range(column_count):
-            header_data = self.model.headerData(column, Qt.Horizontal, Qt.DisplayRole)
-
         #Set root-path
         self.setRootPath(dir_path)
         self.file_panel = file_panel
 
 
         # Prepare context menu
-        self.setContextMenuPolicy(Qt.CustomContextMenu)
+        self.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
         self.customContextMenuRequested.connect(self.openMenu)
 
     def createMenu(self, position):
@@ -286,7 +280,7 @@ class FileList(QTreeView):
             self.paste_by_filename.setEnabled(False)
             self.patch_by_filename.setEnabled(False)
 
-        action = self.menu.exec_(self.viewport().mapToGlobal(position))
+        action = self.menu.exec(self.viewport().mapToGlobal(position))
 
         if action == self.consolidate_metadata:
             index = self.indexAt(position)  # Get index in File-list
@@ -294,6 +288,8 @@ class FileList(QTreeView):
                 target = []
                 for index in self.selectedIndexes():
                     target.append(self.model.filePath(index))   #Can be both files and folders
+                target = list(set(target))        #Remove duplicate filenames. Row contains one index per column
+
                 self.consolidator = ConsolidateMetadata(target,await_start_signal=True)
                 self.progress_bar = ProgressBarWidget('Consolidate', self.consolidator)  # Progress-bar will start worker
 
@@ -303,9 +299,11 @@ class FileList(QTreeView):
                 target = []
                 for index in self.selectedIndexes():
                     target.append(self.model.filePath(index))   #Can be both files and folders
+                target = list(set(target))        #Remove duplicate filenames. Row contains one index per column
+
                 file_name_pattern_dialog = InputFileNamePattern()
-                result = file_name_pattern_dialog.exec_()
-                if result == QDialog.Accepted:
+                result = file_name_pattern_dialog.exec()
+                if result == QDialog.DialogCode.Accepted:
                     # Get the input values
                     file_name_pattern = file_name_pattern_dialog.getInput()
                     prefix, num_pattern, suffix = file_name_pattern
@@ -321,8 +319,11 @@ class FileList(QTreeView):
             # Check if an item was clicked
             if index.isValid():    # A valid file was right-clicked
                 self.source = []
+                selected_indexes = self.selectedIndexes()
                 for index in self.selectedIndexes():
                     self.source.append(self.model.filePath(index))
+                self.source = list(set(self.source))        #Remove duplicate filenames. Row contains one index per column
+
                 if len(self.source) == 1:
                     if os.path.isfile(self.source[0]):
                         self.source_is_single_file = True
@@ -342,6 +343,7 @@ class FileList(QTreeView):
                 target = []
                 for index in self.selectedIndexes():
                     target.append(self.model.filePath(index))
+                target = list(set(target))        #Remove duplicate filenames. Row contains one index per column
 
                 target_logical_tags = []
                 for logical_tag in self.logical_tag_actions:
@@ -361,6 +363,7 @@ class FileList(QTreeView):
                 target = []
                 for index in self.selectedIndexes():
                     target.append(self.model.filePath(index))
+                target = list(set(target))        #Remove duplicate filenames. Row contains one index per column
 
                 target_logical_tags = []
                 for logical_tag in self.logical_tag_actions:
@@ -378,6 +381,7 @@ class FileList(QTreeView):
                 target = []
                 for index in self.selectedIndexes():
                     target.append(self.model.filePath(index))
+                target = list(set(target))        #Remove duplicate filenames. Row contains one index per column
 
                 target_logical_tags = []
                 for logical_tag in self.logical_tag_actions:
@@ -395,6 +399,7 @@ class FileList(QTreeView):
                 target = []
                 for index in self.selectedIndexes():
                     target.append(self.model.filePath(index))
+                target = list(set(target))        #Remove duplicate filenames. Row contains one index per column
 
                 target_logical_tags = []
                 for logical_tag in self.logical_tag_actions:
@@ -471,7 +476,7 @@ class FileList(QTreeView):
                 for i in range(child_count):
                     child_index = self.model.index(i, 0, current_index)
                     stack.append(child_index)
-        return open_folders
+        return list(set(open_folders))
 
     def getSelectedItems(self):
         selected_items = []
@@ -481,7 +486,7 @@ class FileList(QTreeView):
             if index.column() == 0:
                 selected_file_info = self.model.fileInfo(index)
                 selected_items.append(selected_file_info.absoluteFilePath())
-        return selected_items
+        return list(set(selected_items))
 
     def getCurrentFile(self):
         if self.file_panel:
@@ -504,7 +509,8 @@ class FileList(QTreeView):
                 item_index = self.model.index(selected_item)
                 if item_index.isValid():  # Check if the item exists in the model
                     # Select the item
-                    self.selectionModel().select(item_index, self.selectionModel().Select)
+                    self.selectionModel().select(item_index, QItemSelectionModel.SelectionFlag.Select)
+
 
     def setCurrentFile(self, current_file=""):
         self.file_panel=FilePanel.getInstance(current_file)
@@ -561,8 +567,8 @@ class Text(QPlainTextEdit):
         self.logical_tag = logical_tag                                    #Widget should remember who it serves
         self.setMinimumHeight(50)
         self.setMaximumWidth(1250)
-        self.setVerticalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
-        self.setFocusPolicy(Qt.ClickFocus)
+        self.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        self.setFocusPolicy(Qt.FocusPolicy.ClickFocus)
 
         #Get attributes of tag
         tag_attributes = settings.logical_tag_attributes.get(self.logical_tag)
@@ -611,8 +617,7 @@ class Text(QPlainTextEdit):
 
         # Calculate the width of each line of text
         font_metrics = QFontMetrics(font)
-        text_width = font_metrics.width(self.toPlainText())
-
+        text_width = font_metrics.horizontalAdvance(self.toPlainText())
 
         if new_widget_width != -1:
             document_width = new_widget_width
@@ -774,7 +779,7 @@ class TextSet(QWidget):
         layout.setContentsMargins(0, 0, 0, 0)
         layout.addWidget(self.text_list)
         layout.addWidget(self.text_input)
-        layout.setSizeConstraint(QVBoxLayout.SetFixedSize)
+        layout.setSizeConstraint(QVBoxLayout.SizeConstraint.SetFixedSize)
         self.setLayout(layout)
 
         # Connect buttons to functions
@@ -826,8 +831,8 @@ class TextSet(QWidget):
         def __init__(self,text_set=None):
             super().__init__()
             self.text_set=text_set    #Remember who you are serving
-            self.setSelectionMode(QAbstractItemView.ExtendedSelection)
-            self.setDragDropMode(QListWidget.InternalMove)
+            self.setSelectionMode(QAbstractItemView.SelectionMode.ExtendedSelection)
+            self.setDragDropMode(QListWidget.DragDropMode.InternalMove)
 
         def dropEvent(self, event):
             super().dropEvent(event)
@@ -835,7 +840,7 @@ class TextSet(QWidget):
 
         def keyPressEvent(self, event):
             super().keyPressEvent(event)
-            if event.key() == Qt.Key_Delete:
+            if event.key() == Qt.Key.Key_Delete:
                 self.__removeTag()
 
         def __removeTag(self):
