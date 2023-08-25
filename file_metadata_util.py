@@ -1,9 +1,10 @@
 import copy
-from PyQt6.QtCore import QThread, QCoreApplication
+from PyQt6.QtCore import QThread, QCoreApplication,QObject,pyqtSignal,QSize
+from PyQt6.QtGui import QMovie
+from PyQt6.QtWidgets import QLabel, QHBoxLayout, QSizePolicy
 
 import file_preview_util
 from exiftool_wrapper import ExifTool
-from PyQt6.QtCore import QObject,pyqtSignal
 import settings
 import  os
 import file_util
@@ -169,7 +170,6 @@ class FileMetadata(QObject):
             json_queue_file.enqueue({'file': self.file_name, 'logical_tag_values': updated_logical_tag_values, 'force_rewrite': force_rewrite})
             QueueHost.get_instance().start_queue_worker()    # Make Queue-host instance start Queue-worker, if it is not running
             self.change_signal.emit(self.file_name)
-
 
 
     def __update_file(self, force_rewrite):
@@ -364,7 +364,12 @@ class StandardizeFilenames(QObject):
             renamer=file_util.FileRenamer.getInstance(files_for_renaming)
             renamer.filename_changed_signal.connect(renameFileInstances)
             try:
+                ExifTool.close(close_read_process=False,
+                               close_write_process=True)  # Close write-process, so that data in queue can be changed safely
+                QueueHost.get_instance().stop_queue_worker()  # Make sure not to collide with update of metadata
+
                 renamer.start()
+                QueueHost.get_instance().start_queue_worker()  # Start Queue-worker again
             except Exception as e:
                 self.error_signal.emit(e,False)
                 self.done_signal.emit()
@@ -486,6 +491,7 @@ class QueueWorker(QThread):
     waiting = pyqtSignal()
     processing = pyqtSignal()
     about_to_quit = pyqtSignal()
+    queue_size_changed = pyqtSignal(int)   # Queue size: e.g. 1kb
 
     def __init__(self,delay=5):
         super().__init__()
@@ -495,6 +501,7 @@ class QueueWorker(QThread):
         self.waiting.emit()
         self.about_to_quit.connect(self.onAboutToQuit)
         json_queue_file = file_util.JsonQueue.getInstance(settings.queue_file_path)
+        json_queue_file.queue_size_changed.connect(self.onQueueSizeChanged)
         while True:
             queue_entry = json_queue_file.dequeue()
             if queue_entry:
@@ -515,9 +522,15 @@ class QueueWorker(QThread):
         json_queue_file.dequeue_from_file(delay=0)
         self.quit()
 
+    def onQueueSizeChanged(self,queue_size_dictionary={}):
+        queue_size = None
+        queue_size = queue_size_dictionary.get(settings.queue_file_path)
+        if queue_size != None:
+            self.queue_size_changed.emit(queue_size)
 
 class QueueHost(QObject):
-    __instance=None
+    queue_size_changed = pyqtSignal(int)
+    instance=None
     def __init__(self):
         super().__init__()
         self.queue_worker_running = False
@@ -525,28 +538,80 @@ class QueueHost(QObject):
 
     @staticmethod
     def get_instance():
-        if QueueHost.__instance == None:
-            QueueHost.__instance = QueueHost()
-        return QueueHost.__instance
+        if QueueHost.instance == None:
+            QueueHost.instance = QueueHost()
+        return QueueHost.instance
 
-    def worker_waiting(self):
+    def onWorkerWaiting(self):
         self.queue_worker_running = True
         self.queue_worker_processing = False
 
-    def worker_processing(self):
+    def onWorkerProcessing(self):
         self.queue_worker_running = True
         self.queue_worker_processing = True
+    def onQueueSizeChanged(self,queue_size):
+        self.queue_size = queue_size
+        self.queue_size_changed.emit(self.queue_size)
 
 
     def start_queue_worker(self):
         if not self.queue_worker_running:
+            self.queue_worker_running = True
             self.queue_worker=QueueWorker()
-            self.queue_worker.waiting.connect(self.worker_waiting)       # Queue-worker is waiting for something to process
-            self.queue_worker.processing.connect(self.worker_processing) # Queue is being processed. This can be used to show running-indicator in app.
+            self.queue_worker.waiting.connect(self.onWorkerWaiting)       # Queue-worker is waiting for something to process
+            self.queue_worker.processing.connect(self.onWorkerProcessing) # Queue is being processed. This can be used to show running-indicator in app.
+            self.queue_worker.queue_size_changed.connect(self.onQueueSizeChanged)
             self.queue_worker.start()
             QCoreApplication.instance().aboutToQuit.connect(self.queue_worker.about_to_quit.emit)
 
+    def stop_queue_worker(self):
+        if self.queue_worker_running:
+            self.queue_worker.terminate()
+            self.queue_worker = None
+            self.queue_worker_running = False
+            self.queue_worker_processing = False
 
+class QueueStatusMonitor(QHBoxLayout):
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.init_ui()
+        self.queue_host = QueueHost.get_instance()
+        self.queue_host.queue_size_changed.connect(self.onQueueSizeChanged)
+
+    def init_ui(self):
+
+        # Create a label for displaying the queue size
+        self.queue_size_label = QLabel("")
+        self.queue_size_label.setSizePolicy(QSizePolicy.Policy.Minimum, QSizePolicy.Policy.Minimum)
+
+        # Load the processing.gif and display it using a QMovie
+        self.movie = QMovie("processing.gif")
+        self.movie.setScaledSize(QSize(25,18))
+
+
+        # Set the maximum height for the gif label to match the queue size label
+        self.gif_label = QLabel()
+#        self.gif_label.setMaximumHeight(self.queue_size_label.sizeHint().height())
+        self.gif_label.setSizePolicy(QSizePolicy.Policy.Minimum,QSizePolicy.Policy.Minimum)  # Set size policy
+
+        # Create an empty label to take up space
+        self.space_label = QLabel()
+        self.space_label.setSizePolicy(QSizePolicy.Policy.Expanding,QSizePolicy.Policy.Minimum)
+
+        # Create a horizontal layout and add the widgets
+        self.addWidget(self.gif_label)
+        self.addWidget(self.queue_size_label)
+        self.addWidget(self.space_label)
+
+    def onQueueSizeChanged(self, size):
+        self.queue_size_label.setText(str(size))
+        if size > 0:
+            self.gif_label.setMovie(self.movie)
+            self.movie.start()
+        else:
+            self.queue_size_label.clear()
+            self.gif_label.clear()
+            self.movie.stop()
 
 
 

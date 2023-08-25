@@ -1,10 +1,10 @@
+import signal
 import subprocess
 import os
 import json
 import locale
 import unicodedata
 from datetime import datetime
-import settings
 
 class ExifTool(object):
     read_process=None    # Two exiftool-processes runs in memory, one for read and one for write.
@@ -13,6 +13,8 @@ class ExifTool(object):
     executable=None
     sentinel = "{ready}\r\n"
     sys_encoding = locale.getpreferredencoding()
+    last_written_filenames = []    #To be able to clean up temp-files at process closure
+
     # when wrapper calls exiftool, it does so throug windows cmp (command prompt). At the same time parameters are
     # passed through cmd to exiftool (like tag-names, filenames etc).
     # cmd grabs parameters from wrapper (e.g. coded as utf-8). cmd translates parameters into windows system-encoding
@@ -62,20 +64,36 @@ class ExifTool(object):
                                                       creationflags=subprocess.CREATE_NO_WINDOW)
         return self
 
-    def  __exit__(self, exc_type, exc_value, traceback):
+    def __exit__(self, exc_type, exc_value, traceback):
         ExifTool.read_process.stdin.flush()
         ExifTool.write_process.stdin.flush()
 
     @staticmethod
-    def close():
-        if ExifTool.read_process!=None:                 # Process exist
-            if ExifTool.read_process.poll() == None:    # Proceass is running
-                ExifTool.read_process.stdin.write("-stay_open\nFalse\n")    #Close process
-                ExifTool.read_process.stdin.flush()
-        if ExifTool.write_process!=None:                 # Process exist
-            if ExifTool.write_process.poll() == None:    # Proceass is running
-                ExifTool.write_process.stdin.write("-stay_open\nFalse\n")    #Close process
-                ExifTool.write_process.stdin.flush()
+    def close(close_read_process=True, close_write_process=True):
+        if close_read_process:
+            if ExifTool.read_process!=None:                 # Process exist
+                if ExifTool.read_process.poll() == None:    # Proceass is running
+                    try:
+                        subprocess.run(['taskkill', '/F', '/T', '/PID', str(ExifTool.read_process.pid)], check=True)   #Instant forcefully close process
+                        ExifTool.read_process = None
+                    except subprocess.CalledProcessError:
+                        pass
+
+        if close_write_process:
+            if ExifTool.write_process!=None:                 # Process exist
+                if ExifTool.write_process.poll() == None:    # Proceass is running
+                    try:
+                        subprocess.run(['taskkill', '/F', '/T', '/PID', str(ExifTool.write_process.pid)], check=True)   #Instant forcefully close process
+                        ExifTool.write_process = None
+                        for filename in ExifTool.last_written_filenames:
+                            try:
+                                os.remove(filename + '_exiftool_tmp')  # Remove temporary files
+                            except OSError as e:
+                                pass
+                    except subprocess.CalledProcessError:
+                        # Handle error if necessary
+                        pass
+
 
     def execute(self, args,process):
         args.append('-charset')                        # This and the next line tells exiftool which encoding to expect
@@ -173,10 +191,20 @@ class ExifTool(object):
 
 
         if type(filenames)==str:
-            args.append(filenames)
+            filename = filenames
+            args.append(filename)
+            ExifTool.last_written_filenames = [filename]
         else:
+            ExifTool.last_written_filenames = filenames
             for filename in filenames:
                 args.append(filename)
+
+        for filename in ExifTool.last_written_filenames:
+            try:
+                os.remove(filename + '_exiftool_tmp')  # Remove temporary files, if hanging from an earlier terminated process
+            except OSError as e:
+                pass
+
         output = self.execute(args,ExifTool.write_process)
         return output
 

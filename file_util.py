@@ -66,12 +66,6 @@ class FileRenamer(QObject):
         return FileRenamer.__instance
 
     def start(self):
-        def __roll_back(files):
-            for file in files:
-                old_name = file.get('old_name')
-                new_name = file.get('new_name')
-                os.rename(new_name, old_name)
-
         index = 0
         renamed_files = []
 
@@ -81,13 +75,13 @@ class FileRenamer(QObject):
             new_name = file.get('new_name')
             if old_name == None or old_name == '':
                 if new_name == None or new_name == '':
-                    __roll_back(renamed_files)
+                    self.__roll_back(renamed_files)
                     raise FileRenameError('old_name and new_name are both missing in files-entry number '+str(index))
                 else:
-                    __roll_back(renamed_files)
+                    self.__roll_back(renamed_files)
                     raise FileRenameError('old_name is missing in files-entry number ' + str(index))
             if new_name == None or new_name == '':
-                __roll_back(renamed_files)
+                self.__roll_back(renamed_files)
                 raise FileRenameError('new_name is missing in files-entry number ' + str(index))
 
 
@@ -102,7 +96,7 @@ class FileRenamer(QObject):
                     os.rename(new_name, backup_name)
                     renamed_files.append({'old_name': new_name, 'new_name': backup_name})
                 except Exception as e:
-                    __roll_back(renamed_files)
+                    self.__roll_back(renamed_files)
                     raise FileRenameError('error renaming ' + new_name + ' to ' + backup_name)
                 # If the backup-file is also due for renaming, old_name for the entry
                 for backup_index, backup_file in enumerate(self.files):
@@ -118,19 +112,28 @@ class FileRenamer(QObject):
                 os.rename(old_name, new_name)
                 renamed_files.append(file)
             except Exception as e:
-                __roll_back(renamed_files)
+                self.__roll_back(renamed_files)
                 raise FileRenameError('Error renaming ' + old_name + ' to ' + new_name + ':\n'+str(e))
 
         for file in renamed_files:
             self.filename_changed_signal.emit(file.get('old_name'), file.get('new_name'))
 
+    def __roll_back(self,files):
+        for file in files:
+            old_name = file.get('old_name')
+            new_name = file.get('new_name')
+            os.rename(new_name, old_name)
+
+
 # An instance of the JsonQueue can hold a queue with sets of json-data. The queue-data is stored in the self.queue list,
 # and mirrored in a file (if a filepath is provided).
 # The file-mirror is used to restore queue at start of application (after crash or application-closure)
-class JsonQueue:
+class JsonQueue(QObject):
     instances={}
+    queue_size_changed = pyqtSignal(dict)      # {<queue_file_name>: <count_of_entries_in_queue>}
     def __init__(self, file_path):
-        JsonQueue.instances[file_path]=self
+        super().__init__()
+        JsonQueue.instances[file_path] = self
         self.file_path = file_path
         self.lock = threading.Lock()
         self.queue = []             #Queue is empty list
@@ -138,7 +141,7 @@ class JsonQueue:
         self.committed_index = -1   #Last index for which processing has ended
         self.last_file_write_time = time.time()-10
         self.queue_being_changed=False
-
+        self.instance_just_created = True
         # Create file, if it is missing
         if not os.path.isfile(file_path):
             with self.lock:
@@ -164,8 +167,12 @@ class JsonQueue:
             with open(self.file_path, 'a') as file:
                 self.queue.append(data)                                          # Append data in memory
                 file.write(json.dumps(data).replace('\n','<newline>') + '\n')    # Append data in file instantly (prevent data-loss)
+        self.queue_size_changed.emit({self.file_path: len(self.queue)})
 
     def dequeue(self):
+        if self.instance_just_created:
+            self.queue_size_changed.emit({self.file_path: len(self.queue)})   # Send size when processing starts
+            self.instance_just_created = False
         if len(self.queue) > self.index:
             data = self.queue[self.index]
             self.index += 1
@@ -218,8 +225,8 @@ class JsonQueue:
             self.index = 0
             self.committed_index = -1
             self.last_file_write_time = time.time()
-
         self.queue_being_changed = False
         self.lock.release()
+        self.queue_size_changed.emit({self.file_path: len(self.queue)})
 
 

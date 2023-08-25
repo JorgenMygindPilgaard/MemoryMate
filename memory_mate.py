@@ -2,7 +2,7 @@ import sys
 from ui_widgets import *
 from PyQt6.QtWidgets import QWidget,QMainWindow,QApplication
 from exiftool_wrapper import ExifTool
-from file_metadata_util import QueueHost
+from file_metadata_util import QueueHost, QueueStatusMonitor
 
 
 class MainWindow(QMainWindow):
@@ -20,11 +20,15 @@ class MainWindow(QMainWindow):
         self.file_panel = FilePanel.getInstance(self.ui_status.getStatusParameter('current_file'))
 #        self.file_panel = FilePanel.getInstance('')
 
+        # File (Right part of MainWindow)
+        self.queue_status_monitor = QueueStatusMonitor()
+
         # File list (Left part of MainWindow)
         self.file_list = FileList(dir_path='', file_panel=self.file_panel)
         self.file_list.setOpenFolders(self.ui_status.getStatusParameter('open_folders'))
         self.file_list.setSelectedItems(self.ui_status.getStatusParameter('selected_items'))
-        self.file_list.setFixedWidth(1200)
+#        self.file_list.setFixedWidth(1200)
+
 
         # Main-widget (Central widget of MainWindow)
         main_widget = QWidget()
@@ -33,10 +37,14 @@ class MainWindow(QMainWindow):
         # Place Widgets in laqyout
         #-------------------------------------------------------------------------------------------------------------
         main_layout = QHBoxLayout()
+        file_panel_layout = QVBoxLayout()
 
         # main_layout.addWidget(folder_tree)         #Out
         main_layout.addWidget(self.file_list)
-        main_layout.addWidget(self.file_panel)   #file manages its own layout
+        main_layout.addLayout(file_panel_layout)
+        file_panel_layout.addLayout(self.queue_status_monitor)
+        file_panel_layout.addWidget(self.file_panel)
+#        main_layout.addWidget(self.file_panel)   #file manages its own layout
 
         main_widget.setLayout(main_layout)
 
@@ -49,14 +57,6 @@ class MainWindow(QMainWindow):
         super().closeEvent(event)
 
 app = QApplication(sys.argv)
-
-# Set stylesheet for entire app
-# font=app.font()   #font from system
-# font_family = font.family()
-# #font_size = "12pt"
-# font_size = str(font.pointSize())+"pt"
-# font_weight = str(font.weight())
-#app.setStyleSheet(f"* {{ font-family: {font_family}; font-size: {font_size}; font-weight: {font_weight};}}")
 window = MainWindow()
 QueueHost.get_instance().start_queue_worker()    #Start Queue-processing
 window.setGeometry(100, 100, 2000, 1000)
