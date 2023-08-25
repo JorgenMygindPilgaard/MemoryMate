@@ -187,7 +187,7 @@ class FileList(QTreeView):
                                     #by calling self.showFilteredFiles()
 
         self.hideColumn(2)    #Hide File-type
-        self.setColumnWidth(0,700)    #Filename
+        self.setColumnWidth(0,400)    #Filename
         self.setColumnWidth(1,80)    #Filesize
         self.setColumnWidth(2,150)    #Date modified
 
