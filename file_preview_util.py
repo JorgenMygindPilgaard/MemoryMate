@@ -1,9 +1,11 @@
 from PyQt6.QtGui import QPixmap, QImage
 from PyQt6.QtCore import Qt
-from PIL import Image
-import rawpy
 import pillow_heif
 import file_util
+import rawpy
+from PIL import Image
+from moviepy.video.io.VideoFileClip import VideoFileClip
+
 
 class FilePreview():
     instance_index = {}
@@ -13,8 +15,10 @@ class FilePreview():
         file_type = file_util.splitFileName(file_name)[2].lower()
         if file_type == 'heic':
             pixmap = self.__heic_to_qpixmap(file_name)
-#        elif file_type == 'cr2' or file_type == 'cr3' or file_type == 'arw' or file_type == 'nef':   # Dosen' work
-#            pixmap = self.__raw_to_qpixmap(file_name)
+        elif file_type == 'cr2' or file_type == 'cr3' or file_type == 'arw' or file_type == 'nef' or file_type == 'dng':
+             pixmap = self.__raw_to_qpixmap(file_name)
+        elif file_type == 'mov' or file_type == 'mp4':
+            pixmap = self.__movie_to_qpixmap(file_name)
         else:
             pixmap = QPixmap(file_name)
 
@@ -30,22 +34,44 @@ class FilePreview():
         image_data = pil_image.tobytes()
         width, height = pil_image.size
         image_format = QImage.Format.Format_RGB888
-        qimage = QImage(image_data, width, height, image_format)
-        return QPixmap.fromImage(qimage)
+        image = QImage(image_data, width, height, image_format)
+        return QPixmap.fromImage(image)
 
     def __raw_to_qpixmap(self,file_name):
-        raw = rawpy.imread(file_name)
+        with rawpy.imread(file_name) as raw:
+            try:
+                thumb = raw.extract_thumb()
+            except rawpy.LibRawNoThumbnailError:
+                print('no thumbnail found')
+            else:
+                if thumb.format in [rawpy.ThumbFormat.JPEG, rawpy.ThumbFormat.BITMAP]:
+                    if thumb.format is rawpy.ThumbFormat.JPEG:
+                        thumb_image = QImage.fromData(thumb.data)
 
-        raw_image = raw.raw_image  # numpy array
-        pil_image = Image.fromarray(raw_image)
-        pil_image.show()
-        if pil_image.mode != "RGB":
-            pil_image = pil_image.convert("RGB")
-        image_data = pil_image.tobytes()
-        width, height = pil_image.size
-        image_format = QImage.Format_RGB888
-        qimage = QImage(image_data, width, height, image_format)
-        return QPixmap.fromImage(qimage)
+                    else:
+                        thumb_pil = Image.fromarray(thumb.data)
+                        thumb_data = thumb_pil.tobytes()
+                        thumb_image = QImage(thumb_data, thumb_pil.width, thumb_pil.height, QImage.Format_RGB888)
+                return QPixmap.fromImage(thumb_image)
+    def __movie_to_qpixmap(self,file_name):
+        video_clip = VideoFileClip(file_name)
+        thumbnail = video_clip.get_frame(0)  # Get the first frame as the thumbnail
+        video_clip.close()
+
+        height, width, channel = thumbnail.shape
+        bytes_per_line = 3 * width
+
+        q_image = QImage(
+            thumbnail.data,
+            width,
+            height,
+            bytes_per_line,
+            QImage.Format.Format_RGB888,
+        )
+
+        thumbnail_pixmap = QPixmap.fromImage(q_image)
+        return thumbnail_pixmap
+
 
     @staticmethod
     def getInstance(file_name,width=None):
