@@ -1,16 +1,17 @@
 import copy
-from PyQt6.QtCore import QThread, QCoreApplication,QObject,pyqtSignal,QSize
-from PyQt6.QtGui import QMovie
+from PyQt6.QtCore import QThread, QCoreApplication,QObject,pyqtSignal,QSize, Qt
+from PyQt6.QtGui import QMovie,QPixmap, QImage,QImageReader,QTransform
 from PyQt6.QtWidgets import QLabel, QHBoxLayout, QSizePolicy
-
-import file_preview_util
 from exiftool_wrapper import ExifTool
 import settings
-import  os
-import file_util
+import os
 from collections import OrderedDict
 import time
-
+import pillow_heif
+import file_util
+import rawpy
+from PIL import Image
+from moviepy.video.io.VideoFileClip import VideoFileClip
 class FileMetadata(QObject):
     exif_executable = os.path.join(settings.app_data_location, 'exiftool_memory_mate.exe')
     exif_configuration = os.path.join(settings.app_data_location, 'exiftool.cfg')
@@ -67,7 +68,7 @@ class FileMetadata(QObject):
             tag_value = exif_data[0].get(tag)
             if tag_value != None and tag_value != "" and tag_value != []:
                 if isinstance(tag_value,list):
-                    tag_value = list(map(str, tag_value))   # Convert any numbers in list ti string
+                    tag_value = list(map(str, tag_value))   # Convert any numbers in list to string
                 else:
                     tag_value = str(tag_value)
                 if tag == 'Composite:GPSPosition':
@@ -79,7 +80,7 @@ class FileMetadata(QObject):
 #        for logical_tag in settings.logical_tags:
         logical_tags_missing_value = []
         for logical_tag in logical_tags_tags:
-            logical_tag_type = settings.logical_tags.get(logical_tag)
+            logical_tag_type = settings.logical_tags.get(logical_tag).get("widget")
             logical_tag_tags = logical_tags_tags.get(logical_tag)
             if logical_tag_type == 'text_set':
                 tag_value = []
@@ -106,7 +107,7 @@ class FileMetadata(QObject):
         if not tag_values.get('XMP:MemoryMateSaveDateTime'):     #Memory Mate never wrote to file before. Get fall-back tag-values for missing logical tags that has fall-back tag assigned
             self.is_virgin=True
             for logical_tag in logical_tags_missing_value:
-                fallback_tag = settings.logical_tag_attributes.get(logical_tag).get('fallback_tag')
+                fallback_tag = settings.logical_tags.get(logical_tag).get('fallback_tag')
                 if fallback_tag:
                     fallback_tag_value = logical_tag_values.get(fallback_tag)
                     if fallback_tag_value:
@@ -124,9 +125,12 @@ class FileMetadata(QObject):
 
     def __updateReferenceTags(self):
         first = True
-        for logical_tag in settings.reference_tag_content:
+        for logical_tag in settings.logical_tags:
+            if not settings.logical_tags[logical_tag].get("reference_tag"):    #Continue if not a reference tag
+                continue
+
             logical_tag_value = ''
-            for tag_content in settings.reference_tag_content[logical_tag]:
+            for tag_content in settings.logical_tags[logical_tag].get("reference_tag_content"):
                 if tag_content.get('type') =='text_line':
                     tag_content_text = tag_content.get('text')
                     if tag_content_text != None:
@@ -137,8 +141,8 @@ class FileMetadata(QObject):
                 elif tag_content.get('type') == 'tag':
                     ref_logical_tag = tag_content.get('tag_name')
                     if ref_logical_tag:
-                        labels = settings.logical_tag_descriptions.get(ref_logical_tag)
-                        label = labels.get(settings.language)
+                        label_key = settings.logical_tags.get(ref_logical_tag).get("label_text_key")
+                        label = settings.text_keys.get(label_key).get(settings.language)
                         ref_logical_tag_value = self.logical_tag_values.get(ref_logical_tag)
                         if type(ref_logical_tag_value) == str:
                             if ref_logical_tag_value != "":
@@ -225,22 +229,6 @@ class FileMetadata(QObject):
         else:
             self.__update_file(force_rewrite)
         self.is_virgin=False
-
-def renameFileInstances(old_file_name, new_file_name):     # reacts on change filename signal from
-    # Rename filename in metadata-instance
-    file_metadata = FileMetadata.instance_index.get(old_file_name)
-    if file_metadata:
-        file_metadata.updateFilename(new_file_name)
-
-    # Rename filename in preview-instance
-    file_preview = file_preview_util.FilePreview.instance_index.get(old_file_name)
-    if file_preview:
-        file_preview.updateFilename(new_file_name)
-
-    # Rename file in queue
-    json_queue_file = file_util.JsonQueue.getInstance(settings.queue_file_path)
-    json_queue_file.change_queue(find={'file': old_file_name}, change={'file': new_file_name})
-
 class StandardizeFilenames(QObject):
     # The purpose of this class is to rename files systematically. The naming pattern in the files will be
     # <prefix><number><suffix>.<ext>. Example: 2023-F001-001.jpg (prefix="2023-F001-', number='nnn',suffix='').
@@ -390,7 +378,6 @@ class StandardizeFilenames(QObject):
                         file_metadata.save()
 
         self.done_signal.emit()
-
 class CopyLogicalTags(QObject):
     progress_init_signal = pyqtSignal(int)       # Sends number of entries to be processed
     progress_signal = pyqtSignal(int)    # Sends number of processed records
@@ -450,7 +437,6 @@ class CopyLogicalTags(QObject):
             target_file.setLogicalTagValues(target_tag_values, self.overwrite)
             target_file.save()
         self.done_signal.emit()
-
 class ConsolidateMetadata(QObject):
 # This class force-saves logical tags to all physical tags in files
 
@@ -486,7 +472,6 @@ class ConsolidateMetadata(QObject):
             file_metadata = FileMetadata.getInstance(file)
             file_metadata.save(force_rewrite=True)
         self.done_signal.emit()
-
 class QueueWorker(QThread):
     waiting = pyqtSignal()
     processing = pyqtSignal()
@@ -527,7 +512,6 @@ class QueueWorker(QThread):
         queue_size = queue_size_dictionary.get(settings.queue_file_path)
         if queue_size != None:
             self.queue_size_changed.emit(queue_size)
-
 class QueueHost(QObject):
     queue_size_changed = pyqtSignal(int)
     instance=None
@@ -570,7 +554,6 @@ class QueueHost(QObject):
             self.queue_worker = None
             self.queue_worker_running = False
             self.queue_worker_processing = False
-
 class QueueStatusMonitor(QHBoxLayout):
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -612,8 +595,131 @@ class QueueStatusMonitor(QHBoxLayout):
             self.queue_size_label.clear()
             self.gif_label.clear()
             self.movie.stop()
+class FilePreview():
+    instance_index = {}
+
+    def __init__(self,file_name,width):
+        self.file_name = file_name
+        file_type = file_util.splitFileName(file_name)[2].lower()
+        if file_type == 'heic':
+            pixmap = self.__heic_to_qpixmap(file_name)
+        elif file_type == 'cr2' or file_type == 'cr3' or file_type == 'arw' or file_type == 'nef' or file_type == 'dng':
+             pixmap = self.__raw_to_qpixmap(file_name)
+        elif file_type == 'mov' or file_type == 'mp4':
+            pixmap = self.__movie_to_qpixmap(file_name)
+        else:
+            pixmap = self.__default_to_qpixmap(file_name)
+
+        height = int(width * 9 / 16)
+        self.pixmap = pixmap.scaled(width, height, Qt.AspectRatioMode.KeepAspectRatio,Qt.TransformationMode.SmoothTransformation)
+        self.width = width
+        FilePreview.instance_index[file_name] = self
+
+    def __heic_to_qpixmap(self,file_name):
+        pil_image = pillow_heif.read_heif(file_name).to_pillow()
+        if pil_image.mode != "RGB":
+            pil_image = pil_image.convert("RGB")
+        image_data = pil_image.tobytes()
+        width, height = pil_image.size
+        image_format = QImage.Format.Format_RGB888
+        image = QImage(image_data, width, height, image_format)
+        return QPixmap.fromImage(image)
+    def __raw_to_qpixmap(self,file_name):
+        with rawpy.imread(file_name) as raw:
+            try:
+                thumb = raw.extract_thumb()
+            except rawpy.LibRawNoThumbnailError:
+                print('no thumbnail found')
+            else:
+                if thumb.format in [rawpy.ThumbFormat.JPEG, rawpy.ThumbFormat.BITMAP]:
+                    if thumb.format is rawpy.ThumbFormat.JPEG:
+                        thumb_image = QImage.fromData(thumb.data)
+
+                    else:
+                        thumb_pil = Image.fromarray(thumb.data)
+                        thumb_data = thumb_pil.tobytes()
+                        thumb_image = QImage(thumb_data, thumb_pil.width, thumb_pil.height, QImage.Format_RGB888)
+
+                # Apply transformations based on EXIF orientation
+                # Here, somehow get orientation from metadata
+                orientation = FileMetadata.getInstance(file_name).logical_tag_values.get("orientation")
+                transform = QTransform()
+                if orientation == None:
+                    orientation = '1'  # Default orientation
+                # Apply transformations based on EXIF orientation
+                if orientation == '3':
+                    transform.rotate(-180)
+                elif orientation == '6':
+                    transform.rotate(-270)
+                elif orientation == '8':
+                    transform.rotate(-90)   #Was 90
+
+                # Apply transformation to the QImage
+                thumb_image = thumb_image.transformed(transform)
+                return QPixmap.fromImage(thumb_image)
+
+    def __movie_to_qpixmap(self,file_name):
+        video_clip = VideoFileClip(file_name)
+        thumbnail = video_clip.get_frame(0)  # Get the first frame as the thumbnail
+        video_clip.close()
+
+        height, width, channel = thumbnail.shape
+        bytes_per_line = 3 * width
+
+        q_image = QImage(
+            thumbnail.data,
+            width,
+            height,
+            bytes_per_line,
+            QImage.Format.Format_RGB888,
+        )
+
+        thumbnail_pixmap = QPixmap.fromImage(q_image)
+        return thumbnail_pixmap
+    def __default_to_qpixmap(self,file_name):
+        image_reader = QImageReader(file_name)
+        image_reader.setAutoTransform(True)  # This ensures proper orientation handling
+        image = image_reader.read()
+        return QPixmap.fromImage(image)
 
 
+    @staticmethod
+    def getInstance(file_name,width=None):
+        new_needed = False
+
+        file_preview = FilePreview.instance_index.get(file_name)
+        if file_preview is None:
+            new_needed = True
+        elif file_preview.width != width and width != None:
+            del FilePreview.instance_index[file_name]
+            new_needed = True
+        if new_needed:
+            if width == None:
+                file_preview = None
+            else:
+                file_preview =  FilePreview(file_name,width)
+
+        return file_preview
+
+    def updateFilename(self, new_file_name):
+        old_file_name = self.file_name
+        self.file_name = new_file_name
+        FilePreview.instance_index[new_file_name] = self
+        del FilePreview.instance_index[old_file_name]
+def renameFileInstances(old_file_name, new_file_name):     # reacts on change filename signal from
+    # Rename filename in metadata-instance
+    file_metadata = FileMetadata.instance_index.get(old_file_name)
+    if file_metadata:
+        file_metadata.updateFilename(new_file_name)
+
+    # Rename filename in preview-instance
+    file_preview = FilePreview.instance_index.get(old_file_name)
+    if file_preview:
+        file_preview.updateFilename(new_file_name)
+
+    # Rename file in queue
+    json_queue_file = file_util.JsonQueue.getInstance(settings.queue_file_path)
+    json_queue_file.change_queue(find={'file': old_file_name}, change={'file': new_file_name})
 
 
 
