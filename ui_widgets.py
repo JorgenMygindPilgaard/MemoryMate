@@ -215,29 +215,29 @@ class FileList(QTreeView):
         action_text = settings.text_keys.get(action_text_key).get(settings.language)
         self.consolidate_metadata = self.menu.addAction(action_text)
 
-        action_text_key = settings.file_context_menu_actions.get("standardize_filenames").get("text_key")
+        action_text_key = settings.folder_context_menu_actions.get("standardize_filenames").get("text_key")
         action_text = settings.text_keys.get(action_text_key).get(settings.language)
-        self.consolidate_metadata = self.menu.addAction(action_text)
+        self.standardize_filenames = self.menu.addAction(action_text)
 
         action_text_key = settings.file_context_menu_actions.get("copy_metadata").get("text_key")
         action_text = settings.text_keys.get(action_text_key).get(settings.language)
-        self.consolidate_metadata = self.menu.addAction(action_text)
+        self.copy_metadata = self.menu.addAction(action_text)
 
         action_text_key = settings.file_context_menu_actions.get("paste_metadata").get("text_key")
         action_text = settings.text_keys.get(action_text_key).get(settings.language)
-        self.consolidate_metadata = self.menu.addAction(action_text)
+        self.paste_metadata = self.menu.addAction(action_text)
 
         action_text_key = settings.file_context_menu_actions.get("patch_metadata").get("text_key")
         action_text = settings.text_keys.get(action_text_key).get(settings.language)
-        self.consolidate_metadata = self.menu.addAction(action_text)
+        self.patch_metadata = self.menu.addAction(action_text)
 
         action_text_key = settings.file_context_menu_actions.get("paste_by_filename").get("text_key")
         action_text = settings.text_keys.get(action_text_key).get(settings.language)
-        self.consolidate_metadata = self.menu.addAction(action_text)
+        self.paste_by_filename = self.menu.addAction(action_text)
 
         action_text_key = settings.file_context_menu_actions.get("patch_by_filename").get("text_key")
         action_text = settings.text_keys.get(action_text_key).get(settings.language)
-        self.consolidate_metadata = self.menu.addAction(action_text)
+        self.patch_by_filename = self.menu.addAction(action_text)
 
         self.menu.addSeparator()
         action_text_key = settings.file_context_menu_actions.get("choose_tags_to_paste").get("text_key")
@@ -249,6 +249,8 @@ class FileList(QTreeView):
         self.logical_tag_actions = {}
         for logical_tag in settings.logical_tags:
             if settings.logical_tags.get(logical_tag).get("reference_tag"):    #Can't copy-paste a reference tag. It is derrived from the other tags
+                continue
+            if settings.logical_tags.get(logical_tag).get("widget") == None:   #Cant copy-paste tags now shown in widget
                 continue
 
             tag_label_text_key = settings.logical_tags.get(logical_tag).get("label_text_key")
