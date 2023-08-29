@@ -2,13 +2,11 @@ from PyQt6.QtWidgets import QWidget, QHBoxLayout, QVBoxLayout, QTreeView, QLabel
 from PyQt6.QtCore import Qt, QDir, QDateTime, QDate, QModelIndex,QTimer, pyqtSignal,QItemSelectionModel
 from PyQt6.QtGui import QFontMetrics,QFileSystemModel,QAction
 import settings
-from file_metadata_util import FileMetadata, StandardizeFilenames, CopyLogicalTags, ConsolidateMetadata
+from file_metadata_util import FileMetadata, StandardizeFilenames, CopyLogicalTags, ConsolidateMetadata, FilePreview
 from ui_util import ProgressBarWidget, AutoCompleteList
-from file_preview_util import FilePreview
 from ui_pick_gps_location import MapView, MapLocationSelector
 import json
 import os
-
 
 class UiStatusManager():
     def __init__(self,status_file_name: str=""):
@@ -30,8 +28,6 @@ class UiStatusManager():
         return self.status_parameters
     def getStatusParameter(self, parameter_name: str):
         return self.status_parameters.get(parameter_name)
-
-
 class FilePanel(QScrollArea):
     __instance = None
     file_metadata = None
@@ -93,6 +89,8 @@ class FilePanel(QScrollArea):
             FilePanel.metadata_layout.setSizeConstraint(QVBoxLayout.SizeConstraint.SetNoConstraint)   #No constraints
             tags = {}
             for logical_tag in FilePanel.file_metadata.logical_tag_values:
+                if settings.logical_tags.get(logical_tag).get("widget") == None:
+                    continue
                 tags[logical_tag]=FilePanel.tags.get(logical_tag)
                 tag_widget=FilePanel.tags[logical_tag][1]
                 tag_widget.readFromImage()
@@ -129,36 +127,42 @@ class FilePanel(QScrollArea):
 
         FilePanel.tags = {}
         for logical_tag in settings.logical_tags:
-            tag_labels = settings.logical_tag_descriptions.get(logical_tag)  # All language descriptions of tag
-            tag_label = tag_labels.get(settings.language)  # User-language description of tag
-            tag_type = settings.logical_tags.get(logical_tag)
+            tag_label = None
+            tag_label_key = settings.logical_tags.get(logical_tag).get("label_text_key")
+            if tag_label_key:
+                tag_label = settings.text_keys.get(tag_label_key).get(settings.language)
+            tag_widget_type = settings.logical_tags.get(logical_tag).get("widget")
 
-            label_widget = QLabel(tag_label + ":")
-            label_widget.setStyleSheet("color: #868686;")
-            if tag_type == "text_line":
+            if tag_label:
+                label_widget = QLabel(tag_label + ":")
+                label_widget.setStyleSheet("color: #868686;")
+
+            if tag_widget_type == "text_line":
                 tag_widget = TextLine(logical_tag)
-                FilePanel.tags[logical_tag] = [label_widget, tag_widget,tag_type]
-            elif tag_type == "text":
+                FilePanel.tags[logical_tag] = [label_widget, tag_widget,tag_widget_type]
+            elif tag_widget_type == "text":
                 tag_widget = Text(logical_tag)
-                FilePanel.tags[logical_tag] = [label_widget, tag_widget,tag_type]
-            elif tag_type == "reference_tag":
-                tag_widget = Text(logical_tag)
-                tag_widget.setDisabled(True)
-                FilePanel.tags[logical_tag] = [label_widget, tag_widget,tag_type]
-            elif tag_type == "date_time":
+                FilePanel.tags[logical_tag] = [label_widget, tag_widget,tag_widget_type]
+            elif tag_widget_type == "date_time":
                 tag_widget = DateTime(logical_tag)
-                FilePanel.tags[logical_tag] = [label_widget, tag_widget,tag_type]
-            elif tag_type == "date":
+                FilePanel.tags[logical_tag] = [label_widget, tag_widget,tag_widget_type]
+            elif tag_widget_type == "date":
                 tag_widget = Date(logical_tag)
-                FilePanel.tags[logical_tag] = [label_widget, tag_widget,tag_type]
-            elif tag_type == "text_set":
+                FilePanel.tags[logical_tag] = [label_widget, tag_widget,tag_widget_type]
+            elif tag_widget_type == "text_set":
                 tag_widget = TextSet(logical_tag)
-                FilePanel.tags[logical_tag] = [label_widget, tag_widget,tag_type]
-            elif tag_type == "geo_location":
+                FilePanel.tags[logical_tag] = [label_widget, tag_widget,tag_widget_type]
+            elif tag_widget_type == "geo_location":
                 tag_widget = GeoLocation(logical_tag)
-                FilePanel.tags[logical_tag] = [label_widget, tag_widget,tag_type]
+                FilePanel.tags[logical_tag] = [label_widget, tag_widget,tag_widget_type]
             else:
                 pass
+
+            if settings.logical_tags.get(logical_tag).get("reference_tag"):
+                tag_widget.setDisabled(True)
+
+
+
 
     @staticmethod
     def metadataChanged(file_name):
@@ -168,7 +172,6 @@ class FilePanel(QScrollArea):
     @staticmethod
     def filenemeChanged(old_filename, new_filename):     # reacts on change filename
         FileMetadata.deleteInstance(old_filename)        # file for this instance does not exist anymore
-
 class FileList(QTreeView):
     def __init__(self,dir_path='', file_panel: FilePanel=None):
         super().__init__()
@@ -208,47 +211,48 @@ class FileList(QTreeView):
         self.menu = QMenu()
       
         # Add actions to the menu
-        action_texts = settings.file_context_menu_actions.get("consolidate_metadata")  # All language descriptions of action
-        action_text = action_texts.get(settings.language)
+        action_text_key = settings.file_context_menu_actions.get("consolidate_metadata").get("text_key")
+        action_text = settings.text_keys.get(action_text_key).get(settings.language)
         self.consolidate_metadata = self.menu.addAction(action_text)
 
-        action_texts = settings.folder_context_menu_actions.get("standardize_filenames")  # All language descriptions of action
-        action_text  = action_texts.get(settings.language)
-        self.standardize_filenames = self.menu.addAction(action_text)
+        action_text_key = settings.file_context_menu_actions.get("standardize_filenames").get("text_key")
+        action_text = settings.text_keys.get(action_text_key).get(settings.language)
+        self.consolidate_metadata = self.menu.addAction(action_text)
 
-        action_texts = settings.file_context_menu_actions.get("copy_metadata")  # All language descriptions of action
-        action_text  = action_texts.get(settings.language)
-        self.copy_metadata = self.menu.addAction(action_text)
+        action_text_key = settings.file_context_menu_actions.get("copy_metadata").get("text_key")
+        action_text = settings.text_keys.get(action_text_key).get(settings.language)
+        self.consolidate_metadata = self.menu.addAction(action_text)
 
-        action_texts = settings.file_context_menu_actions.get("paste_metadata")  # All language descriptions of action
-        action_text  = action_texts.get(settings.language)
-        self.paste_metadata = self.menu.addAction(action_text)
+        action_text_key = settings.file_context_menu_actions.get("paste_metadata").get("text_key")
+        action_text = settings.text_keys.get(action_text_key).get(settings.language)
+        self.consolidate_metadata = self.menu.addAction(action_text)
 
-        action_texts = settings.file_context_menu_actions.get("patch_metadata")  # All language descriptions of action
-        action_text  = action_texts.get(settings.language)
-        self.patch_metadata = self.menu.addAction(action_text)
+        action_text_key = settings.file_context_menu_actions.get("patch_metadata").get("text_key")
+        action_text = settings.text_keys.get(action_text_key).get(settings.language)
+        self.consolidate_metadata = self.menu.addAction(action_text)
 
-        action_texts = settings.file_context_menu_actions.get("paste_by_filename")  # All language descriptions of action
-        action_text  = action_texts.get(settings.language)
-        self.paste_by_filename = self.menu.addAction(action_text)
+        action_text_key = settings.file_context_menu_actions.get("paste_by_filename").get("text_key")
+        action_text = settings.text_keys.get(action_text_key).get(settings.language)
+        self.consolidate_metadata = self.menu.addAction(action_text)
 
-        action_texts = settings.file_context_menu_actions.get("patch_by_filename")  # All language descriptions of action
-        action_text  = action_texts.get(settings.language)
-        self.patch_by_filename = self.menu.addAction(action_text)
+        action_text_key = settings.file_context_menu_actions.get("patch_by_filename").get("text_key")
+        action_text = settings.text_keys.get(action_text_key).get(settings.language)
+        self.consolidate_metadata = self.menu.addAction(action_text)
 
         self.menu.addSeparator()
-        action_texts = settings.file_context_menu_actions.get("choose_tags_to_paste")  # All language descriptions of action
-        action_text  = action_texts.get(settings.language)
+        action_text_key = settings.file_context_menu_actions.get("choose_tags_to_paste").get("text_key")
+        action_text = settings.text_keys.get(action_text_key).get(settings.language)
         menu_text_line = QAction(action_text, self, enabled=False)
         self.menu.addAction(menu_text_line)   # Just a textline in menu saying "Choose what to paste"
 
         # Ad checkable actions for each logical tag
         self.logical_tag_actions = {}
         for logical_tag in settings.logical_tags:
-            if settings.logical_tags.get(logical_tag)=='reference_tag':    #Can't copy-paste a reference tag. It is derrived from the other tags
+            if settings.logical_tags.get(logical_tag).get("reference_tag"):    #Can't copy-paste a reference tag. It is derrived from the other tags
                 continue
-            tag_labels = settings.logical_tag_descriptions.get(logical_tag)  # All language descriptions of tag
-            tag_label = tag_labels.get(settings.language)  # User-language description of tag
+
+            tag_label_text_key = settings.logical_tags.get(logical_tag).get("label_text_key")
+            tag_label = settings.text_keys.get(tag_label_text_key).get(settings.language)
             tag_action = QAction(tag_label, self, checkable=True)
             tag_action.setChecked(True)
             self.logical_tag_actions[logical_tag] = tag_action
@@ -530,9 +534,6 @@ class FileList(QTreeView):
             outfile.write(us_status_json_object)
     def loadUiStatus(self):
         pass
-
-
-
 class TextLine(QLineEdit):
     def __init__(self, logical_tag):
         super().__init__()
@@ -540,7 +541,7 @@ class TextLine(QLineEdit):
         self.setMaximumWidth(1250)
 
         #Get attributes of tag
-        tag_attributes = settings.logical_tag_attributes.get(self.logical_tag)
+        tag_attributes = settings.logical_tags.get(self.logical_tag)
         if tag_attributes.get("Autocomplete"):                       #Enable autocompletion
             self.auto_complete_list = AutoCompleteList.getInstance(logical_tag)
             self.setCompleter(self.auto_complete_list)
@@ -560,7 +561,6 @@ class TextLine(QLineEdit):
         if hasattr(self, 'auto_complete_list'):
             self.auto_complete_list.collectItem(self.text())    # Collect new entry in auto_complete_list
         FilePanel.focus_tag=self.logical_tag
-
 class Text(QPlainTextEdit):
     def __init__(self, logical_tag):
         super().__init__()     #Puts text in Widget
@@ -571,7 +571,7 @@ class Text(QPlainTextEdit):
         self.setFocusPolicy(Qt.FocusPolicy.ClickFocus)
 
         #Get attributes of tag
-        tag_attributes = settings.logical_tag_attributes.get(self.logical_tag)
+        tag_attributes = settings.logical_tags.get(self.logical_tag)
         if tag_attributes.get("Autocomplete"):                         #Enable autocompletion
             self.auto_complete_list = AutoCompleteList.getInstance(logical_tag)
             self.setCompleter(self.auto_complete_list)
@@ -647,7 +647,6 @@ class Text(QPlainTextEdit):
         text_height = int(num_lines * line_height)
 
         return text_height
-
 class DateTime(QDateTimeEdit):
     def __init__(self, logical_tag):
         super().__init__()
@@ -664,7 +663,7 @@ class DateTime(QDateTimeEdit):
 
 
         #Get attributes of tag
-        tag_attributes = settings.logical_tag_attributes.get(self.logical_tag)
+        tag_attributes = settings.logical_tags.get(self.logical_tag)
         if tag_attributes.get("Autocomplete"):                         #Enable autocompletion
             self.auto_complete_list = AutoCompleteList.getInstance(logical_tag)
             self.setCompleter(self.auto_complete_list)
@@ -705,7 +704,6 @@ class DateTime(QDateTimeEdit):
             self.auto_complete_list.collectItem(self.dateTime())    # Collect new entry in auto_complete_list
         self.setStyleSheet("color: black")
         FilePanel.focus_tag=self.logical_tag
-
 class Date(QDateEdit):
     def __init__(self, logical_tag):
         super().__init__()
@@ -715,7 +713,7 @@ class Date(QDateEdit):
         self.setFixedWidth(250)
 
         #Get attributes of tag
-        tag_attributes = settings.logical_tag_attributes.get(self.logical_tag)
+        tag_attributes = settings.logical_tags.get(self.logical_tag)
         if tag_attributes.get("Autocomplete"):                         #Enable autocompletion
             self.auto_complete_list = AutoCompleteList.getInstance(logical_tag)
             self.setCompleter(self.auto_complete_list)
@@ -748,7 +746,6 @@ class Date(QDateEdit):
         if hasattr(self, 'auto_complete_list'):
             self.auto_complete_list.collectItem(self.date())    # Collect new entry in auto_complete_list
         FilePanel.focus_tag=self.logical_tag
-
 class TextSet(QWidget):
 
     def __init__(self, logical_tag):
@@ -765,7 +762,7 @@ class TextSet(QWidget):
     def __initUI(self):
         # Prepare text_input with completer
         # Get attributes of tag
-        tag_attributes = settings.logical_tag_attributes.get(self.logical_tag)
+        tag_attributes = settings.logical_tags.get(self.logical_tag)
         self.auto_complete_list = None
         if tag_attributes.get("Autocomplete"):                         #Enable autocompletion
             self.auto_complete_list = AutoCompleteList.getInstance(self.logical_tag)
@@ -865,7 +862,6 @@ class TextSet(QWidget):
             super().__init__()
             self.text_set=text_set    #Remember who you are serving
             self.setPlaceholderText('Tast navn')
-
 class GeoLocation(MapView):
     def __init__(self, logical_tag):
         super().__init__(marker_editable=False, drag_enabled=False, zoom_enabled=False)
@@ -875,7 +871,7 @@ class GeoLocation(MapView):
         self.setFixedHeight(250)
 
         #Get attributes of tag
-        tag_attributes = settings.logical_tag_attributes.get(self.logical_tag)
+        tag_attributes = settings.logical_tags.get(self.logical_tag)
         if tag_attributes.get("Autocomplete"):                         #Enable autocompletion
             self.auto_complete_list = AutoCompleteList.getInstance(logical_tag)
             self.setCompleter(self.auto_complete_list)
@@ -923,7 +919,6 @@ class GeoLocation(MapView):
         # if hasattr(self, 'auto_complete_list'):
         #     self.auto_complete_list.collectItem(self.date())    # Collect new entry in auto_complete_list
         FilePanel.focus_tag=self.logical_tag
-
 class InputFileNamePattern(QDialog):
     def __init__(self):
         super().__init__()

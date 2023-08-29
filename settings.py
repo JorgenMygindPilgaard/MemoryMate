@@ -22,11 +22,9 @@ if os.path.isfile(settings_path):
     languages = settings.get("languages")
     language = settings.get("language")
     logical_tags = settings.get("logical_tags")
-    reference_tag_content = settings.get("reference_tag_content")
-    logical_tag_descriptions = settings.get("logical_tag_descriptions")
-    logical_tag_attributes = settings.get("logical_tag_attributes")
     tags = settings.get("tags")
     file_type_tags = settings.get("file_type_tags")
+    text_keys = settings.get("text_keys")
     file_context_menu_actions = settings.get("file_context_menu_actions")
     folder_context_menu_actions = settings.get("folder_context_menu_actions")
 
@@ -38,50 +36,40 @@ if not os.path.isfile(settings_path):
     languages = {"DA": "Danish",
                  "EN": "English"}
     language = "DA"
-    logical_tags = {"title":             "text_line",
-                    "date":              "date_time",
-                    "description_only":  "text",
-                    "persons":           "text_set",
-                    "photographer":      "text_line",
-                    "source":            "text_line",
-                    "original_filename": "text_line",
-                    "geo_location":      "geo_location",
-                    "description":       "reference_tag"  # Always type text
-                    }
-    reference_tag_content = {"description": [{"type": "tag", "tag_name": "title", "tag_label": False},
-                                             {"type": "tag", "tag_name": "description_only", "tag_label": False},
-                                             {"type": "text_line", "text": ""},
-                                             {"type": "tag", "tag_name": "persons", "tag_label": True},
-                                             {"type": "tag", "tag_name": "source", "tag_label": True},
-                                             {"type": "tag", "tag_name": "photographer", "tag_label": True},
-                                             {"type": "tag", "tag_name": "original_filename", "tag_label": True}
-                                             ]
-                             }
-    logical_tag_descriptions = {"title":             {"DA": "Titel",               "EN": "Title"},
-                                "date":              {"DA": "Dato",                "EN": "Date"},
-                                "description":       {"DA": "Fuld beskrivelse",    "EN": "Full Description"},
-                                "description_only":  {"DA": "Beskrivelse",         "EN": "Description"},
-                                "persons":           {"DA": "Personer",            "EN": "People"},
-                                "photographer":      {"DA": "Fotograf",            "EN": "Photographer"},
-                                "source":            {"DA": "Oprindelse",          "EN": "Source"},
-                                "original_filename": {"DA": "Oprindeligt filnavn", "EN": "Original filename"},
-                                "geo_location":      {"DA": "Geo-lokation",        "EN": "Geo-location"}
-                                }
 
-    logical_tag_attributes = {"title": {},
-                              "date": {},
-                              "description": {"hide": False},  #As it is a ref-tag, it can be hidden. It is always write-protected
-
-                              # The logical tag will be defaulted from fallback_tag if missing in image,
-                              # but only until memory-mate saved metadata to image first time.
-                              "description_only": {"fallback_tag": "description"},
-
-                              "persons": {"Autocomplete": True},
-                              "photographer": {"Autocomplete": True},
-                              "source": {"Autocomplete": True},
-                              "original_filename": {},
-                              "geo_location":{}
-                              }
+    logical_tags = {"title":             {"widget":                "text_line",
+                                          "label_text_key":        "tag_label_title"},
+                    "date":              {"widget":                "date_time",
+                                          "label_text_key":        "tag_label_date"},
+                    "description_only":  {"widget":                "text",
+                                          "label_text_key":        "tag_label_description_only",
+                                          "fallback_tag":          "description"},    #If description_only is blank in metadata, it is populated from description
+                    "persons":           {"widget":                "text_set",
+                                          "label_text_key":        "tag_label_persons",
+                                          "Autocomplete":          True},
+                    "photographer":      {"widget":                "text_line",
+                                          "label_text_key":        "tag_label_photographer",
+                                          "Autocomplete":          True},
+                    "source":            {"widget":                "text_line",
+                                          "label_text_key":        "tag_label_source",
+                                          "Autocomplete":          True},
+                    "original_filename": {"widget":                "text_line",
+                                          "label_text_key":        "tag_label_original_filename"},
+                    "geo_location":      {"widget":                "geo_location",
+                                          "label_text_key":        "tag_label_geo_location"},
+                    "description":       {"widget":                "text",
+                                          "label_text_key":        "tag_label_description",
+                                          "reference_tag":         True,
+                                          "reference_tag_content": [{"type": "tag", "tag_name": "title", "tag_label": False},
+                                                                    {"type": "tag", "tag_name": "description_only", "tag_label": False},
+                                                                    {"type": "text_line", "text": ""},
+                                                                    {"type": "tag", "tag_name": "persons", "tag_label": True},
+                                                                    {"type": "tag", "tag_name": "source", "tag_label": True},
+                                                                    {"type": "tag", "tag_name": "photographer", "tag_label": True},
+                                                                    {"type": "tag", "tag_name": "original_filename", "tag_label": True}
+                                                                   ]},
+                    "orientation":       {"widget":        None}
+                   }
 
     tags = {"XMP:Title": {"type": "text_line", "access": "Read/Write"},
             "EXIF:XPTitle": {"type": "text_line", "access": "Read/Write"},
@@ -121,6 +109,7 @@ if not os.path.isfile(settings_path):
             "File:FileCreateDate": {"type": "date_time", "access": "Read"},
             "Composite:GPSPosition": {"type": "geo_location", "access": "Read/Write"}
             }
+
     file_type_tags = {
         "jpg": {"title": ["XMP:Title", "EXIF:XPTitle", "IPTC:ObjectName"],
                 "date": ["XMP:Date", "EXIF:DateTimeOriginal", "EXIF:CreateDate", "EXIF:ModifyDate",
@@ -133,8 +122,9 @@ if not os.path.isfile(settings_path):
                 "source": ["XMP:Source"],
                 "original_filename": ["XMP:PreservedFileName"],
                 "description": ["XMP:Description", "EXIF:XPComment", "EXIF:UserComment", "EXIF:ImageDescription",
-                                "IPTC:Caption-Abstract"]
-                },
+                                "IPTC:Caption-Abstract"],
+                "orientation": ["EXIF:Orientation"]
+               },
         "jpeg": {"title": ["XMP:Title", "EXIF:XPTitle", "IPTC:ObjectName"],
                 "date": ["XMP:Date", "EXIF:DateTimeOriginal", "EXIF:CreateDate", "EXIF:ModifyDate",
                          "IPTC:DateCreated", "File:FileCreateDate"],
@@ -146,7 +136,8 @@ if not os.path.isfile(settings_path):
                 "source": ["XMP:Source"],
                 "original_filename": ["XMP:PreservedFileName"],
                 "description": ["XMP:Description", "EXIF:XPComment", "EXIF:UserComment", "EXIF:ImageDescription",
-                                "IPTC:Caption-Abstract"]
+                                "IPTC:Caption-Abstract"],
+                "orientation": ["EXIF:Orientation"]
                 },
         "png": {"title": ["XMP:Title", "EXIF:XPTitle", "IPTC:ObjectName"],
                 "date": ["XMP:Date", "EXIF:DateTimeOriginal", "EXIF:CreateDate", "EXIF:ModifyDate",
@@ -159,7 +150,8 @@ if not os.path.isfile(settings_path):
                 "source": ["XMP:Source"],
                 "original_filename": ["XMP:PreservedFileName"],
                 "description": ["XMP:Description", "EXIF:XPComment", "EXIF:UserComment", "EXIF:ImageDescription",
-                                "IPTC:Caption-Abstract"]
+                                "IPTC:Caption-Abstract"],
+                "orientation": ["EXIF:Orientation"]
                 },
         "cr3": {"title": ["XMP:Title", "EXIF:XPTitle"],
                 "date": ["XMP:Date", "EXIF:DateTimeOriginal", "EXIF:CreateDate", "EXIF:ModifyDate", "File:FileCreateDate"],
@@ -170,7 +162,8 @@ if not os.path.isfile(settings_path):
                 "geo_location": ["Composite:GPSPosition"],
                 "source": ["XMP:Source"],
                 "original_filename": ["XMP:PreservedFileName"],
-                "description": ["XMP:Description", "EXIF:XPComment", "EXIF:UserComment", "EXIF:ImageDescription"]
+                "description": ["XMP:Description", "EXIF:XPComment", "EXIF:UserComment", "EXIF:ImageDescription"],
+                "orientation": ["EXIF:Orientation"]
                 },
 
         "cr2": {"title": ["XMP:Title", "EXIF:XPTitle"],
@@ -182,7 +175,8 @@ if not os.path.isfile(settings_path):
                 "geo_location": ["Composite:GPSPosition"],
                 "source": ["XMP:Source"],
                 "original_filename": ["XMP:PreservedFileName"],
-                "description": ["XMP:Description", "EXIF:XPComment", "EXIF:UserComment", "EXIF:ImageDescription"]
+                "description": ["XMP:Description", "EXIF:XPComment", "EXIF:UserComment", "EXIF:ImageDescription"],
+                "orientation": ["EXIF:Orientation"]
                 },
         "nef": {"title": ["XMP:Title", "EXIF:XPTitle"],
                 "date": ["XMP:Date", "EXIF:DateTimeOriginal", "EXIF:CreateDate", "EXIF:ModifyDate", "File:FileCreateDate"],
@@ -193,7 +187,8 @@ if not os.path.isfile(settings_path):
                 "geo_location": ["Composite:GPSPosition"],
                 "source": ["XMP:Source"],
                 "original_filename": ["XMP:PreservedFileName"],
-                "description": ["XMP:Description", "EXIF:XPComment", "EXIF:UserComment", "EXIF:ImageDescription"]
+                "description": ["XMP:Description", "EXIF:XPComment", "EXIF:UserComment", "EXIF:ImageDescription"],
+                "orientation": ["EXIF:Orientation"]
                 },
         "dng": {"title": ["XMP:Title", "EXIF:XPTitle", "IPTC:ObjectName"],
                 "date": ["XMP:Date", "EXIF:DateTimeOriginal", "EXIF:CreateDate", "EXIF:ModifyDate",
@@ -206,7 +201,8 @@ if not os.path.isfile(settings_path):
                 "source": ["XMP:Source"],
                 "original_filename": ["XMP:PreservedFileName"],
                 "description": ["XMP:Description", "EXIF:XPComment", "EXIF:UserComment", "EXIF:ImageDescription",
-                                "IPTC:Caption-Abstract"]
+                                "IPTC:Caption-Abstract"],
+                "orientation": ["EXIF:Orientation"]
                 },
         "arw": {"title": ["XMP:Title", "EXIF:XPTitle", "IPTC:ObjectName"],
                 "date": ["XMP:Date", "EXIF:DateTimeOriginal", "EXIF:CreateDate", "EXIF:ModifyDate",
@@ -219,7 +215,8 @@ if not os.path.isfile(settings_path):
                 "source": ["XMP:Source"],
                 "original_filename": ["XMP:PreservedFileName"],
                 "description": ["XMP:Description", "EXIF:XPComment", "EXIF:UserComment", "EXIF:ImageDescription",
-                                "IPTC:Caption-Abstract"]
+                                "IPTC:Caption-Abstract"],
+                "orientation": ["EXIF:Orientation"]
                 },
         "heic": {"title": ["XMP:Title", "EXIF:XPTitle"],
                  "date": ["XMP:Date", "EXIF:DateTimeOriginal", "EXIF:CreateDate", "EXIF:ModifyDate", "File:FileCreateDate"],
@@ -230,7 +227,8 @@ if not os.path.isfile(settings_path):
                  "geo_location": ["Composite:GPSPosition"],
                  "source": ["XMP:Source"],
                  "original_filename": ["XMP:PreservedFileName"],
-                 "description": ["XMP:Description", "EXIF:XPComment", "EXIF:UserComment", "EXIF:ImageDescription"]
+                 "description": ["XMP:Description", "EXIF:XPComment", "EXIF:UserComment", "EXIF:ImageDescription"],
+                "orientation": ["EXIF:Orientation"]
                  },
         "tif": {"title": ["XMP:Title", "EXIF:XPTitle", "IPTC:ObjectName"],
                 "date": ["XMP:Date", "EXIF:DateTimeOriginal", "EXIF:CreateDate", "EXIF:ModifyDate",
@@ -243,7 +241,8 @@ if not os.path.isfile(settings_path):
                 "source": ["XMP:Source"],
                 "original_filename": ["XMP:PreservedFileName"],
                 "description": ["XMP:Description", "EXIF:XPComment", "EXIF:UserComment", "EXIF:ImageDescription",
-                                "IPTC:Caption-Abstract"]
+                                "IPTC:Caption-Abstract"],
+                "orientation": ["EXIF:Orientation"]
                 },
         "gif": {"title": ["XMP:Title", "EXIF:XPTitle"],
                 "date": ["XMP:Date", "EXIF:DateTimeOriginal", "EXIF:CreateDate", "EXIF:ModifyDate"],
@@ -254,7 +253,8 @@ if not os.path.isfile(settings_path):
                 "geo_location": ["Composite:GPSPosition"],
                 "source": ["XMP:Source"],
                 "original_filename": ["XMP:PreservedFileName"],
-                "description": ["XMP:Description", "EXIF:XPComment", "EXIF:UserComment", "EXIF:ImageDescription"]
+                "description": ["XMP:Description", "EXIF:XPComment", "EXIF:UserComment", "EXIF:ImageDescription"],
+                "orientation": ["EXIF:Orientation"]
                 },
         "mp4": {"title": ["XMP:Title", "Quicktime:Title"],
                 "date": ["XMP:Date", "Quicktime:CreateDate", "Quicktime:ModifyDate",
@@ -283,18 +283,82 @@ if not os.path.isfile(settings_path):
         "avi": {"date": ["RIFF:DateTimeOriginal", "File:FileCreateDate"]
                 }
     }
-    file_context_menu_actions = {"consolidate_metadata": {"DA": "Konsolider metadata", "EN": "Consolidate Metadata"},
-                                 "copy_metadata": {"DA": "Kopier metadata", "EN": "Copy Metadata"},
-                                 "paste_metadata": {"DA": "Indsæt metadata", "EN": "Paste Metadata"},
-                                 "patch_metadata": {"DA": "Udfyld metadata", "EN": "Patch Metadata"},
-                                 "paste_by_filename": {"DA": "Indsæt metadata efter filnavn", "EN": "Paste Metadata by filename"},
-                                 "patch_by_filename": {"DA": "Udfyld metadata efter filnavn", "EN": "Patch Metadata by filename"},
-                                 "choose_tags_to_paste": {"DA": "Vælg hvad du vil overføre:",
-                                                          "EN": "Choose what to transfer:"}
+
+    text_keys = {"tag_label_title":
+                     {"DA": "Titel",
+                      "EN": "Title"},
+                 "tag_label_date":
+                     {"DA": "Dato",
+                      "EN": "Date"},
+                 "tag_label_description_only":
+                     {"DA": "Beskrivelse",
+                      "EN": "Description"},
+                 "tag_label_persons":
+                     {"DA": "Personer",
+                      "EN": "People"},
+                 "tag_label_photographer":
+                     {"DA": "Fotograf",
+                      "EN": "Photographer"},
+                 "tag_label_source":
+                     {"DA": "Oprindelse",
+                      "EN": "Source"},
+                 "tag_label_original_filename":
+                     {"DA": "Oprindeligt filnavn",
+                      "EN": "Original filename"},
+                 "tag_label_geo_location":
+                     {"DA": "Geo-lokation",
+                      "EN": "Geo-location"},
+                 "tag_label_description":
+                     {"DA": "Fuld beskrivelse",
+                      "EN": "Full Description"},
+                 "file_menu_consolidate":
+                     {"DA": "Konsolider metadata",
+                      "EN": "Consolidate Metadata"},
+                 "file_menu_copy":
+                     {"DA": "Kopier metadata",
+                      "EN": "Copy Metadata"},
+                 "file_menu_paste":
+                     {"DA": "Indsæt metadata",
+                      "EN": "Paste Metadata"},
+                 "file_menu_patch":
+                     {"DA": "Udfyld metadata",
+                      "EN": "Patch Metadata"},
+                 "file_menu_paste_by_filename":
+                     {"DA": "Indsæt metadata efter filnavn",
+                      "EN": "Paste Metadata by filename"},
+                 "file_menu_patch_by_filename":
+                     {"DA": "Udfyld metadata efter filnavn",
+                      "EN": "Patch Metadata by filename"},
+                 "file_menu_chose_tags_to_paste":
+                     {"DA": "Vælg hvad du vil overføre:",
+                      "EN": "Choose what to transfer:"},
+                 "folder_menu_standardize":
+                     {"DA": "Standardiser filnavne",
+                      "EN": "Standardize Filenames"},
+                 "folder_menu_consolidate":
+                     {"DA": "Konsolider metadata", "EN": "Consolidate Metadata"}
+                }
+
+    file_context_menu_actions = {"consolidate_metadata":
+                                     {"text_key": "file_menu_consolidate"},
+                                 "copy_metadata":
+                                     {"text_key": "file_menu_copy"},
+                                 "paste_metadata":
+                                    {"text_key": "file_menu_paste"},
+                                "patch_metadata":
+                                     {"text_key": "file_menu_patch"},
+                                 "paste_by_filename":
+                                     {"text_key": "file_menu_paste_by_filename"},
+                                 "patch_by_filename":
+                                     {"text_key": "file_menu_patch_by_filename"},
+                                 "choose_tags_to_paste":
+                                     {"text_key": "file_menu_chose_tags_to_paste"}
                                  }
 
-    folder_context_menu_actions = {"standardize_filenames": {"DA": "Standardiser filnavne", "EN": "Standardize Filenames"},
-                                   "consolidate_metadata": {"DA": "Konsolider metadata", "EN": "Consolidate Metadata"}
+    folder_context_menu_actions = {"standardize_filenames":
+                                       {"text_key": "folder_menu_standardize"},
+                                   "consolidate_metadata":
+                                       {"text_key": "floder_menu_consolidate"}
                                   }
 
 
@@ -302,11 +366,9 @@ if not os.path.isfile(settings_path):
                 "languages": languages,
                 "language": language,
                 "logical_tags": logical_tags,
-                "reference_tag_content": reference_tag_content,
-                "logical_tag_descriptions": logical_tag_descriptions,
-                "logical_tag_attributes": logical_tag_attributes,
                 "tags": tags,
                 "file_type_tags": file_type_tags,
+                "text_keys": text_keys,
                 "file_context_menu_actions": file_context_menu_actions,
                 "folder_context_menu_actions": folder_context_menu_actions}
 
