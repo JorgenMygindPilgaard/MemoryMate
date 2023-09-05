@@ -78,9 +78,10 @@ class FilePanel(QScrollArea):
             # Prepare file-preview widget
             FilePanel.file_preview = QLabel()
             FilePanel.pixmap = FilePreview.getInstance(FilePanel.file_name,self.width()-60).pixmap
-            FilePanel.file_preview.setPixmap(FilePanel.pixmap)
-            FilePanel.file_preview.setAlignment(Qt.AlignmentFlag.AlignHCenter)
-            FilePanel.main_layout.addWidget(FilePanel.file_preview)
+            if FilePanel.pixmap != None:
+                FilePanel.file_preview.setPixmap(FilePanel.pixmap)
+                FilePanel.file_preview.setAlignment(Qt.AlignmentFlag.AlignHCenter)
+                FilePanel.main_layout.addWidget(FilePanel.file_preview)
             dummy_widget_for_width = QWidget()
             dummy_widget_for_width.setFixedWidth(self.width() - 60)
             FilePanel.main_layout.addWidget(dummy_widget_for_width)

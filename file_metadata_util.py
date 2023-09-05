@@ -1,6 +1,6 @@
 import copy
 from PyQt6.QtCore import QThread, QCoreApplication,QObject,pyqtSignal,QSize, Qt
-from PyQt6.QtGui import QMovie,QPixmap, QImage,QImageReader,QTransform
+from PyQt6.QtGui import QMovie,QPixmap, QImage,QTransform, QImageReader
 from PyQt6.QtWidgets import QLabel, QHBoxLayout, QSizePolicy
 from exiftool_wrapper import ExifTool
 import settings
@@ -8,6 +8,7 @@ import os
 from collections import OrderedDict
 import time
 import pillow_heif
+
 import file_util
 import rawpy
 from PIL import Image
@@ -597,7 +598,6 @@ class QueueStatusMonitor(QHBoxLayout):
             self.movie.stop()
 class FilePreview():
     instance_index = {}
-
     def __init__(self,file_name,width):
         self.file_name = file_name
         file_type = file_util.splitFileName(file_name)[2].lower()
@@ -609,21 +609,34 @@ class FilePreview():
             pixmap = self.__movie_to_qpixmap(file_name)
         else:
             pixmap = self.__default_to_qpixmap(file_name)
-
-        height = int(width * 9 / 16)
-        self.pixmap = pixmap.scaled(width, height, Qt.AspectRatioMode.KeepAspectRatio,Qt.TransformationMode.SmoothTransformation)
+        if pixmap != None:
+            height = int(width * 9 / 16)
+            self.pixmap = pixmap.scaled(width, height, Qt.AspectRatioMode.KeepAspectRatio,Qt.TransformationMode.SmoothTransformation)
+        else:
+            self.pixmap = None
         self.width = width
         FilePreview.instance_index[file_name] = self
 
     def __heic_to_qpixmap(self,file_name):
-        pil_image = pillow_heif.read_heif(file_name).to_pillow()
-        if pil_image.mode != "RGB":
-            pil_image = pil_image.convert("RGB")
-        image_data = pil_image.tobytes()
-        width, height = pil_image.size
-        image_format = QImage.Format.Format_RGB888
-        image = QImage(image_data, width, height, image_format)
-        return QPixmap.fromImage(image)
+        orientation = FileMetadata.getInstance(file_name).logical_tag_values.get("orientation")
+        transform = QTransform()
+        if orientation == None or orientation == '':
+            orientation = '1'  # Default orientation
+        print("heic orientation:", orientation)
+
+        if pillow_heif.is_supported(file_name):
+            pillow_heif.register_heif_opener()
+            pil_image = Image.open(file_name)
+            if pil_image.mode != "RGB":
+                pil_image = pil_image.convert("RGB")
+            image_data = pil_image.tobytes()
+            width, height = pil_image.size
+            image_format = QImage.Format.Format_RGB888
+            image = QImage(image_data, width, height, image_format)
+            return QPixmap.fromImage(image)
+        else:
+            return self.__default_to_qpixmap(file_name)
+
     def __raw_to_qpixmap(self,file_name):
         with rawpy.imread(file_name) as raw:
             try:
@@ -638,14 +651,16 @@ class FilePreview():
                     else:
                         thumb_pil = Image.fromarray(thumb.data)
                         thumb_data = thumb_pil.tobytes()
-                        thumb_image = QImage(thumb_data, thumb_pil.width, thumb_pil.height, QImage.Format_RGB888)
+                        thumb_image = QImage(thumb_data, thumb_pil.width, thumb_pil.height, QImage.Format.Format_RGB888)
 
                 # Apply transformations based on EXIF orientation
                 # Here, somehow get orientation from metadata
+                metadata = FileMetadata.getInstance(file_name).logical_tag_values
                 orientation = FileMetadata.getInstance(file_name).logical_tag_values.get("orientation")
                 transform = QTransform()
-                if orientation == None:
+                if orientation == None or orientation =='':
                     orientation = '1'  # Default orientation
+                print("raw orientation:",orientation)
                 # Apply transformations based on EXIF orientation
                 if orientation == '3':
                     transform.rotate(-180)
@@ -677,11 +692,16 @@ class FilePreview():
         thumbnail_pixmap = QPixmap.fromImage(q_image)
         return thumbnail_pixmap
     def __default_to_qpixmap(self,file_name):
+        orientation = FileMetadata.getInstance(file_name).logical_tag_values.get("orientation")
+        transform = QTransform()
+        if orientation == None or orientation == '':
+            orientation = '1'  # Default orientation
+        print("default orientation:", orientation)
+
         image_reader = QImageReader(file_name)
         image_reader.setAutoTransform(True)  # This ensures proper orientation handling
         image = image_reader.read()
         return QPixmap.fromImage(image)
-
 
     @staticmethod
     def getInstance(file_name,width=None):
