@@ -217,7 +217,7 @@ if not os.path.isfile(settings_path):
                 "description": ["XMP:Description", "EXIF:XPComment", "EXIF:UserComment", "EXIF:ImageDescription",
                                 "IPTC:Caption-Abstract"],
                 "orientation": ["EXIF:Orientation"]
-                },
+               },
         "heic": {"title": ["XMP:Title", "EXIF:XPTitle"],
                  "date": ["XMP:Date", "EXIF:DateTimeOriginal", "EXIF:CreateDate", "EXIF:ModifyDate", "File:FileCreateDate"],
                  "description_only": ["XMP:DescriptionOnly"],
@@ -227,9 +227,8 @@ if not os.path.isfile(settings_path):
                  "geo_location": ["Composite:GPSPosition"],
                  "source": ["XMP:Source"],
                  "original_filename": ["XMP:PreservedFileName"],
-                 "description": ["XMP:Description", "EXIF:XPComment", "EXIF:UserComment", "EXIF:ImageDescription"],
-                "orientation": ["EXIF:Orientation"]
-                 },
+                 "description": ["XMP:Description", "EXIF:XPComment", "EXIF:UserComment", "EXIF:ImageDescription"]
+                },
         "tif": {"title": ["XMP:Title", "EXIF:XPTitle", "IPTC:ObjectName"],
                 "date": ["XMP:Date", "EXIF:DateTimeOriginal", "EXIF:CreateDate", "EXIF:ModifyDate",
                          "IPTC:DateCreated", "File:FileCreateDate"],
@@ -243,7 +242,7 @@ if not os.path.isfile(settings_path):
                 "description": ["XMP:Description", "EXIF:XPComment", "EXIF:UserComment", "EXIF:ImageDescription",
                                 "IPTC:Caption-Abstract"],
                 "orientation": ["EXIF:Orientation"]
-                },
+               },
         "gif": {"title": ["XMP:Title", "EXIF:XPTitle"],
                 "date": ["XMP:Date", "EXIF:DateTimeOriginal", "EXIF:CreateDate", "EXIF:ModifyDate"],
                 "description_only": ["XMP:DescriptionOnly", "File:FileCreateDate"],
@@ -255,7 +254,7 @@ if not os.path.isfile(settings_path):
                 "original_filename": ["XMP:PreservedFileName"],
                 "description": ["XMP:Description", "EXIF:XPComment", "EXIF:UserComment", "EXIF:ImageDescription"],
                 "orientation": ["EXIF:Orientation"]
-                },
+               },
         "mp4": {"title": ["XMP:Title", "Quicktime:Title"],
                 "date": ["XMP:Date", "Quicktime:CreateDate", "Quicktime:ModifyDate",
                          "Quicktime:MediaModifyDate", "Quicktime:TrackCreateDate",
