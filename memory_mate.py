@@ -3,6 +3,8 @@ from ui_widgets import *
 from PyQt6.QtWidgets import QWidget,QMainWindow,QApplication
 from exiftool_wrapper import ExifTool
 from file_metadata_util import QueueHost, QueueStatusMonitor
+from ui_status import UiStatusManager
+from ui_main import FilePanel, FileList
 
 
 class MainWindow(QMainWindow):
