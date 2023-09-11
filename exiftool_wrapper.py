@@ -74,7 +74,7 @@ class ExifTool(object):
             if ExifTool.read_process!=None:                 # Process exist
                 if ExifTool.read_process.poll() == None:    # Proceass is running
                     try:
-                        subprocess.run(['taskkill', '/F', '/T', '/PID', str(ExifTool.read_process.pid)], check=True)   #Instant forcefully close process
+                        subprocess.run(['taskkill', '/F', '/T', '/PID', str(ExifTool.read_process.pid)], stdout=subprocess.DEVNULL, check=True)   #Instant forcefully close process
                         ExifTool.read_process = None
                     except subprocess.CalledProcessError:
                         pass
@@ -83,7 +83,7 @@ class ExifTool(object):
             if ExifTool.write_process!=None:                 # Process exist
                 if ExifTool.write_process.poll() == None:    # Proceass is running
                     try:
-                        subprocess.run(['taskkill', '/F', '/T', '/PID', str(ExifTool.write_process.pid)], check=True)   #Instant forcefully close process
+                        subprocess.run(['taskkill', '/F', '/T', '/PID', str(ExifTool.write_process.pid)], stdout=subprocess.DEVNULL, check=True)   #Instant forcefully close process
                         ExifTool.write_process = None
                         for filename in ExifTool.last_written_filenames:
                             try:
@@ -160,7 +160,7 @@ class ExifTool(object):
             args.append(tag)
         args.append('-G')
         args.append('-j')
-        args.append('-n')
+#        args.append('-n')
         if type(filenames)==str:
             args.append(filenames)
             file_to_return=filenames
@@ -182,13 +182,16 @@ class ExifTool(object):
                     args.append('#[CSTR]' + '-' + tag + '=' + tag_value)         # #[CSTR] tells exiftool to accept escape-caracter sequence in argument
                 else:
                     args.append('-' + tag + '=' + tag_values[tag])
-            else:                                                               # assuming tag_value is a list (eg. persons in image)
+            elif isinstance(tag_values[tag], list):
                 if tag_values[tag] == []:
                     args.append('-' + tag + '=')
                 else:
                     for tag_value_item in tag_values[tag]:
-                        args.append('-' + tag + '=' + tag_value_item)               # adds tag_value_items one at the time (e.g. persons)
-
+                        args.append('-' + tag + '=' + str(tag_value_item))      # adds tag_value_items one at the time (e.g. persons)
+            elif tag_values[tag] == None:
+                args.append('-' + tag + '=')
+            else:                                                               # assuming tag_value is a number
+                args.append('-' + tag + '=' + str(tag_values[tag]))
 
         if type(filenames)==str:
             filename = filenames

@@ -1,545 +1,16 @@
-from PyQt6.QtWidgets import QWidget, QHBoxLayout, QVBoxLayout, QTreeView, QLabel, QLineEdit, QPlainTextEdit, QDateTimeEdit, QDateEdit, QPushButton, QListWidget, QAbstractItemView, QMenu, QDialog, QScrollArea
-from PyQt6.QtCore import Qt, QDir, QDateTime, QDate, QModelIndex,QTimer, pyqtSignal,QItemSelectionModel
-from PyQt6.QtGui import QFontMetrics,QFileSystemModel,QAction
+from PyQt6.QtWidgets import QWidget, QHBoxLayout, QVBoxLayout, QLabel, QLineEdit, QPlainTextEdit, QDateTimeEdit, QDateEdit, QPushButton, QListWidget, QAbstractItemView, QDialog
+from PyQt6.QtCore import Qt, QDateTime, QDate, QTimer, pyqtSignal
+from PyQt6.QtGui import QFontMetrics,QPixmap
 import settings
-from file_metadata_util import FileMetadata, StandardizeFilenames, CopyLogicalTags, ConsolidateMetadata, FilePreview
-from ui_util import ProgressBarWidget, AutoCompleteList
+from file_metadata_util import FileMetadata
+from ui_util import AutoCompleteList
 from ui_pick_gps_location import MapView, MapLocationSelector
-import json
 import os
 
-class UiStatusManager():
-    def __init__(self,status_file_name: str=""):
-        self.status_file_name = status_file_name
-        self.status_parameters = {}
-        if os.path.exists(self.status_file_name):
-            with open(self.status_file_name, 'r') as infile:
-                self.status_parameters = json.load(infile)
-
-    def setUiStatusParameters(self,status_parameters={}):
-        # Write or replace status-parameters in status file
-        for parameter_name in status_parameters:
-            self.status_parameters[parameter_name]=status_parameters[parameter_name]
-        status_parameters_json_object = json.dumps(status_parameters, indent=4)
-        with open(self.status_file_name, "w") as outfile:
-            outfile.write(status_parameters_json_object)
-
-    def getStatusParameters(self):
-        return self.status_parameters
-    def getStatusParameter(self, parameter_name: str):
-        return self.status_parameters.get(parameter_name)
-class FilePanel(QScrollArea):
-    __instance = None
-    file_metadata = None
-    file_name = ''
-    focus_tag = None        # After refreshing FilePanel, bring focus back to the tag that had focus before
-
-    def __init__(self):
-        super().__init__()
-        self.setMinimumWidth(350)
-
-    def resizeEvent(self, event):
-        super().resizeEvent(event)
-        if event.oldSize().width() != -1:  # ignore first call to resizeEvent
-            if event.oldSize().width()!=event.size().width():
-                self.prepareFilePanel()
-
-    @staticmethod
-    def getInstance(file_name):
-        FilePanel.focus_tag = None      #Forget focus-tag when changing to different photo
-        if FilePanel.file_metadata != None and FilePanel.file_name !='':                      #Changing to different picture: Save this pictures metadata
-            FilePanel.file_metadata.save()
-        if FilePanel.__instance==None:
-            FilePanel.__instance=FilePanel()
-        if file_name==None or file_name == '':
-            FilePanel.file_name = ''
-            FilePanel.file_metadata = None
-        else:
-            if os.path.isfile(file_name):
-                FilePanel.file_name=file_name
-                FilePanel.file_metadata=FileMetadata.getInstance(FilePanel.file_name)
-                FilePanel.file_metadata.change_signal.connect(FilePanel.metadataChanged)    # If a copy-process changes file
-        FilePanel.__instance.prepareFilePanel()
-        return FilePanel.__instance
-
-    @staticmethod
-    def saveMetadata():
-        if FilePanel.file_metadata != None and FilePanel.file_name !='':
-            FilePanel.file_metadata.save()
-
-    def prepareFilePanel(self):       # Happens each time a new filename is assigned
-        scroll_position = FilePanel.__instance.verticalScrollBar().value()    # Remember scroll-position
-        self.takeWidget()
-
-        if FilePanel.file_name != None and FilePanel.file_name != '':
-            FilePanel.__initializeWidgets()    #Widgets for metadata only
-
-        if FilePanel.file_name != None and FilePanel.file_name != '':
-            # Prepare file-preview widget
-            FilePanel.file_preview = QLabel()
-            FilePanel.pixmap = FilePreview.getInstance(FilePanel.file_name,self.width()-60).pixmap
-            if FilePanel.pixmap != None:
-                FilePanel.file_preview.setPixmap(FilePanel.pixmap)
-                FilePanel.file_preview.setAlignment(Qt.AlignmentFlag.AlignHCenter)
-                FilePanel.main_layout.addWidget(FilePanel.file_preview)
-            dummy_widget_for_width = QWidget()
-            dummy_widget_for_width.setFixedWidth(self.width() - 60)
-            FilePanel.main_layout.addWidget(dummy_widget_for_width)
-
-            # Prepare metadata widgets and place them all in metadata_layout.
-            FilePanel.metadata_layout.setSizeConstraint(QVBoxLayout.SizeConstraint.SetNoConstraint)   #No constraints
-            tags = {}
-            for logical_tag in FilePanel.file_metadata.logical_tag_values:
-                if settings.logical_tags.get(logical_tag).get("widget") == None:
-                    continue
-                tags[logical_tag]=FilePanel.tags.get(logical_tag)
-                tag_widget=FilePanel.tags[logical_tag][1]
-                tag_widget.readFromImage()
-
-            # Place all tags in V-box layout for metadata
-            focus_widget = None
-            for logical_tag in tags:
-                FilePanel.metadata_layout.addWidget(tags[logical_tag][0])  # Label-widget
-                FilePanel.metadata_layout.addWidget(tags[logical_tag][1])  # Tag-widget
-                space_label=QLabel(" ")
-                FilePanel.metadata_layout.addWidget(space_label)
-                if logical_tag == FilePanel.focus_tag:
-                    if tags[logical_tag][2] == 'text_set':
-                        focus_widget = tags[logical_tag][1].text_input
-                    else:
-                        focus_widget = tags[logical_tag][1]
-
-            FilePanel.main_layout.addLayout(FilePanel.metadata_layout)
-            FilePanel.main_widget.setFixedWidth(self.width() - 30)
-            FilePanel.main_widget.setLayout(FilePanel.main_layout)
-            self.setWidget(FilePanel.main_widget)
-            if focus_widget:
-                focus_widget.setFocus()
-            FilePanel.__instance.verticalScrollBar().setValue(scroll_position)  # Remember scroll-position
-
-    @staticmethod
-    def __initializeWidgets():
-        FilePanel.main_widget = QWidget()
-        FilePanel.main_widget.setMinimumHeight(5000)   # Ensure that there is enough available place in widget for scroll-area
-        FilePanel.main_layout=QVBoxLayout()
-        FilePanel.main_layout.setSizeConstraint(QVBoxLayout.SizeConstraint.SetFixedSize)
-        FilePanel.metadata_layout=QVBoxLayout()
-        FilePanel.metadata_layout.setSizeConstraint(QVBoxLayout.SizeConstraint.SetFixedSize)
-
-        FilePanel.tags = {}
-        for logical_tag in settings.logical_tags:
-            tag_label = None
-            tag_label_key = settings.logical_tags.get(logical_tag).get("label_text_key")
-            if tag_label_key:
-                tag_label = settings.text_keys.get(tag_label_key).get(settings.language)
-            tag_widget_type = settings.logical_tags.get(logical_tag).get("widget")
-
-            if tag_label:
-                label_widget = QLabel(tag_label + ":")
-                label_widget.setStyleSheet("color: #868686;")
-
-            if tag_widget_type == "text_line":
-                tag_widget = TextLine(logical_tag)
-                FilePanel.tags[logical_tag] = [label_widget, tag_widget,tag_widget_type]
-            elif tag_widget_type == "text":
-                tag_widget = Text(logical_tag)
-                FilePanel.tags[logical_tag] = [label_widget, tag_widget,tag_widget_type]
-            elif tag_widget_type == "date_time":
-                tag_widget = DateTime(logical_tag)
-                FilePanel.tags[logical_tag] = [label_widget, tag_widget,tag_widget_type]
-            elif tag_widget_type == "date":
-                tag_widget = Date(logical_tag)
-                FilePanel.tags[logical_tag] = [label_widget, tag_widget,tag_widget_type]
-            elif tag_widget_type == "text_set":
-                tag_widget = TextSet(logical_tag)
-                FilePanel.tags[logical_tag] = [label_widget, tag_widget,tag_widget_type]
-            elif tag_widget_type == "geo_location":
-                tag_widget = GeoLocation(logical_tag)
-                FilePanel.tags[logical_tag] = [label_widget, tag_widget,tag_widget_type]
-            else:
-                pass
-
-            if settings.logical_tags.get(logical_tag).get("reference_tag"):
-                tag_widget.setDisabled(True)
-
-
-
-
-    @staticmethod
-    def metadataChanged(file_name):
-        if file_name==FilePanel.file_name:
-            FilePanel.__instance.prepareFilePanel()      # If matadata changed in file shown in panel, then update metadata in panel
-
-    @staticmethod
-    def filenemeChanged(old_filename, new_filename):     # reacts on change filename
-        FileMetadata.deleteInstance(old_filename)        # file for this instance does not exist anymore
-class FileList(QTreeView):
-    def __init__(self,dir_path='', file_panel: FilePanel=None):
-        super().__init__()
-
-        # Many files can be selected in one go
-        self.setSelectionMode(QAbstractItemView.SelectionMode.ExtendedSelection)
-#        self.setSelectionBehavior(QAbstractItemView.SelectItems)   #6-problem guess right
-
-        # Only show image- and video-files
-        self.model = QFileSystemModel()
-        self.model.setFilter(QDir.Filter.NoDotAndDotDot | QDir.Filter.AllDirs | QDir.Filter.Files )
-
-        self.setModel(self.model)
-        self.__setFiletypeFilter(settings.file_types)
-        self.hideFilteredFiles()    #Default is to hide filetered files. They can also be shown dimmed
-                                    #by calling self.showFilteredFiles()
-
-        self.hideColumn(2)    #Hide File-type
-        self.setColumnWidth(0,400)    #Filename
-        self.setColumnWidth(1,80)    #Filesize
-        self.setColumnWidth(2,150)    #Date modified
-
-
-        column_count = self.model.columnCount()
-
-        #Set root-path
-        self.setRootPath(dir_path)
-        self.file_panel = file_panel
-
-
-        # Prepare context menu
-        self.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
-        self.customContextMenuRequested.connect(self.openMenu)
-
-    def createMenu(self, position):
-
-        self.menu = QMenu()
-      
-        # Add actions to the menu
-        action_text_key = settings.file_context_menu_actions.get("consolidate_metadata").get("text_key")
-        action_text = settings.text_keys.get(action_text_key).get(settings.language)
-        self.consolidate_metadata = self.menu.addAction(action_text)
-
-        action_text_key = settings.folder_context_menu_actions.get("standardize_filenames").get("text_key")
-        action_text = settings.text_keys.get(action_text_key).get(settings.language)
-        self.standardize_filenames = self.menu.addAction(action_text)
-
-        action_text_key = settings.file_context_menu_actions.get("copy_metadata").get("text_key")
-        action_text = settings.text_keys.get(action_text_key).get(settings.language)
-        self.copy_metadata = self.menu.addAction(action_text)
-
-        action_text_key = settings.file_context_menu_actions.get("paste_metadata").get("text_key")
-        action_text = settings.text_keys.get(action_text_key).get(settings.language)
-        self.paste_metadata = self.menu.addAction(action_text)
-
-        action_text_key = settings.file_context_menu_actions.get("patch_metadata").get("text_key")
-        action_text = settings.text_keys.get(action_text_key).get(settings.language)
-        self.patch_metadata = self.menu.addAction(action_text)
-
-        action_text_key = settings.file_context_menu_actions.get("paste_by_filename").get("text_key")
-        action_text = settings.text_keys.get(action_text_key).get(settings.language)
-        self.paste_by_filename = self.menu.addAction(action_text)
-
-        action_text_key = settings.file_context_menu_actions.get("patch_by_filename").get("text_key")
-        action_text = settings.text_keys.get(action_text_key).get(settings.language)
-        self.patch_by_filename = self.menu.addAction(action_text)
-
-        self.menu.addSeparator()
-        action_text_key = settings.file_context_menu_actions.get("choose_tags_to_paste").get("text_key")
-        action_text = settings.text_keys.get(action_text_key).get(settings.language)
-        menu_text_line = QAction(action_text, self, enabled=False)
-        self.menu.addAction(menu_text_line)   # Just a textline in menu saying "Choose what to paste"
-
-        # Ad checkable actions for each logical tag
-        self.logical_tag_actions = {}
-        for logical_tag in settings.logical_tags:
-            if settings.logical_tags.get(logical_tag).get("reference_tag"):    #Can't copy-paste a reference tag. It is derrived from the other tags
-                continue
-            if settings.logical_tags.get(logical_tag).get("widget") == None:   #Cant copy-paste tags now shown in widget
-                continue
-
-            tag_label_text_key = settings.logical_tags.get(logical_tag).get("label_text_key")
-            tag_label = settings.text_keys.get(tag_label_text_key).get(settings.language)
-            tag_action = QAction(tag_label, self, checkable=True)
-            tag_action.setChecked(True)
-            self.logical_tag_actions[logical_tag] = tag_action
-
-            self.menu.addAction(tag_action)
-            tag_action.triggered.connect(self.toggleAction)
-
-    def openMenu(self, position):
-        if not hasattr(self, 'menu'):
-            self.createMenu(position)
-
-        if not hasattr(self, 'source'):
-            self.source=[]
-            self.source_is_single_file=False
-
-        if self.source_is_single_file and len(self.source) == 1:   #Exactly one field selected
-            self.paste_metadata.setEnabled(True)
-            self.patch_metadata.setEnabled(True)
-            self.paste_by_filename.setEnabled(True)
-            self.patch_by_filename.setEnabled(True)
-        elif len(self.source) >= 1:
-            self.paste_metadata.setEnabled(False)
-            self.patch_metadata.setEnabled(False)
-            self.paste_by_filename.setEnabled(True)
-            self.patch_by_filename.setEnabled(True)
-        else:
-            self.paste_metadata.setEnabled(False)
-            self.patch_metadata.setEnabled(False)
-            self.paste_by_filename.setEnabled(False)
-            self.patch_by_filename.setEnabled(False)
-
-        action = self.menu.exec(self.viewport().mapToGlobal(position))
-
-        if action == self.consolidate_metadata:
-            index = self.indexAt(position)  # Get index in File-list
-            if index.isValid():
-                target = []
-                for index in self.selectedIndexes():
-                    target.append(self.model.filePath(index))   #Can be both files and folders
-                target = list(set(target))        #Remove duplicate filenames. Row contains one index per column
-
-                self.consolidator = ConsolidateMetadata(target,await_start_signal=True)
-                self.progress_bar = ProgressBarWidget('Consolidate', self.consolidator)  # Progress-bar will start worker
-
-        elif action == self.standardize_filenames:
-            index = self.indexAt(position)  # Get index in File-list
-            if index.isValid():
-                target = []
-                for index in self.selectedIndexes():
-                    target.append(self.model.filePath(index))   #Can be both files and folders
-                target = list(set(target))        #Remove duplicate filenames. Row contains one index per column
-
-                file_name_pattern_dialog = InputFileNamePattern()
-                result = file_name_pattern_dialog.exec()
-                if result == QDialog.DialogCode.Accepted:
-                    # Get the input values
-                    file_name_pattern = file_name_pattern_dialog.getInput()
-                    prefix, num_pattern, suffix = file_name_pattern
-
-                    # Rename all files in folders and subfolders
-                    self.unselectAll()
-                    self.standardizer=StandardizeFilenames(target,prefix,num_pattern,suffix,await_start_signal=True)  # worker-instance
-                    self.progress_bar=ProgressBarWidget('Standardize',self.standardizer)   # Progress-bar will start worker
-
-        elif action == self.copy_metadata:
-            self.source_is_single_file = False
-            index = self.indexAt(position)  # Get index in File-list
-            # Check if an item was clicked
-            if index.isValid():    # A valid file was right-clicked
-                self.source = []
-                selected_indexes = self.selectedIndexes()
-                for index in self.selectedIndexes():
-                    self.source.append(self.model.filePath(index))
-                self.source = list(set(self.source))        #Remove duplicate filenames. Row contains one index per column
-
-                if len(self.source) == 1:
-                    if os.path.isfile(self.source[0]):
-                        self.source_is_single_file = True
-            else:
-                self.source = []                # No item was clicked
-
-            # index = self.indexAt(position)  # Get index in File-list
-            # # Check if an item was clicked
-            # if index.isValid():
-            #     self.source = self.model.filePath(index)
-            # else:
-            #     self.source = None                # No item was clicked
-        elif action == self.paste_metadata:
-            index = self.indexAt(position)  # Get index in File-list
-            # Check if an item was clicked
-            if index.isValid():    # A valid file was right-clicked
-                target = []
-                for index in self.selectedIndexes():
-                    target.append(self.model.filePath(index))
-                target = list(set(target))        #Remove duplicate filenames. Row contains one index per column
-
-                target_logical_tags = []
-                for logical_tag in self.logical_tag_actions:
-                    if self.logical_tag_actions[logical_tag].isChecked():
-                        target_logical_tags.append(logical_tag)
-
-                self.copier = CopyLogicalTags(self.source, target, target_logical_tags, await_start_signal=True)
-                self.progress_bar = ProgressBarWidget('Copy Tags', self.copier)  # Progress-bar will start worker
-                self.source = []
-
-
-
-        elif action == self.paste_by_filename:
-            index = self.indexAt(position)  # Get index in File-list
-            # Check if an item was clicked
-            if index.isValid():  # A valid file was right-clicked
-                target = []
-                for index in self.selectedIndexes():
-                    target.append(self.model.filePath(index))
-                target = list(set(target))        #Remove duplicate filenames. Row contains one index per column
-
-                target_logical_tags = []
-                for logical_tag in self.logical_tag_actions:
-                    if self.logical_tag_actions[logical_tag].isChecked():
-                        target_logical_tags.append(logical_tag)
-
-                self.copier = CopyLogicalTags(self.source, target, target_logical_tags, match_file_name=True, await_start_signal=True)
-                self.progress_bar = ProgressBarWidget('Copy Tags', self.copier)  # Progress-bar will start worker
-                self.source = []
-
-        elif action == self.patch_metadata:
-            index = self.indexAt(position)  # Get index in File-list
-            # Check if an item was clicked
-            if index.isValid():  # A valid file was right-clicked
-                target = []
-                for index in self.selectedIndexes():
-                    target.append(self.model.filePath(index))
-                target = list(set(target))        #Remove duplicate filenames. Row contains one index per column
-
-                target_logical_tags = []
-                for logical_tag in self.logical_tag_actions:
-                    if self.logical_tag_actions[logical_tag].isChecked():
-                        target_logical_tags.append(logical_tag)
-                self.copier = CopyLogicalTags(self.source, target, target_logical_tags, overwrite=False, await_start_signal=True)
-                self.progress_bar = ProgressBarWidget('Copy Tags', self.copier)  # Progress-bar will start worker
-                self.source = []
-
-
-        elif action == self.patch_by_filename:
-            index = self.indexAt(position)  # Get index in File-list
-            # Check if an item was clicked
-            if index.isValid():  # A valid file was right-clicked
-                target = []
-                for index in self.selectedIndexes():
-                    target.append(self.model.filePath(index))
-                target = list(set(target))        #Remove duplicate filenames. Row contains one index per column
-
-                target_logical_tags = []
-                for logical_tag in self.logical_tag_actions:
-                    if self.logical_tag_actions[logical_tag].isChecked():
-                        target_logical_tags.append(logical_tag)
-
-                self.copier = CopyLogicalTags(self.source, target, target_logical_tags, overwrite=False, match_file_name=True, await_start_signal=True)
-                self.progress_bar = ProgressBarWidget('Copy Tags', self.copier)  # Progress-bar will start worker
-                self.source = []
-
-            else:
-                self.menu.target_file_name = None                # No item was clicked
-        elif action == None:
-            pass
-        else:
-            self.openMenu(position)    # Toggle one of the logical tags was chosen
-
-    def unselectAll(self):
-        self.selectionModel().clearSelection()  # Unselect any file, as soon selection will be renamed
-        self.setCurrentIndex(QModelIndex())
-        # self.selection_model.setCurrentIndex(QModelIndex(), QTreeView.NoIndex)
-
-    def toggleAction(self):
-        # Get the action that triggered the signal
-        action = self.sender()
-        is_checked = not action.isChecked()
-        if is_checked:
-            action.setChecked(False)
-        else:
-            action.setChecked(True)
-
-    def setRootPath(self, dir_path):
-        self.model.setRootPath(dir_path)
-        self.setRootIndex(self.model.index(dir_path))
-
-    def __setFiletypeFilter(self, file_types=["*.*"]):
-        self.file_type_filter = file_types
-        for i in range(len(file_types)):
-            self.file_type_filter[i] = "*." + self.file_type_filter[i]
-        self.model.setNameFilters(self.file_type_filter)
-
-    def hideFilteredFiles(self):
-        self.model.setNameFilterDisables(False)   #Filtered files are not shown
-
-    def showFilteredFiles(self):
-        self.model.setNameFilterDisables(True)    #Filtered files are shown as dimmed, and are not selectable
-
-    def currentChanged(self, current, previous):       #Redefinet method called at event "current file changed"
-        chosen_path = self.model.filePath(current)
-        previous_path = self.model.filePath((previous))
-        if chosen_path != previous_path:
-            if not self.file_panel == None:
-                if os.path.isfile(chosen_path):
-                    self.file_panel=FilePanel.getInstance(chosen_path)   # Gets file-singleton. At the same time set singleton to chosen file
-
-    def getOpenFolders(self):
-        open_folders = []
-        stack = []
-        root_index = self.model.index(self.rootIndex().data())
-        if self.model.hasChildren(root_index):  # Check if the current index has children (i.e., is a directory)
-            child_count = self.model.rowCount(root_index)
-            for i in range(child_count):
-                child_index = self.model.index(i, 0, root_index)
-                stack.append(child_index)
-
-        while stack:
-            current_index = stack.pop()
-            if self.isExpanded(current_index):
-                current_file_info = self.model.fileInfo(current_index)
-                if current_file_info.isDir():
-                    open_folders.append(current_file_info.absoluteFilePath())
-
-                child_count = self.model.rowCount(current_index)
-                for i in range(child_count):
-                    child_index = self.model.index(i, 0, current_index)
-                    stack.append(child_index)
-        return list(set(open_folders))
-
-    def getSelectedItems(self):
-        selected_items = []
-        selected_indexes = self.selectedIndexes()
-
-        for index in selected_indexes:
-            if index.column() == 0:
-                selected_file_info = self.model.fileInfo(index)
-                selected_items.append(selected_file_info.absoluteFilePath())
-        return list(set(selected_items))
-
-    def getCurrentFile(self):
-        if self.file_panel:
-            return self.file_panel.file_name
-
-    def setOpenFolders(self, open_folders=[]):
-        if open_folders:
-            for open_folder in open_folders:
-                # Find the QModelIndex corresponding to the folder_path
-                folder_index = self.model.index(open_folder)
-                if folder_index.isValid():  # Check if the folder exists in the model
-                    # Expand the folder
-                    self.setExpanded(folder_index, True)
-
-    def setSelectedItems(self, selected_items=[]):
-        self.clearSelection()
-        if selected_items:
-            for selected_item in selected_items:
-                # Find the QModelIndex corresponding to the item_path
-                item_index = self.model.index(selected_item)
-                if item_index.isValid():  # Check if the item exists in the model
-                    # Select the item
-                    self.selectionModel().select(item_index, QItemSelectionModel.SelectionFlag.Select)
-
-
-    def setCurrentFile(self, current_file=""):
-        self.file_panel=FilePanel.getInstance(current_file)
-
-    # Class can remember last location and open it again at next program launch
-    def __getUiStatusFilename(self):
-        return os.path.join(settings.app_data_location, "ui_status.json")
-
-    def saveUiStatus(self):
-        ui_status = {'open_folders': self.getOpenFolders(),
-                     'selected_items': self.getSelectedItems(),
-                     'current_file': self.getCurrentFile()}
-
-        us_status_json_object = json.dumps(ui_status, indent=4)
-        ui_status_filename = self.__getUiStatusFilename()
-        with open(ui_status_filename, "w") as outfile:
-            outfile.write(us_status_json_object)
-    def loadUiStatus(self):
-        pass
 class TextLine(QLineEdit):
-    def __init__(self, logical_tag):
+    def __init__(self, file_name, logical_tag):
         super().__init__()
+        self.file_name = file_name
         self.logical_tag = logical_tag                                    #Widget should remember who it serves
         self.setMaximumWidth(1250)
 
@@ -554,19 +25,27 @@ class TextLine(QLineEdit):
         self.editingFinished.connect(self.__edited)
 
     def readFromImage(self):
-        if FilePanel.file_metadata:
-            self.setText(FilePanel.file_metadata.logical_tag_values.get(self.logical_tag))
+        file_metadata = FileMetadata.getInstance(self.file_name)
+        if file_metadata:
+            text_line = file_metadata.logical_tag_values.get(self.logical_tag)
+            if text_line == None:
+                return
+            self.setText(text_line)
             if hasattr(self, 'auto_complete_list') and self.text() != "":
                 self.auto_complete_list.collectItem(self.text())    # Collect new entry in auto_complete_list
 
     def __edited(self):
-        FilePanel.file_metadata.setLogicalTagValues({self.logical_tag: self.text()})
+        file_metadata = FileMetadata.getInstance(self.file_name)
+        file_metadata.setLogicalTagValues({self.logical_tag: self.text()})
         if hasattr(self, 'auto_complete_list'):
             self.auto_complete_list.collectItem(self.text())    # Collect new entry in auto_complete_list
-        FilePanel.focus_tag=self.logical_tag
+    def updateFilename(self,file_name):
+        self.file_name = file_name
+#        FilePanel.focus_tag=self.logical_tag
 class Text(QPlainTextEdit):
-    def __init__(self, logical_tag):
+    def __init__(self, file_name, logical_tag):
         super().__init__()     #Puts text in Widget
+        self.file_name = file_name
         self.logical_tag = logical_tag                                    #Widget should remember who it serves
         self.setMinimumHeight(50)
         self.setMaximumWidth(1250)
@@ -590,8 +69,11 @@ class Text(QPlainTextEdit):
         # Ignore the wheel event
         event.ignore()
     def readFromImage(self):
-        if FilePanel.file_metadata:
-            text=FilePanel.file_metadata.logical_tag_values.get(self.logical_tag)
+        file_metadata = FileMetadata.getInstance(self.file_name)
+        if file_metadata:
+            text = file_metadata.logical_tag_values.get(self.logical_tag)
+            if text == None:
+                return
             self.setPlainText(text)
             self.setFixedHeight(self.widgetHeight(self.width()))      #Calculates needed height from width and text
             if hasattr(self, 'auto_complete_list') and self.toPlainText() != "":
@@ -600,11 +82,11 @@ class Text(QPlainTextEdit):
         self.__edited()
 
     def __edited(self):
-        FilePanel.file_metadata.setLogicalTagValues({self.logical_tag: self.toPlainText()})
+        file_metadata = FileMetadata.getInstance(self.file_name)
+        file_metadata.setLogicalTagValues({self.logical_tag: self.toPlainText()})
         if hasattr(self, 'auto_complete_list'):
             self.auto_complete_list.collectItem(self.toPlainText())    # Collect new entry in auto_complete_list
-        FilePanel.focus_tag=self.logical_tag
-#        FilePanel.file_metadata.save()
+#        FilePanel.focus_tag=self.logical_tag
 
     def widgetHeight(self, new_widget_width=-1):
 
@@ -651,8 +133,9 @@ class Text(QPlainTextEdit):
 
         return text_height
 class DateTime(QDateTimeEdit):
-    def __init__(self, logical_tag):
+    def __init__(self, file_name, logical_tag):
         super().__init__()
+        self.file_name = file_name
         self.logical_tag = logical_tag                                    #Widget should remember who it serves
 
         self.setCalendarPopup(True)
@@ -682,11 +165,14 @@ class DateTime(QDateTimeEdit):
 
 
     def readFromImage(self):
-        if FilePanel.file_metadata:
-            date_time = FilePanel.file_metadata.logical_tag_values.get(self.logical_tag)
+        file_metadata = FileMetadata.getInstance(self.file_name)
+        if file_metadata:
+            date_time = file_metadata.logical_tag_values.get(self.logical_tag)
+            if date_time == None:
+                return
             self.clear()
             self.setStyleSheet("color: #D3D3D3;")
-            if date_time != "":  # Data was found
+            if date_time != "" and date_time != None:  # Data was found
                 date_time = ''.join(date_time.split('+')[:1]) # 2022/12/24 13:50:00+02:00 --> 2022/12/24 13:50:00
                 date_time = date_time.replace(" ", ":")       # 2022/12/24 13:50:00 --> 2022/12/24:13:50:00
                 date_time = date_time.replace("/", ":")       # 2022/12/24:13:50:00 --> 2022:12:24:13:50:00
@@ -702,14 +188,16 @@ class DateTime(QDateTimeEdit):
 
     def __edited(self):
         date_time_string = self.dateTime().toString("yyyy:MM:dd hh:mm:ss")
-        FilePanel.file_metadata.setLogicalTagValues({self.logical_tag: date_time_string})
+        file_metadata = FileMetadata.getInstance(self.file_name)
+        file_metadata.setLogicalTagValues({self.logical_tag: date_time_string})
         if hasattr(self, 'auto_complete_list'):
             self.auto_complete_list.collectItem(self.dateTime())    # Collect new entry in auto_complete_list
         self.setStyleSheet("color: black")
-        FilePanel.focus_tag=self.logical_tag
+#        FilePanel.focus_tag=self.logical_tag
 class Date(QDateEdit):
-    def __init__(self, logical_tag):
+    def __init__(self, file_name, logical_tag):
         super().__init__()
+        self.file_name = file_name
         self.logical_tag = logical_tag                                    #Widget should remember who it serves
 
         self.setCalendarPopup(True)
@@ -731,8 +219,11 @@ class Date(QDateEdit):
         event.ignore()
 
     def readFromImage(self):
-        if FilePanel.file_metadata:
-            date = FilePanel.file_metadata.logical_tag_values.get(self.logical_tag)
+        file_metadata = FileMetadata.getInstance(self.file_name)
+        if file_metadata:
+            date = file_metadata.logical_tag_values.get(self.logical_tag)
+            if date == None:
+                return
             self.setDate(QDate(1752,1,1))
             if date !="":
                 date = date.replace("/", ":")          # 2022/12/24 --> 2022:12:24
@@ -745,15 +236,16 @@ class Date(QDateEdit):
 
     def __edited(self):
         date_string = self.date().toString("yyyy:MM:dd")
-        FilePanel.file_metadata.setLogicalTagValues({self.logical_tag: date_string})
+        file_metadata = FileMetadata.getInstance(self.file_name)
+        file_metadata.setLogicalTagValues({self.logical_tag: date_string})
         if hasattr(self, 'auto_complete_list'):
             self.auto_complete_list.collectItem(self.date())    # Collect new entry in auto_complete_list
-        FilePanel.focus_tag=self.logical_tag
+#        FilePanel.focus_tag=self.logical_tag
 class TextSet(QWidget):
 
-    def __init__(self, logical_tag):
+    def __init__(self, file_name, logical_tag):
         super().__init__()
-
+        self.file_name = file_name
         self.logical_tag = logical_tag  # Widget should remember who it serves
         self.text_list = self.TextList()
         self.text_list.setFixedWidth(300)
@@ -789,8 +281,11 @@ class TextSet(QWidget):
            self.auto_complete_list.activated.connect(self.__onCompleterActivated)
 
     def readFromImage(self):
-        if FilePanel.file_metadata:
-            tags = FilePanel.file_metadata.logical_tag_values.get(self.logical_tag)
+        file_metadata = FileMetadata.getInstance(self.file_name)
+        if file_metadata:
+            tags = file_metadata.logical_tag_values.get(self.logical_tag)
+            if tags == None:
+                return
             if type(tags) == str:
                 tag_list = [tags]
             else:
@@ -809,8 +304,9 @@ class TextSet(QWidget):
             item = self.text_list.item(index)
             text = item.text()
             items.append(text)
-        FilePanel.file_metadata.setLogicalTagValues({self.logical_tag: items})
-        FilePanel.focus_tag=self.logical_tag
+        file_metadata = FileMetadata.getInstance(self.file_name)
+        file_metadata.setLogicalTagValues({self.logical_tag: items})
+#        FilePanel.focus_tag=self.logical_tag
 
     def __onReturnPressed(self):
         if self.auto_complete_list.currentCompletion():  # Return pressed in completer-list
@@ -866,9 +362,9 @@ class TextSet(QWidget):
             self.text_set=text_set    #Remember who you are serving
             self.setPlaceholderText('Tast navn')
 class GeoLocation(MapView):
-    def __init__(self, logical_tag):
+    def __init__(self, file_name, logical_tag):
         super().__init__(marker_editable=False, drag_enabled=False, zoom_enabled=False)
-
+        self.file_name = file_name
         self.logical_tag = logical_tag                                    #Widget should remember who it serves
         self.setFixedWidth(250)
         self.setFixedHeight(250)
@@ -900,9 +396,12 @@ class GeoLocation(MapView):
 
 
     def readFromImage(self):
-        if FilePanel.file_metadata:
-            gps_position_string = FilePanel.file_metadata.logical_tag_values.get(self.logical_tag)    # "50.454545 -0.959595"
-            if gps_position_string != "":
+        file_metadata = FileMetadata.getInstance(self.file_name)
+        if file_metadata:
+            gps_position_string = file_metadata.logical_tag_values.get(self.logical_tag)    # "50.454545 -0.959595"
+            if gps_position_string == None:
+                return
+            if gps_position_string != "" and gps_position_string != None:
                 if ',' in gps_position_string:
                     gps_position_parts = gps_position_string.split(",")
                 else:
@@ -918,47 +417,150 @@ class GeoLocation(MapView):
             marker_location_string = str(self.marker_location[0])+','+str(self.marker_location[1])
         else:
             marker_location_string = ''
-        FilePanel.file_metadata.setLogicalTagValues({self.logical_tag: marker_location_string})
+        file_metadata = FileMetadata.getInstance(self.file_name)
+        file_metadata.setLogicalTagValues({self.logical_tag: marker_location_string})
         # if hasattr(self, 'auto_complete_list'):
         #     self.auto_complete_list.collectItem(self.date())    # Collect new entry in auto_complete_list
-        FilePanel.focus_tag=self.logical_tag
-class InputFileNamePattern(QDialog):
-    def __init__(self):
+#        FilePanel.focus_tag=self.logical_tag
+class Orientation(QWidget):
+    def __init__(self, file_name, logical_tag):
         super().__init__()
+        self.file_name = file_name
+        self.logical_tag = logical_tag
+        self.orientation = None
+        self.initUI()
 
-        layout = QVBoxLayout()
-        self.setLayout(layout)
+    def initUI(self):
+        self.layout = QHBoxLayout()
 
-        # Add labels and input fields
-        prefix_label = QLabel("Prefix:")
 
-        self.prefix = QLineEdit()
-        layout.addWidget(prefix_label)
-        layout.addWidget(self.prefix)
+        # Create a QLabel for "rotate_left" image
+        self.left_image_label = QLabel()
+        self.left_image_label.setPixmap(QPixmap('rotate_left.png'))  # Replace with your image file
+        self.left_image_label.mousePressEvent = self.onRotateLeft
 
-        num_pattern_label = QLabel("Number Pattern:")
-        self.num_pattern = QLineEdit()
-        layout.addWidget(num_pattern_label)
-        layout.addWidget(self.num_pattern)
+        # Create a QLabel for "rotate_right" image
+        self.right_image_label = QLabel()
+        self.right_image_label.setPixmap(QPixmap('rotate_right.png'))  # Replace with your image file
+        self.right_image_label.mousePressEvent = self.onRotateRight
 
-        suffix_label = QLabel("Suffix:")
-        self.suffix = QLineEdit()
-        layout.addWidget(suffix_label)
-        layout.addWidget(self.suffix)
 
-        # Add OK and Cancel buttons
-        button_layout = QHBoxLayout()
-        layout.addLayout(button_layout)
+        self.layout.addStretch(1)
+        self.layout.addWidget(self.left_image_label)
+        self.layout.addWidget(self.right_image_label)
+        self.layout.addStretch(1)
 
-        ok_button = QPushButton("OK")
-        ok_button.clicked.connect(self.accept)
-        button_layout.addWidget(ok_button)
+        self.setLayout(self.layout)
 
-        cancel_button = QPushButton("Cancel")
-        cancel_button.clicked.connect(self.reject)
-        button_layout.addWidget(cancel_button)
+        self.setWindowTitle('Image Rotator')
+        self.setGeometry(20, 20, 800, 20)
 
-    def getInput(self):
-        # Return the input values as a tuple
-        return (self.prefix.text(), self.num_pattern.text(), self.suffix.text())
+    def readFromImage(self):
+        file_metadata = FileMetadata.getInstance(self.file_name)
+        if file_metadata:
+            orientation = file_metadata.logical_tag_values.get(self.logical_tag)
+            if orientation == None:
+                return
+            self.orientation = orientation
+
+    def __edited(self):
+        file_metadata = FileMetadata.getInstance(self.file_name)
+        file_metadata.setLogicalTagValues({self.logical_tag: self.orientation})
+
+    def onRotateLeft(self, event):
+        if self.orientation == 1 or self.orientation == None:     # 1: Not Rotated
+            self.orientation = 8                                  # 8: Rotated 270 CW
+        elif self.orientation == 8:                               # 8: Rotated 270 CW
+            self.orientation = 3                                  # 3: Rotated 180
+        elif self.orientation == 3:                               # 3: Rotated 180
+            self.orientation = 6                                  # 6: Rotated 90 CW
+        elif self.orientation == 6:                               # 6: Rotated 90 CW
+            self.orientation = 1                                  # 1: Not Rotated
+        else:
+            self.orientation = 1
+        self.__edited()
+
+    def onRotateRight(self, event):
+        if self.orientation == 1 or self.orientation == None:     # 1: Not Rotated
+            self.orientation = 6                                  # 6: Rotated 90 CW
+        elif self.orientation == 6:                               # 6: Rotated 90 CW
+            self.orientation = 3                                  # 3: Rotated 180
+        elif self.orientation == 3:                               # 3: Rotated 180
+            self.orientation = 8                                  # 8: Rotated 270 CW
+        elif self.orientation == 8:                               # 8: Rotated 270 CW
+            self.orientation = 1                                  # 1: Not Rotated
+        else:
+            self.orientation = 1
+        self.__edited()
+
+class Rotation(QWidget):
+    def __init__(self, file_name, logical_tag):
+        super().__init__()
+        self.file_name = file_name
+        self.logical_tag = logical_tag
+        self.rotation = None
+        self.initUI()
+
+    def initUI(self):
+        self.layout = QHBoxLayout()
+
+
+        # Create a QLabel for "rotate_left" image
+        self.left_image_label = QLabel()
+        self.left_image_label.setPixmap(QPixmap('rotate_left.png'))  # Replace with your image file
+        self.left_image_label.mousePressEvent = self.onRotateLeft
+
+        # Create a QLabel for "rotate_right" image
+        self.right_image_label = QLabel()
+        self.right_image_label.setPixmap(QPixmap('rotate_right.png'))  # Replace with your image file
+        self.right_image_label.mousePressEvent = self.onRotateRight
+
+
+        self.layout.addStretch(1)
+        self.layout.addWidget(self.left_image_label)
+        self.layout.addWidget(self.right_image_label)
+        self.layout.addStretch(1)
+
+        self.setLayout(self.layout)
+
+        self.setWindowTitle('Image Rotator')
+        self.setGeometry(20, 20, 800, 20)
+
+    def readFromImage(self):
+        file_metadata = FileMetadata.getInstance(self.file_name)
+        if file_metadata:
+            rotation = file_metadata.logical_tag_values.get(self.logical_tag)
+            if rotation == None:
+                return
+            self.rotation = rotation
+
+    def __edited(self):
+        file_metadata = FileMetadata.getInstance(self.file_name)
+        file_metadata.setLogicalTagValues({self.logical_tag: self.rotation})
+
+    def onRotateLeft(self, event):
+        if self.rotation == 0 or self.rotation == None:
+            self.rotation = 90
+        elif self.rotation == 90:
+            self.rotation = 180
+        elif self.rotation == 180:
+            self.rotation = 270
+        elif self.rotation == 270:
+            self.rotation = 0
+        else:
+            self.rotation = 0
+        self.__edited()
+
+    def onRotateRight(self, event):
+        if self.rotation == 0 or self.rotation == None:
+            self.rotation = 270
+        elif self.rotation == 270:
+            self.rotation = 180
+        elif self.rotation == 180:
+            self.rotation = 90
+        elif self.rotation == 90:
+            self.rotation = 0
+        else:
+            self.rotation = 0
+        self.__edited()
 
