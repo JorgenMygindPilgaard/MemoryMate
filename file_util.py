@@ -49,9 +49,24 @@ def splitFileName(file_name):
     file_path = rreplace(file_name, short_file_name, "")
     return [file_path, short_file_name_ex_type, file_type]
 
+class FileNameChangedEmitter(QObject):
+    instance = None
+    change_signal = pyqtSignal(str, str)  # old filename, new file name
+
+    def __init__(self):
+        super().__init__()
+
+    @staticmethod
+    def getInstance():
+        if FileNameChangedEmitter.instance == None:
+            FileNameChangedEmitter.instance = FileNameChangedEmitter()
+        return FileNameChangedEmitter.instance
+    def emit(self, old_file_name, new_file_name):
+        self.change_signal.emit(old_file_name, new_file_name)
+
 class FileRenamer(QObject):
     __instance = None
-    filename_changed_signal = pyqtSignal(str, str)   # Emits Old filename, New_filename
+    change_signal = FileNameChangedEmitter.getInstance()  # Filename, old logical tag values, new logical tag values
 
     def __init__(self, files=[]):
         super().__init__()
@@ -89,6 +104,7 @@ class FileRenamer(QObject):
         for index, file in enumerate(self.files):
             old_name = file.get('old_name')
             new_name = file.get('new_name')
+
             if os.path.exists(new_name):
                 # To prevent overwriting files, rename existing new_name files by appending _backup
                 backup_name = new_name + "_backup"
@@ -116,7 +132,7 @@ class FileRenamer(QObject):
                 raise FileRenameError('Error renaming ' + old_name + ' to ' + new_name + ':\n'+str(e))
 
         for file in renamed_files:
-            self.filename_changed_signal.emit(file.get('old_name'), file.get('new_name'))
+            self.change_signal.emit(file.get('old_name'), file.get('new_name'))
 
     def __roll_back(self,files):
         for file in files:

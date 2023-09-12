@@ -3,6 +3,7 @@ from PyQt6.QtCore import Qt, QDir, QModelIndex,QItemSelectionModel, QObject, pyq
 from PyQt6.QtGui import QFileSystemModel,QAction
 import settings
 from file_metadata_util import FileMetadata, QueueHost, FileMetadataChangedEmitter
+from file_util import FileNameChangedEmitter
 from ui_util import ProgressBarWidget
 import json
 import os
@@ -664,7 +665,6 @@ class StandardizeFilenames(QObject):
                 files_for_renaming.append({'old_name': file_name, 'new_name': new_file_name})
         if files_for_renaming != []:
             renamer=file_util.FileRenamer.getInstance(files_for_renaming)
-            renamer.filename_changed_signal.connect(onFileRenamed)
             try:
                 ExifTool.close(close_read_process=False,
                                close_write_process=True)  # Close write-process, so that data in queue can be changed safely
@@ -838,22 +838,26 @@ def onMetadataChanged(file_name,old_logical_tags,new_logical_tags):
             FilePanel.instance.prepareFilePanel()      # If matadata changed in file shown in panel, then update metadata in panel
 
 def onFileRenamed(old_file_name, new_file_name):     # reacts on change filename signal from
-    # Update filename in metadata-instance
-    file_metadata = FileMetadata.instance_index.get(old_file_name)
-    if file_metadata:
-        file_metadata.updateFilename(new_file_name)
+    # Update filename in file-panel
+    if FilePanel.file_name == old_file_name:
+        FilePanel.updateFilename(new_file_name)
 
     # Update filename in preview-instance
     file_preview = FilePreview.instance_index.get(old_file_name)
     if file_preview:
         file_preview.updateFilename(new_file_name)
 
-    # Update filename in file-panel
-    if FilePanel.file_name == old_file_name:
-        FilePanel.updateFilename(new_file_name)
+    # Update filename in metadata-instance
+    file_metadata = FileMetadata.instance_index.get(old_file_name)
+    if file_metadata:
+        file_metadata.updateFilename(new_file_name)
 
     # Update fileename in queue
     json_queue_file = file_util.JsonQueue.getInstance(settings.queue_file_path)
     json_queue_file.change_queue(find={'file': old_file_name}, change={'file': new_file_name})
+
 file_metadata_changed_emitter = FileMetadataChangedEmitter.getInstance()
 file_metadata_changed_emitter.change_signal.connect(onMetadataChanged)
+
+file_name_changed_emitter = FileNameChangedEmitter.getInstance()
+file_name_changed_emitter.change_signal.connect(onFileRenamed)
