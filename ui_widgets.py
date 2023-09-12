@@ -309,12 +309,9 @@ class TextSet(QWidget):
 #        FilePanel.focus_tag=self.logical_tag
 
     def __onReturnPressed(self):
-        if self.auto_complete_list.currentCompletion():  # Return pressed in completer-list
-            pass  # Return pressed from completer
-        else:
-            self.text_list.addTag(self.text_input.text())  # Return pressed from QLineEdit
-            self.auto_complete_list.collectItem(self.text_input.text())
-            self.text_input.clear()
+        self.text_list.addTag(self.text_input.text())  # Return pressed from QLineEdit
+        self.auto_complete_list.collectItem(self.text_input.text())
+        self.text_input.clear()
 
     def __onCompleterActivated(self, text):
         self.text_list.addTag(text)
