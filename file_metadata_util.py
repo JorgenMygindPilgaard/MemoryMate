@@ -8,6 +8,7 @@ import settings
 import time
 import file_util
 
+
 class FileMetadataChangedEmitter(QObject):
     instance = None
     change_signal = pyqtSignal(str, dict, dict)  # Filename, old logical tag values, new logical tag values
@@ -86,8 +87,7 @@ class FileMetadata(QObject):
                 tag_values[tag] = tag_value
 
         # Finally map tag_values to logical_tag_values
-        logical_tag_values = {}
-#        for logical_tag in settings.logical_tags:
+        self.logical_tag_values = {}
         logical_tags_missing_value = []
         for logical_tag in logical_tags_tags:
             logical_tag_data_type = settings.logical_tags.get(logical_tag).get("data_type")
@@ -97,7 +97,7 @@ class FileMetadata(QObject):
             else:
                 tag_value = None
 
-            logical_tag_values[logical_tag] = tag_value  # Set to empty value to begin with"
+            self.logical_tag_values[logical_tag] = tag_value  # Set to empty value to begin with"
 
             logical_tag_value_found = False
             for tag in logical_tag_tags:
@@ -107,12 +107,26 @@ class FileMetadata(QObject):
                 if logical_tag_data_type != 'list' and isinstance(tag_value, list):     #E.g. Author contains multiple entries. Concatenate ti a string then
                     tag_value = ', '.join(str(tag_value))
                 if tag_value != None and tag_value != "":
-                    logical_tag_values[logical_tag] = tag_value
+                    self.logical_tag_values[logical_tag] = tag_value
                     break
             if not logical_tag_value_found:
                 logical_tags_missing_value.append(logical_tag)
 
-        self.saved_logical_tag_values = copy.deepcopy(logical_tag_values)
+        self.saved_logical_tag_values = copy.deepcopy(self.logical_tag_values)
+        self.confirmed_logical_tag_values = copy.deepcopy(self.logical_tag_values)
+
+        # Update logical tags in memory from queue-file (Queue originates from previous run)
+        json_queue = file_util.JsonQueue.getInstance(settings.queue_file_path)
+        for queue_entry in json_queue.queue:
+            if queue_entry.get('file') == self.file_name:
+                queue_logical_tag_values = queue_entry.get('logical_tag_values')
+                if queue_logical_tag_values != None and queue_logical_tag_values != {}:
+                    self.setLogicalTagValues(queue_logical_tag_values,supress_signal=True)
+                    for queue_logical_tag in queue_logical_tag_values:
+                        while queue_logical_tag in logical_tags_missing_value:
+                            logical_tags_missing_value.remove(queue_logical_tag)
+
+        self.confirmed_logical_tag_values = copy.deepcopy(self.logical_tag_values)    # Confirmed means that tag has been put in queue
 
         # Read fallback_tag (if assigned) into missing logical tags
         if not tag_values.get('XMP:MemoryMateSaveDateTime'):     #Memory Mate never wrote to file before. Get fall-back tag-values for missing logical tags that has fall-back tag assigned
@@ -120,19 +134,10 @@ class FileMetadata(QObject):
             for logical_tag in logical_tags_missing_value:
                 fallback_tag = settings.logical_tags.get(logical_tag).get('fallback_tag')
                 if fallback_tag:
-                    fallback_tag_value = logical_tag_values.get(fallback_tag)
+                    fallback_tag_value = self.logical_tag_values.get(fallback_tag)
                     if fallback_tag_value:
-                        logical_tag_values[logical_tag] = fallback_tag_value
-        self.logical_tag_values = copy.deepcopy(logical_tag_values)
-        self.confirmed_logical_tag_values = copy.deepcopy(logical_tag_values)
+                        self.logical_tag_values[logical_tag] = fallback_tag_value
 
-        # Update logical tags in memory from queue-file (Queue originates from previous run)
-        json_queue = file_util.JsonQueue.getInstance(settings.queue_file_path)
-        for queue_entry in json_queue.queue:
-            if queue_entry.get('file') == self.file_name:
-                queue_logical_tag_values=queue_entry.get('logical_tag_values')
-                if queue_logical_tag_values != None and queue_logical_tag_values != {}:
-                    self.setLogicalTagValues(queue_logical_tag_values)
 
     def __updateReferenceTags(self):
         first = True
@@ -210,9 +215,11 @@ class FileMetadata(QObject):
             self.confirmed_logical_tag_values = copy.deepcopy(self.logical_tag_values)
             self.saved_logical_tag_values = copy.deepcopy(self.logical_tag_values)
 
-    def setLogicalTagValues(self,logical_tag_values,overwrite=True):
+    def setLogicalTagValues(self,logical_tag_values,overwrite=True,supress_signal=False):
         old_logical_tag_values = copy.deepcopy(self.logical_tag_values)
         for logical_tag in logical_tag_values:
+            if not logical_tag in old_logical_tag_values:          # If the file-type does not support the logical tag, then skip it
+                continue
             old_logical_tag_value = self.logical_tag_values.get(logical_tag)
             if old_logical_tag_value != logical_tag_values[logical_tag]:
                 if overwrite:
@@ -227,7 +234,7 @@ class FileMetadata(QObject):
                         elif type(old_logical_tag_value) == list:
                             if old_logical_tag_value == []:
                                 self.logical_tag_values[logical_tag] = logical_tag_values[logical_tag]
-        if self.logical_tag_values != old_logical_tag_values:
+        if self.logical_tag_values != old_logical_tag_values and not supress_signal:
             self.change_signal.emit(self.file_name, old_logical_tag_values, self.logical_tag_values)
 
     def updateFilename(self, new_file_name):
@@ -271,7 +278,7 @@ class QueueWorker(QThread):
                 logical_tag_values = queue_entry.get('logical_tag_values')
                 force_rewrite = queue_entry.get('force_rewrite')
                 file_metadata = FileMetadata.getInstance(file)
-                file_metadata.setLogicalTagValues(logical_tag_values)
+ #               file_metadata.setLogicalTagValues(logical_tag_values)    # Not needed. file_metadata already updated when data enters queue
                 file_metadata.save(force_rewrite=force_rewrite, put_in_queue=False)
                 json_queue_file.dequeue_commit()
             else:
@@ -318,7 +325,7 @@ class QueueHost(QObject):
     def start_queue_worker(self):
         if not self.queue_worker_running:
             self.queue_worker_running = True
-            self.queue_worker=QueueWorker()
+            self.queue_worker = QueueWorker()
             self.queue_worker.waiting.connect(self.onWorkerWaiting)       # Queue-worker is waiting for something to process
             self.queue_worker.processing.connect(self.onWorkerProcessing) # Queue is being processed. This can be used to show running-indicator in app.
             self.queue_worker.queue_size_changed.connect(self.onQueueSizeChanged)
