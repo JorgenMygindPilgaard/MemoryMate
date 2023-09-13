@@ -79,7 +79,11 @@ class FilePreview(QObject):
             if rotation == None:
                 rotation = 0.
             if self.original_rotation == None:
-                self.original_rotation = rotation
+                saved_rotation = FileMetadata.getInstance(self.file_name).saved_logical_tag_values.get("rotation")
+                if saved_rotation != None:
+                    self.original_rotation = saved_rotation
+                else:
+                    self.original_rotation = 0
 
             rotation_change = self.original_rotation - rotation
             if rotation_change != 0:

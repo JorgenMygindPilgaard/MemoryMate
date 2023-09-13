@@ -254,6 +254,9 @@ class TextSet(QWidget):
         self.__initUI()
         self.readFromImage()
 
+        self.timer_text_input_clear = QTimer(self)
+        self.timer_text_input_clear.timeout.connect(self.__clearTextInput)
+
     def __initUI(self):
         # Prepare text_input with completer
         # Get attributes of tag
@@ -307,15 +310,20 @@ class TextSet(QWidget):
         file_metadata = FileMetadata.getInstance(self.file_name)
         file_metadata.setLogicalTagValues({self.logical_tag: items})
 #        FilePanel.focus_tag=self.logical_tag
+    def __clearTextInput(self):
+        self.text_input.clear()
+        self.timer_text_input_clear.stop()
 
     def __onReturnPressed(self):
         self.text_list.addTag(self.text_input.text())  # Return pressed from QLineEdit
         self.auto_complete_list.collectItem(self.text_input.text())
         self.text_input.clear()
+        self.timer_text_input_clear.start(100)
 
     def __onCompleterActivated(self, text):
-        self.text_list.addTag(text)
-        QTimer.singleShot(0, self.text_input.clear)
+        if self.text_input.text() !='':
+            self.text_list.addTag(self.text_input.text())
+            self.timer_text_input_clear.start(100)
 
     class TextList(QListWidget):
         edit_signal = pyqtSignal()
