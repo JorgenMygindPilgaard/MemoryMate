@@ -25,9 +25,8 @@ class FilePanel(QScrollArea):
 
     def resizeEvent(self, event):
         super().resizeEvent(event)
-        if event.oldSize().width() != -1:  # ignore first call to resizeEvent
-            if event.oldSize().width() != event.size().width():
-                self.prepareFilePanel()
+        if event.oldSize().width() != event.size().width():
+            self.prepareFilePanel()
 
     @staticmethod
     def getInstance(file_name):
@@ -102,7 +101,7 @@ class FilePanel(QScrollArea):
                         focus_widget = tags[logical_tag][1]
 
             FilePanel.main_layout.addLayout(FilePanel.metadata_layout)
-            FilePanel.main_widget.setFixedWidth(self.width() - 30)
+#            FilePanel.main_widget.setFixedWidth(self.width() - 30)
             FilePanel.main_widget.setLayout(FilePanel.main_layout)
             self.setWidget(FilePanel.main_widget)
             if focus_widget:
