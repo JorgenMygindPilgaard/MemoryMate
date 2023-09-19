@@ -13,6 +13,7 @@ class TextLine(QLineEdit):
         self.file_name = file_name
         self.logical_tag = logical_tag                                    #Widget should remember who it serves
         self.setMaximumWidth(1250)
+        self.auto_complete_list = None
 
         #Get attributes of tag
         tag_attributes = settings.logical_tags.get(self.logical_tag)
@@ -31,26 +32,29 @@ class TextLine(QLineEdit):
             if text_line == None:
                 return
             self.setText(text_line)
-            if hasattr(self, 'auto_complete_list') and self.text() != "":
+            if self.auto_complete_list != None and self.text() != '':
                 self.auto_complete_list.collectItem(self.text())    # Collect new entry in auto_complete_list
 
     def __edited(self):
         file_metadata = FileMetadata.getInstance(self.file_name)
         file_metadata.setLogicalTagValues({self.logical_tag: self.text()})
-        if hasattr(self, 'auto_complete_list'):
+        if self.auto_complete_list != None and self.text() != '':
             self.auto_complete_list.collectItem(self.text())    # Collect new entry in auto_complete_list
     def updateFilename(self,file_name):
         self.file_name = file_name
 #        FilePanel.focus_tag=self.logical_tag
 class Text(QPlainTextEdit):
+    instance_index = {}
     def __init__(self, file_name, logical_tag):
         super().__init__()     #Puts text in Widget
+        Text.instance_index[file_name] = self
         self.file_name = file_name
         self.logical_tag = logical_tag                                    #Widget should remember who it serves
         self.setMinimumHeight(50)
         self.setMaximumWidth(1250)
         self.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
         self.setFocusPolicy(Qt.FocusPolicy.ClickFocus)
+        self.auto_complete_list = None
 
         #Get attributes of tag
         tag_attributes = settings.logical_tags.get(self.logical_tag)
@@ -76,17 +80,16 @@ class Text(QPlainTextEdit):
                 return
             self.setPlainText(text)
             self.setFixedHeight(self.widgetHeight(self.width()))      #Calculates needed height from width and text
-            if hasattr(self, 'auto_complete_list') and self.toPlainText() != "":
+            if self.auto_complete_list != None and self.toPlainText() != '':
                 self.auto_complete_list.collectItem(self.toPlainText())    # Collect new entry in auto_complete_list
     def focusOutEvent(self, event):
+        pass
         self.__edited()
-
     def __edited(self):
         file_metadata = FileMetadata.getInstance(self.file_name)
         file_metadata.setLogicalTagValues({self.logical_tag: self.toPlainText()})
-        if hasattr(self, 'auto_complete_list'):
+        if self.auto_complete_list != None and self.toPlainText() != '':
             self.auto_complete_list.collectItem(self.toPlainText())    # Collect new entry in auto_complete_list
-#        FilePanel.focus_tag=self.logical_tag
 
     def widgetHeight(self, new_widget_width=-1):
 
@@ -137,9 +140,9 @@ class DateTime(QDateTimeEdit):
         super().__init__()
         self.file_name = file_name
         self.logical_tag = logical_tag                                    #Widget should remember who it serves
-
         self.setCalendarPopup(True)
         self.setFixedWidth(250)
+        self.auto_complete_list = None
 
         display_format = self.displayFormat()
         if not 'mm.ss' in display_format.lower():
@@ -182,7 +185,7 @@ class DateTime(QDateTimeEdit):
                 self.setDateTime(QDateTime(int(date_time_parts[0]), int(date_time_parts[1]), int(date_time_parts[2]),
                                            int(date_time_parts[3]), int(date_time_parts[4]), int(date_time_parts[5])))
                 self.setStyleSheet("color: black")
-                if hasattr(self, 'auto_complete_list'):
+                if self.auto_complete_list != None:
                     self.auto_complete_list.collectItem(date_time)    # Collect new entry in auto_complete_list
 
 
@@ -190,7 +193,7 @@ class DateTime(QDateTimeEdit):
         date_time_string = self.dateTime().toString("yyyy:MM:dd hh:mm:ss")
         file_metadata = FileMetadata.getInstance(self.file_name)
         file_metadata.setLogicalTagValues({self.logical_tag: date_time_string})
-        if hasattr(self, 'auto_complete_list'):
+        if self.auto_complete_list != None:
             self.auto_complete_list.collectItem(self.dateTime())    # Collect new entry in auto_complete_list
         self.setStyleSheet("color: black")
 #        FilePanel.focus_tag=self.logical_tag
@@ -199,9 +202,9 @@ class Date(QDateEdit):
         super().__init__()
         self.file_name = file_name
         self.logical_tag = logical_tag                                    #Widget should remember who it serves
-
         self.setCalendarPopup(True)
         self.setFixedWidth(250)
+        self.auto_complete_list = None
 
         #Get attributes of tag
         tag_attributes = settings.logical_tags.get(self.logical_tag)
@@ -231,14 +234,14 @@ class Date(QDateEdit):
                 while len(date_parts) < 3:
                     date_parts.append("")
                 self.setDate(QDate(int(date_parts[0]), int(date_parts[1]), int(date_parts[2])))
-                if hasattr(self, 'auto_complete_list'):
+                if self.auto_complete_list != None:
                     self.auto_complete_list.collectItem(date)  # Collect new entry in auto_complete_list
 
     def __edited(self):
         date_string = self.date().toString("yyyy:MM:dd")
         file_metadata = FileMetadata.getInstance(self.file_name)
         file_metadata.setLogicalTagValues({self.logical_tag: date_string})
-        if hasattr(self, 'auto_complete_list'):
+        if self.auto_complete_list != None:
             self.auto_complete_list.collectItem(self.date())    # Collect new entry in auto_complete_list
 #        FilePanel.focus_tag=self.logical_tag
 class TextSet(QWidget):
@@ -249,11 +252,10 @@ class TextSet(QWidget):
         self.logical_tag = logical_tag  # Widget should remember who it serves
         self.text_list = self.TextList()
         self.text_list.setFixedWidth(300)
-
         self.text_input = self.TextInput('Tast navn')
+        self.auto_complete_list = None
         self.__initUI()
         self.readFromImage()
-
         self.timer_text_input_clear = QTimer(self)
         self.timer_text_input_clear.timeout.connect(self.__clearTextInput)
 
@@ -293,7 +295,7 @@ class TextSet(QWidget):
                 tag_list = [tags]
             else:
                 tag_list = tags
-            if hasattr(self, 'auto_complete_list'):
+            if self.auto_complete_list != None:
                 self.auto_complete_list.collectItems(tag_list)
             self.text_list.clear()
             for tag in tag_list:
@@ -316,7 +318,8 @@ class TextSet(QWidget):
 
     def __onReturnPressed(self):
         self.text_list.addTag(self.text_input.text())  # Return pressed from QLineEdit
-        self.auto_complete_list.collectItem(self.text_input.text())
+        if self.auto_complete_list != None:
+            self.auto_complete_list.collectItem(self.text_input.text())
         self.text_input.clear()
         self.timer_text_input_clear.start(100)
 
@@ -373,6 +376,7 @@ class GeoLocation(MapView):
         self.logical_tag = logical_tag                                    #Widget should remember who it serves
         self.setFixedWidth(250)
         self.setFixedHeight(250)
+        self.auto_complete_list = None
 
         #Get attributes of tag
         tag_attributes = settings.logical_tags.get(self.logical_tag)
@@ -412,7 +416,7 @@ class GeoLocation(MapView):
                 else:
                     gps_position_parts = gps_position_string.split(" ")
                 self.marker_location = [float(gps_position_parts[0]),float(gps_position_parts[1])]
-                if hasattr(self, 'auto_complete_list'):
+                if self.auto_complete_list != None:
                     self.auto_complete_list.collectItem(gps_position_string)  # Collect new entry in auto_complete_list
             else:
                 self.marker_location = None
@@ -424,9 +428,8 @@ class GeoLocation(MapView):
             marker_location_string = ''
         file_metadata = FileMetadata.getInstance(self.file_name)
         file_metadata.setLogicalTagValues({self.logical_tag: marker_location_string})
-        # if hasattr(self, 'auto_complete_list'):
-        #     self.auto_complete_list.collectItem(self.date())    # Collect new entry in auto_complete_list
-#        FilePanel.focus_tag=self.logical_tag
+        if self.auto_complete_list != None and marker_location_string != '':
+            self.auto_complete_list.collectItem(marker_location_string)    # Collect new entry in auto_complete_list
 class Orientation(QWidget):
     def __init__(self, file_name, logical_tag):
         super().__init__()

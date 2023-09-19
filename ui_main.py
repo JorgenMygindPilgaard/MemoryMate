@@ -30,18 +30,23 @@ class FilePanel(QScrollArea):
 
     @staticmethod
     def getInstance(file_name):
+        new_file_name = file_name
+        if new_file_name == None:
+            new_file_name = ''
+        old_file_name = FilePanel.file_name
+
+        FilePanel.file_name = new_file_name
+
         FilePanel.focus_tag = None  # Forget focus-tag when changing to different photo
-        if FilePanel.file_metadata != None and FilePanel.file_name != '':  # Changing to different picture: Save this pictures metadata
+        if FilePanel.file_metadata != None and old_file_name != '':  # Changing to different picture: Save this pictures metadata
             FilePanel.file_metadata.save()
         if FilePanel.instance == None:
             FilePanel.instance = FilePanel()
-        if file_name == None or file_name == '':
-            FilePanel.file_name = ''
+        if new_file_name == '':
             FilePanel.file_metadata = None
         else:
-            if os.path.isfile(file_name):
-                FilePanel.file_name = file_name
-                FilePanel.file_metadata = FileMetadata.getInstance(FilePanel.file_name)
+            if os.path.isfile(new_file_name):
+                FilePanel.file_metadata = FileMetadata.getInstance(new_file_name)
 
         FilePanel.instance.prepareFilePanel()
         return FilePanel.instance
@@ -833,8 +838,8 @@ def onMetadataChanged(file_name,old_logical_tags,new_logical_tags):
         file_preview = FilePreview.instance_index.get(file_name)
         if file_preview != None:
             file_preview.updatePixmap()
-        if file_name == FilePanel.file_name:
-            FilePanel.instance.prepareFilePanel()      # If matadata changed in file shown in panel, then update metadata in panel
+    if file_name == FilePanel.file_name:
+        FilePanel.instance.prepareFilePanel()      # If matadata changed in file shown in panel, then update metadata in panel
 
 def onFileRenamed(old_file_name, new_file_name):     # reacts on change filename signal from
     # Update filename in file-panel
