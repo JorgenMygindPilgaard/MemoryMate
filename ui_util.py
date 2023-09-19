@@ -86,13 +86,6 @@ class AutoCompleteList(QCompleter):
             AutoCompleteList.instance_index[list_name] = auto_complete_list  # Add new instance to instance-index
         return auto_complete_list
 
-    # def eventFilter(self, obj, event):
-    #     if event.type() == QKeyEvent.KeyPress:
-    #         if event.key() == Qt.Key_Return or event.key() == Qt.Key_Enter:
-    #             return False
-    #     else:
-    #         return True
-
     def pathFromIndex(self, index):
         path = super().pathFromIndex(index)
         # Add a delete action to the popup menu
