@@ -94,6 +94,8 @@ class FileMetadata(QObject):
             logical_tag_tags = logical_tags_tags.get(logical_tag)
             if logical_tag_data_type == 'list':
                 tag_value = []
+            elif logical_tag_data_type == 'string':
+                tag_value = ''
             else:
                 tag_value = None
 
@@ -106,7 +108,7 @@ class FileMetadata(QObject):
                     logical_tag_value_found = True
                 if logical_tag_data_type != 'list' and isinstance(tag_value, list):     #E.g. Author contains multiple entries. Concatenate ti a string then
                     tag_value = ', '.join(str(tag_value))
-                if tag_value != None and tag_value != "":
+                if tag_value != None and tag_value != '':
                     self.logical_tag_values[logical_tag] = tag_value
                     break
             if not logical_tag_value_found:
@@ -189,10 +191,8 @@ class FileMetadata(QObject):
         if updated_logical_tag_values != {} or force_rewrite:
             json_queue_file=file_util.JsonQueue.getInstance(settings.queue_file_path)
             json_queue_file.enqueue({'file': self.file_name, 'logical_tag_values': updated_logical_tag_values, 'force_rewrite': force_rewrite})
+            self.confirmed_logical_tag_values = copy.deepcopy(self.logical_tag_values)
             QueueHost.get_instance().start_queue_worker()    # Make Queue-host instance start Queue-worker, if it is not running
-
-        self.confirmed_logical_tag_values = copy.deepcopy(self.logical_tag_values)
-
 
     def __update_file(self, force_rewrite):
         if self.logical_tag_values != self.saved_logical_tag_values or force_rewrite or self.is_virgin:

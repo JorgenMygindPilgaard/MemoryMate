@@ -1,11 +1,27 @@
 from PyQt6.QtWidgets import QWidget, QHBoxLayout, QVBoxLayout, QLabel, QLineEdit, QPlainTextEdit, QDateTimeEdit, QDateEdit, QPushButton, QListWidget, QAbstractItemView, QDialog
-from PyQt6.QtCore import Qt, QDateTime, QDate, QTimer, pyqtSignal
+from PyQt6.QtCore import Qt, QDateTime, QDate, QTimer, QObject, pyqtSignal
 from PyQt6.QtGui import QFontMetrics,QPixmap
 import settings
 from file_metadata_util import FileMetadata
 from ui_util import AutoCompleteList
 from ui_pick_gps_location import MapView, MapLocationSelector
 import os
+
+class ImageRotatedEmitter(QObject):
+    instance = None
+    rotate_signal = pyqtSignal(str)  # Filename
+
+    def __init__(self):
+        super().__init__()
+
+    @staticmethod
+    def getInstance():
+        if ImageRotatedEmitter.instance == None:
+            ImageRotatedEmitter.instance = ImageRotatedEmitter()
+        return ImageRotatedEmitter.instance
+    def emit(self, file_name):
+        self.rotate_signal.emit(file_name)
+
 
 class TextLine(QLineEdit):
     def __init__(self, file_name, logical_tag):
@@ -23,7 +39,6 @@ class TextLine(QLineEdit):
             autocompleter_file = os.path.join(settings.app_data_location, "autocomplete_" + self.logical_tag +'.txt')
             self.auto_complete_list.setFileName(autocompleter_file)
         self.readFromImage()
-        self.editingFinished.connect(self.__edited)
 
     def readFromImage(self):
         file_metadata = FileMetadata.getInstance(self.file_name)
@@ -34,15 +49,14 @@ class TextLine(QLineEdit):
             self.setText(text_line)
             if self.auto_complete_list != None and self.text() != '':
                 self.auto_complete_list.collectItem(self.text())    # Collect new entry in auto_complete_list
+    def logical_tag_value(self):
+        logical_tag_value = self.text()
+        if self.auto_complete_list != None and logical_tag_value != '':  # Collect in autocomplete-list
+            self.auto_complete_list.collectItem(logical_tag_value)
+        return logical_tag_value
 
-    def __edited(self):
-        file_metadata = FileMetadata.getInstance(self.file_name)
-        file_metadata.setLogicalTagValues({self.logical_tag: self.text()})
-        if self.auto_complete_list != None and self.text() != '':
-            self.auto_complete_list.collectItem(self.text())    # Collect new entry in auto_complete_list
     def updateFilename(self,file_name):
         self.file_name = file_name
-#        FilePanel.focus_tag=self.logical_tag
 class Text(QPlainTextEdit):
     instance_index = {}
     def __init__(self, file_name, logical_tag):
@@ -82,17 +96,14 @@ class Text(QPlainTextEdit):
             self.setFixedHeight(self.widgetHeight(self.width()))      #Calculates needed height from width and text
             if self.auto_complete_list != None and self.toPlainText() != '':
                 self.auto_complete_list.collectItem(self.toPlainText())    # Collect new entry in auto_complete_list
-    def focusOutEvent(self, event):
-        pass
-        self.__edited()
-    def __edited(self):
-        file_metadata = FileMetadata.getInstance(self.file_name)
-        file_metadata.setLogicalTagValues({self.logical_tag: self.toPlainText()})
-        if self.auto_complete_list != None and self.toPlainText() != '':
-            self.auto_complete_list.collectItem(self.toPlainText())    # Collect new entry in auto_complete_list
+
+    def logical_tag_value(self):
+        logical_tag_value = self.toPlainText()
+        if self.auto_complete_list != None and logical_tag_value != '':   # Collect value in autocomplete-list
+            self.auto_complete_list.collectItem(logical_tag_value)
+        return logical_tag_value
 
     def widgetHeight(self, new_widget_width=-1):
-
         # Get text from document
         text=self.toPlainText()
         text_length = len(text)
@@ -149,8 +160,6 @@ class DateTime(QDateTimeEdit):
             self.setDisplayFormat(display_format+'.ss')
         display_format = self.displayFormat()
 
-
-
         #Get attributes of tag
         tag_attributes = settings.logical_tags.get(self.logical_tag)
         if tag_attributes.get("Autocomplete"):                         #Enable autocompletion
@@ -158,14 +167,11 @@ class DateTime(QDateTimeEdit):
             self.setCompleter(self.auto_complete_list)
             autocompleter_file = os.path.join(settings.app_data_location, "autocomplete_" + self.logical_tag +'.txt')
             self.auto_complete_list.setFileName(autocompleter_file)
-
         self.readFromImage()
-        self.editingFinished.connect(self.__edited)
 
     def wheelEvent(self, event):
         # Ignore the wheel event
         event.ignore()
-
 
     def readFromImage(self):
         file_metadata = FileMetadata.getInstance(self.file_name)
@@ -188,15 +194,12 @@ class DateTime(QDateTimeEdit):
                 if self.auto_complete_list != None:
                     self.auto_complete_list.collectItem(date_time)    # Collect new entry in auto_complete_list
 
+    def logical_tag_value(self):
+        logical_tag_value = self.dateTime().toString("yyyy:MM:dd hh:mm:ss")
+        if self.auto_complete_list != None and logical_tag_value != '':  # Collect value in autocomplete-list
+            self.auto_complete_list.collectItem(logical_tag_value)
+        return logical_tag_value
 
-    def __edited(self):
-        date_time_string = self.dateTime().toString("yyyy:MM:dd hh:mm:ss")
-        file_metadata = FileMetadata.getInstance(self.file_name)
-        file_metadata.setLogicalTagValues({self.logical_tag: date_time_string})
-        if self.auto_complete_list != None:
-            self.auto_complete_list.collectItem(self.dateTime())    # Collect new entry in auto_complete_list
-        self.setStyleSheet("color: black")
-#        FilePanel.focus_tag=self.logical_tag
 class Date(QDateEdit):
     def __init__(self, file_name, logical_tag):
         super().__init__()
@@ -215,7 +218,6 @@ class Date(QDateEdit):
             self.auto_complete_list.setFileName(autocompleter_file)
 
         self.readFromImage()
-        self.editingFinished.connect(self.__edited)
 
     def wheelEvent(self, event):
         # Ignore the wheel event
@@ -236,16 +238,13 @@ class Date(QDateEdit):
                 self.setDate(QDate(int(date_parts[0]), int(date_parts[1]), int(date_parts[2])))
                 if self.auto_complete_list != None:
                     self.auto_complete_list.collectItem(date)  # Collect new entry in auto_complete_list
+    def logical_tag_value(self):
+        logical_tag_value = self.date().toString("yyyy:MM:dd")
+        if self.auto_complete_list != None and logical_tag_value != '':   # Collect value in autocomplete-list
+            self.auto_complete_list.collectItem(logical_tag_value)
+        return logical_tag_value
 
-    def __edited(self):
-        date_string = self.date().toString("yyyy:MM:dd")
-        file_metadata = FileMetadata.getInstance(self.file_name)
-        file_metadata.setLogicalTagValues({self.logical_tag: date_string})
-        if self.auto_complete_list != None:
-            self.auto_complete_list.collectItem(self.date())    # Collect new entry in auto_complete_list
-#        FilePanel.focus_tag=self.logical_tag
 class TextSet(QWidget):
-
     def __init__(self, file_name, logical_tag):
         super().__init__()
         self.file_name = file_name
@@ -254,6 +253,7 @@ class TextSet(QWidget):
         self.text_list.setFixedWidth(300)
         self.text_input = self.TextInput('Tast navn')
         self.auto_complete_list = None
+        self.return_pressed = False        # Prevent return-pressed to add two entries in list, if autocompleter active
         self.__initUI()
         self.readFromImage()
         self.timer_text_input_clear = QTimer(self)
@@ -281,7 +281,6 @@ class TextSet(QWidget):
 
         # Connect buttons to functions
         self.text_input.returnPressed.connect(self.__onReturnPressed)
-        self.text_list.edit_signal.connect(self.__edited)
         if self.auto_complete_list != None:
            self.auto_complete_list.activated.connect(self.__onCompleterActivated)
 
@@ -302,45 +301,46 @@ class TextSet(QWidget):
                 self.text_list.addItem(tag)
             self.text_list.setFixedHeight(self.text_list.widgetHeight())  # Calculates needed height for the number of items
 
-    def __edited(self):
-        items = []
+    def logical_tag_value(self):
+        # Collect the entry in autocomplete-list
+        logical_tag_value = []
         count = self.text_list.count()
         for index in range(count):
             item = self.text_list.item(index)
             text = item.text()
-            items.append(text)
-        file_metadata = FileMetadata.getInstance(self.file_name)
-        file_metadata.setLogicalTagValues({self.logical_tag: items})
-#        FilePanel.focus_tag=self.logical_tag
+            logical_tag_value.append(text)
+        if self.auto_complete_list != None:                             # Collect value in autocomplete-list
+            self.auto_complete_list.collectItems(logical_tag_value)
+        return logical_tag_value
+
     def __clearTextInput(self):
         self.text_input.clear()
         self.timer_text_input_clear.stop()
 
     def __onReturnPressed(self):
-        self.text_list.addTag(self.text_input.text())  # Return pressed from QLineEdit
-        if self.auto_complete_list != None:
-            self.auto_complete_list.collectItem(self.text_input.text())
-        self.text_input.clear()
-        self.timer_text_input_clear.start(100)
+        self.return_pressed = True
+        text_input_to_be_added = self.text_input.text()
+        if text_input_to_be_added != '':
+            if self.auto_complete_list != None:
+                self.auto_complete_list.collectItem(text_input_to_be_added)
+            self.timer_text_input_clear.start(100)
+            self.text_list.addTag(text_input_to_be_added)
 
     def __onCompleterActivated(self, text):
-        if self.text_input.text() !='':
-            self.text_list.addTag(self.text_input.text())
+        text_input_to_be_added = self.text_input.text()
+        if text_input_to_be_added !='':
+            if self.return_pressed != True:
+                self.text_list.addTag(text_input_to_be_added)
             self.timer_text_input_clear.start(100)
+        self.return_pressed = False
 
     class TextList(QListWidget):
-        edit_signal = pyqtSignal()
-
 
         def __init__(self,text_set=None):
             super().__init__()
             self.text_set=text_set    #Remember who you are serving
             self.setSelectionMode(QAbstractItemView.SelectionMode.ExtendedSelection)
             self.setDragDropMode(QListWidget.DragDropMode.InternalMove)
-
-        def dropEvent(self, event):
-            super().dropEvent(event)
-            self.edit_signal.emit()
 
         def keyPressEvent(self, event):
             super().keyPressEvent(event)
@@ -352,11 +352,9 @@ class TextSet(QWidget):
             if items:
                 for item in items:
                     self.takeItem(self.row(item))
-                self.edit_signal.emit()
 
         def addTag(self,text):
             self.addItem(text)
-            self.edit_signal.emit()
 
         def widgetHeight(self):
             item_height = self.sizeHintForRow(0)
@@ -369,6 +367,7 @@ class TextSet(QWidget):
             super().__init__()
             self.text_set=text_set    #Remember who you are serving
             self.setPlaceholderText('Tast navn')
+
 class GeoLocation(MapView):
     def __init__(self, file_name, logical_tag):
         super().__init__(marker_editable=False, drag_enabled=False, zoom_enabled=False)
@@ -393,7 +392,6 @@ class GeoLocation(MapView):
         self.marker_location = marker_location
         self.setLocationZoom(location=self.marker_location, zoom=15)
         self.setMarkerLocation(self.marker_location)
-        self.__edited()
 
     def onLeftButton(self):          #redefined
         if self.marker_location:
@@ -402,7 +400,6 @@ class GeoLocation(MapView):
             self.map_location_selector = MapLocationSelector(location=[0,0], zoom=1)
         self.map_location_selector.marker_location_changed.connect(self.onMarkerLocationChanged)
         self.map_location_selector.show()
-
 
     def readFromImage(self):
         file_metadata = FileMetadata.getInstance(self.file_name)
@@ -421,15 +418,16 @@ class GeoLocation(MapView):
             else:
                 self.marker_location = None
 
-    def __edited(self):
+    def logical_tag_value(self):
+        # Collect the entry in autocomplete-list
         if self.marker_location:
-            marker_location_string = str(self.marker_location[0])+','+str(self.marker_location[1])
+            logical_tag_value = str(self.marker_location[0])+','+str(self.marker_location[1])
         else:
-            marker_location_string = ''
-        file_metadata = FileMetadata.getInstance(self.file_name)
-        file_metadata.setLogicalTagValues({self.logical_tag: marker_location_string})
-        if self.auto_complete_list != None and marker_location_string != '':
-            self.auto_complete_list.collectItem(marker_location_string)    # Collect new entry in auto_complete_list
+            logical_tag_value = ''
+        if self.auto_complete_list != None and logical_tag_value != '':    # Collect value in autocomplete-list
+            self.auto_complete_list.collectItem(logical_tag_value)
+        return logical_tag_value
+
 class Orientation(QWidget):
     def __init__(self, file_name, logical_tag):
         super().__init__()
@@ -446,11 +444,15 @@ class Orientation(QWidget):
         self.left_image_label = QLabel()
         self.left_image_label.setPixmap(QPixmap('rotate_left.png'))  # Replace with your image file
         self.left_image_label.mousePressEvent = self.onRotateLeft
+        self.left_image_label.enterEvent = self.onEnterLeft
+        self.left_image_label.leaveEvent = self.onLeaveLeft
 
         # Create a QLabel for "rotate_right" image
         self.right_image_label = QLabel()
         self.right_image_label.setPixmap(QPixmap('rotate_right.png'))  # Replace with your image file
         self.right_image_label.mousePressEvent = self.onRotateRight
+        self.right_image_label.enterEvent = self.onEnterRight
+        self.right_image_label.leaveEvent = self.onLeaveRight
 
 
         self.layout.addStretch(1)
@@ -460,9 +462,6 @@ class Orientation(QWidget):
 
         self.setLayout(self.layout)
 
-        self.setWindowTitle('Image Rotator')
-        self.setGeometry(20, 20, 800, 20)
-
     def readFromImage(self):
         file_metadata = FileMetadata.getInstance(self.file_name)
         if file_metadata:
@@ -471,9 +470,8 @@ class Orientation(QWidget):
                 return
             self.orientation = orientation
 
-    def __edited(self):
-        file_metadata = FileMetadata.getInstance(self.file_name)
-        file_metadata.setLogicalTagValues({self.logical_tag: self.orientation})
+    def logical_tag_value(self):
+        return self.orientation
 
     def onRotateLeft(self, event):
         if self.orientation == 1 or self.orientation == None:     # 1: Not Rotated
@@ -486,7 +484,8 @@ class Orientation(QWidget):
             self.orientation = 1                                  # 1: Not Rotated
         else:
             self.orientation = 1
-        self.__edited()
+        image_rotated_emitter = ImageRotatedEmitter.getInstance()
+        image_rotated_emitter.emit(self.file_name)
 
     def onRotateRight(self, event):
         if self.orientation == 1 or self.orientation == None:     # 1: Not Rotated
@@ -499,7 +498,19 @@ class Orientation(QWidget):
             self.orientation = 1                                  # 1: Not Rotated
         else:
             self.orientation = 1
-        self.__edited()
+        image_rotated_emitter = ImageRotatedEmitter.getInstance()
+        image_rotated_emitter.emit(self.file_name)
+
+    def onEnterLeft(self,event):
+        self.left_image_label.setCursor(Qt.CursorShape.PointingHandCursor)  # Change cursor to pointing hand when mouse enters
+
+    def onLeaveLeft(self,event):
+        self.left_image_label.setCursor(Qt.CursorShape.ArrowCursor)  # Change cursor back tor arrow
+    def onEnterRight(self,event):
+        self.right_image_label.setCursor(Qt.CursorShape.PointingHandCursor)  # Change cursor to pointing hand when mouse enters
+
+    def onLeaveRight(self,event):
+        self.right_image_label.setCursor(Qt.CursorShape.ArrowCursor)  # Change cursor back tor arrow
 
 class Rotation(QWidget):
     def __init__(self, file_name, logical_tag):
@@ -512,7 +523,6 @@ class Rotation(QWidget):
     def initUI(self):
         self.layout = QHBoxLayout()
 
-
         # Create a QLabel for "rotate_left" image
         self.left_image_label = QLabel()
         self.left_image_label.setPixmap(QPixmap('rotate_left.png'))  # Replace with your image file
@@ -522,6 +532,10 @@ class Rotation(QWidget):
         self.right_image_label = QLabel()
         self.right_image_label.setPixmap(QPixmap('rotate_right.png'))  # Replace with your image file
         self.right_image_label.mousePressEvent = self.onRotateRight
+        self.left_image_label.enterEvent = self.onEnterLeft
+        self.left_image_label.leaveEvent = self.onLeaveLeft
+        self.right_image_label.enterEvent = self.onEnterRight
+        self.right_image_label.leaveEvent = self.onLeaveRight
 
 
         self.layout.addStretch(1)
@@ -531,9 +545,6 @@ class Rotation(QWidget):
 
         self.setLayout(self.layout)
 
-        self.setWindowTitle('Image Rotator')
-        self.setGeometry(20, 20, 800, 20)
-
     def readFromImage(self):
         file_metadata = FileMetadata.getInstance(self.file_name)
         if file_metadata:
@@ -542,9 +553,8 @@ class Rotation(QWidget):
                 return
             self.rotation = rotation
 
-    def __edited(self):
-        file_metadata = FileMetadata.getInstance(self.file_name)
-        file_metadata.setLogicalTagValues({self.logical_tag: self.rotation})
+    def logical_tag_value(self):
+        return self.rotation
 
     def onRotateLeft(self, event):
         if self.rotation == 0 or self.rotation == None:
@@ -557,7 +567,9 @@ class Rotation(QWidget):
             self.rotation = 0
         else:
             self.rotation = 0
-        self.__edited()
+        image_rotated_emitter = ImageRotatedEmitter.getInstance()
+        image_rotated_emitter.emit(self.file_name)
+
 
     def onRotateRight(self, event):
         if self.rotation == 0 or self.rotation == None:
@@ -570,5 +582,16 @@ class Rotation(QWidget):
             self.rotation = 0
         else:
             self.rotation = 0
-        self.__edited()
+        image_rotated_emitter = ImageRotatedEmitter.getInstance()
+        image_rotated_emitter.emit(self.file_name)
 
+    def onEnterLeft(self,event):
+        self.left_image_label.setCursor(Qt.CursorShape.PointingHandCursor)  # Change cursor to pointing hand when mouse enters
+
+    def onLeaveLeft(self,event):
+        self.left_image_label.setCursor(Qt.CursorShape.ArrowCursor)  # Change cursor back tor arrow
+    def onEnterRight(self,event):
+        self.right_image_label.setCursor(Qt.CursorShape.PointingHandCursor)  # Change cursor to pointing hand when mouse enters
+
+    def onLeaveRight(self,event):
+        self.right_image_label.setCursor(Qt.CursorShape.ArrowCursor)  # Change cursor back tor arrow
