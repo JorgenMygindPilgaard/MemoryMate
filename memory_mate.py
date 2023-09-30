@@ -13,20 +13,19 @@ class MainWindow(QMainWindow):
         self.setWindowTitle("Memory Mate")
 
         # Get UI-status from last run from UI-status file
-        self.ui_status = UiStatusManager(os.path.join(settings.app_data_location, "ui_status.json"))
+        self.ui_status = UiStatusManager.getInstance(os.path.join(settings.app_data_location, "ui_status.json"))
 
         #-------------------------------------------------------------------------------------------------------------
         # Prepare widgets for MainWindow
         #-------------------------------------------------------------------------------------------------------------
         # File (Right part of MainWindow)
         self.file_panel = FilePanel.getInstance(self.ui_status.getStatusParameter('current_file'))
-#        self.file_panel = FilePanel.getInstance('')
 
         # File (Right part of MainWindow)
         self.queue_status_monitor = QueueStatusMonitor()
 
         # File list (Left part of MainWindow)
-        self.file_list = FileList(dir_path='', file_panel=self.file_panel)
+        self.file_list = FileList(dir_path='')
         self.file_list.setOpenFolders(self.ui_status.getStatusParameter('open_folders'))
         self.file_list.setSelectedItems(self.ui_status.getStatusParameter('selected_items'))
 #        self.file_list.setFixedWidth(1200)
@@ -55,6 +54,7 @@ class MainWindow(QMainWindow):
         self.ui_status.setUiStatusParameters({'current_file':   self.file_panel.file_name,
                                               'open_folders':   self.file_list.getOpenFolders(),
                                               'selected_items': self.file_list.getSelectedItems()})
+        self.ui_status.save()
         ExifTool.close()              # Close exiftool process
         super().closeEvent(event)
 

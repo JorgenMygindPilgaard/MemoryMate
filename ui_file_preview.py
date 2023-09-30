@@ -172,7 +172,7 @@ class FilePreview(QObject):
             if width == None:
                 file_preview = None
             else:
-                file_preview =  FilePreview(file_name,width)
+                file_preview = FilePreview(file_name,width)
 
         return file_preview
 
