@@ -840,9 +840,10 @@ class CurrentFileChangedEmitter(QObject):
 
 def onMetadataChanged(file_name,old_logical_tags,new_logical_tags):
     pass
+
 def onMetadataCopied(file_name):
     if file_name == FilePanel.file_name:
-        FilePanel.getInstance(file_name).saveMetadata()   # ..not to copy old data, save what is in screen
+        FilePanel.saveMetadata()   # ..not to copy old data, save what is in screen
 
 def onMetadataPasted(file_name):
     if file_name == FilePanel.file_name:
@@ -894,3 +895,4 @@ file_metadata_pasted_emitter.paste_signal.connect(onMetadataPasted)
 
 image_rotated_emitter = ImageRotatedEmitter.getInstance()
 image_rotated_emitter.rotate_signal.connect(onImageRotated)
+
