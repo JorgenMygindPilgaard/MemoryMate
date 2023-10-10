@@ -6,7 +6,7 @@ from PyQt6.QtGui import QMovie
 from PyQt6.QtWidgets import QLabel, QHBoxLayout, QSizePolicy
 import settings
 import time
-import file_util
+import file_util, sys
 
 
 class FileMetadataChangedEmitter(QObject):
@@ -25,8 +25,12 @@ class FileMetadataChangedEmitter(QObject):
         self.change_signal.emit(file_name, old_logical_tag_values, new_logical_tag_values)
 
 class FileMetadata(QObject):
-    exif_executable = os.path.join(settings.app_data_location, 'exiftool_memory_mate.exe')
-    exif_configuration = os.path.join(settings.app_data_location, 'exiftool.cfg')
+    app_path = sys.argv[0]
+    app_dir = os.path.dirname(os.path.abspath(app_path))
+    exif_executable = os.path.join(app_dir, 'exiftool_memory_mate.exe')
+    exif_configuration = os.path.join(app_dir, 'exiftool_memory_mate.cfg')
+#    exif_executable = os.path.join(settings.app_data_location, 'exiftool_memory_mate.exe')
+#    exif_configuration = os.path.join(settings.app_data_location, 'exiftool.cfg')
     if not os.path.isfile(exif_configuration):
         exif_configuration=''
     getInstance_active = False  # To be able to give error when instantiated directly, outside getInstance
