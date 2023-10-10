@@ -1,22 +1,21 @@
 import json
 import os
-from file_util import JsonQueue
-#
+
 # Make location for Application, if missing
-#
 app_data_location = os.path.join(os.environ.get("ProgramData"),"Memory Mate")
 if not os.path.isdir(app_data_location):
     os.mkdir(app_data_location)
 
+# Set path to settings
 settings_path = os.path.join(app_data_location,"settings.json")
+
+# Set path to queue-file
 queue_file_path = os.path.join(app_data_location,"queue.json")
 
-#
 # Read settings-file, if it is there
-#
 if os.path.isfile(settings_path):
-    with open(settings_path, 'r') as infile:
-        settings = json.load(infile)
+    with open(settings_path, 'r') as settings_file:
+        settings = json.load(settings_file)
 
     file_types = settings.get("file_types")
     languages = settings.get("languages")
@@ -28,16 +27,14 @@ if os.path.isfile(settings_path):
     file_context_menu_actions = settings.get("file_context_menu_actions")
     folder_context_menu_actions = settings.get("folder_context_menu_actions")
 
-#
-# Make settings-file, if it is missing
-#
+# Make default settings-file, if it is missing
 if not os.path.isfile(settings_path):
     file_types = ["jpg", "jpeg", "png", "bmp", "cr3", "cr2", "dng", "arw", "nef", "heic", "tif", "gif", "mp4", "mov", "avi"]
     languages = {"DA": "Danish",
                  "EN": "English"}
     language = "DA"
-
-    logical_tags = {"orientation":       {"widget":                "orientation",
+    logical_tags = {
+                    "orientation":       {"widget":                "orientation",
                                           "data_type":             "number"},
                     "rotation":          {"widget":                "rotation",
                                           "data_type":             "number"},
@@ -82,7 +79,6 @@ if not os.path.isfile(settings_path):
                                                                     {"type": "tag", "tag_name": "original_filename", "tag_label": True}
                                                                    ]}
                    }
-
     tags = {"XMP:Title": {"access": "Read/Write"},
             "EXIF:XPTitle": {"access": "Read/Write"},
             "IPTC:ObjectName": {"access": "Read/Write"},
@@ -123,7 +119,6 @@ if not os.path.isfile(settings_path):
             "EXIF:Orientation#:": {"access": "Read/Write"},
             "QuickTime:Rotation#": {"access": "Read/Write"}
             }
-
     file_type_tags = {
         "jpg": {"orientation": ["EXIF:Orientation#"],
                 "title": ["XMP:Title", "EXIF:XPTitle", "IPTC:ObjectName"],
@@ -298,7 +293,6 @@ if not os.path.isfile(settings_path):
         "avi": {"date": ["RIFF:DateTimeOriginal", "File:FileCreateDate"]
                 }
     }
-
     text_keys = {"tag_label_title":
                      {"DA": "Titel",
                       "EN": "Title"},
@@ -353,7 +347,6 @@ if not os.path.isfile(settings_path):
                  "folder_menu_consolidate":
                      {"DA": "Konsolider metadata", "EN": "Consolidate Metadata"}
                 }
-
     file_context_menu_actions = {"consolidate_metadata":
                                      {"text_key": "file_menu_consolidate"},
                                  "copy_metadata":
@@ -369,7 +362,6 @@ if not os.path.isfile(settings_path):
                                  "choose_tags_to_paste":
                                      {"text_key": "file_menu_chose_tags_to_paste"}
                                  }
-
     folder_context_menu_actions = {"standardize_filenames":
                                        {"text_key": "folder_menu_standardize"},
                                    "consolidate_metadata":
@@ -391,31 +383,3 @@ if not os.path.isfile(settings_path):
     with open(settings_path, "w") as outfile:
         outfile.write(settings_json_object)
 
-# Make exiftool.cfg file if it is missing
-exiftool_cfg_path = os.path.join(app_data_location,"exiftool.cfg")
-if not os.path.isfile(exiftool_cfg_path):
-    exiftool_cfg = ["# A new XMP-namespace (jmp_mde) is added to Main XMP-table:",
-                    "%Image::ExifTool::UserDefined = (",
-                    "    'Image::ExifTool::XMP::Main' => {",
-                    "        jmp_mde => {",
-                    "            SubDirectory => {",
-                    "                TagTable => 'Image::ExifTool::UserDefined::jmp_mde',",
-                    "            },",
-                    "        },",
-                    "    },",
-                    ");",
-                    "",
-                    "# New tags are added to XMP-jmp_mde namespace:",
-                    "%Image::ExifTool::UserDefined::jmp_mde = (",
-                    "    GROUPS => { 0 => 'XMP', 1 => 'XMP-jmp_mde', 2 => 'Image' },",
-                    "    NAMESPACE => { 'jmp_mde' => 'https://jorgenpilgaard.dk/namespace/jmp_mde/' },",
-                    "    WRITABLE => 'string', # (default to string-type tags)",
-                    "    DescriptionOnly => { Writable => 'lang-alt' },",
-                    "    MemoryMateSaveDateTime => { Writable => 'lang-alt' },",
-                    "    #AnotherTag => { Writable => 'lang-alt' },",
-                    ");"]
-
-    with open(exiftool_cfg_path, "w") as outfile:
-        # Loop through the list and write each string to a new line in the file
-        for item in exiftool_cfg:
-            outfile.write(item + "\n")
