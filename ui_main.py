@@ -48,6 +48,9 @@ class FilePanel(QScrollArea):
         new_file_name = file_name
         if new_file_name == None:
             new_file_name = ''
+        if new_file_name != '' and new_file_name != FilePanel.old_file_name:
+            if not os.path.exists(new_file_name):
+                new_file_name = ''
         FilePanel.old_file_name = FilePanel.file_name
         FilePanel.file_name = new_file_name
 
