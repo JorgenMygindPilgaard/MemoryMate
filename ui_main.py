@@ -1,17 +1,17 @@
-from PyQt6.QtWidgets import QTreeView, QMenu, QScrollArea, QWidget, QHBoxLayout, QVBoxLayout, QLabel, QLineEdit,QPushButton, QAbstractItemView, QDialog
+from PyQt6.QtWidgets import QTreeView, QMenu, QScrollArea, QWidget, QHBoxLayout, QVBoxLayout, QLabel, QLineEdit,QPushButton, QAbstractItemView, QDialog, QComboBox
 from PyQt6.QtCore import Qt, QDir, QModelIndex,QItemSelectionModel, QObject, pyqtSignal
 from PyQt6.QtGui import QFileSystemModel,QAction
 import settings
 from file_metadata_util import FileMetadata, QueueHost, FileMetadataChangedEmitter
 from file_util import FileNameChangedEmitter
 from ui_util import ProgressBarWidget
-import json
 import os
-from ui_widgets import TextLine,Text, DateTime, Date, TextSet, GeoLocation, Orientation, Rotation, ImageRotatedEmitter
+from ui_widgets import TextLine, Text, DateTime, Date, TextSet, GeoLocation, Orientation, Rotation, ImageRotatedEmitter
 import file_util
 from collections import OrderedDict
 from exiftool_wrapper import ExifTool
 from ui_file_preview import FilePreview
+from PyQt6.QtGui import QPixmap
 
 class FileMetadataPastedEmitter(QObject):
     instance = None
@@ -309,6 +309,7 @@ class FileList(QTreeView):
         action = self.menu.exec(self.viewport().mapToGlobal(position))
 
         if action == self.consolidate_metadata:
+
             index = self.indexAt(position)  # Get index in File-list
             if index.isValid():
                 target = []
@@ -462,9 +463,10 @@ class FileList(QTreeView):
         self.setRootIndex(self.model.index(dir_path))
 
     def __setFiletypeFilter(self, file_types=["*.*"]):
-        self.file_type_filter = file_types
-        for i in range(len(file_types)):
-            self.file_type_filter[i] = "*." + self.file_type_filter[i]
+        self.file_type_filter = []
+        for file_type in file_types:
+            file_type_filter_item = "*." + file_type
+            self.file_type_filter.append(file_type_filter_item)
         self.model.setNameFilters(self.file_type_filter)
 
     def hideFilteredFiles(self):
@@ -531,6 +533,54 @@ class FileList(QTreeView):
                 if item_index.isValid():  # Check if the item exists in the model
                     # Select the item
                     self.selectionModel().select(item_index, QItemSelectionModel.SelectionFlag.Select)
+
+class SettingsWheeel(QLabel):
+    def __init__(self):
+        super().__init__()
+        pixmap = QPixmap('settings.png').scaled(20,20)
+        self.setPixmap(pixmap)
+        self.mousePressEvent = self.onMousePress
+        self.enterEvent = self.onEnter
+        self.leaveEvent = self.onLeave
+    def onEnter(self,event):
+        self.setCursor(Qt.CursorShape.PointingHandCursor)  # Change cursor to pointing hand when mouse enters
+
+    def onLeave(self,event):
+        self.setCursor(Qt.CursorShape.ArrowCursor)  # Change cursor back tor arrow
+
+    def onMousePress(self,event):
+        self.settings_window = SettingsWindow()
+        self.settings_window.show()
+
+class SettingsWindow(QWidget):
+    def __init__(self):
+        super().__init__()
+
+        # Prepare window
+        window_title = settings.text_keys.get("settings_window_title").get(settings.language)
+        self.setWindowTitle(window_title)
+        self.setGeometry(100, 100, 400, 200)
+        settings_layout = QVBoxLayout()
+        self.setLayout(settings_layout)
+
+        # Add language selection box
+        self.language_combobox = QComboBox(self)
+        for index, (key, value) in enumerate(settings.languages.items()):
+            self.language_combobox.addItem(key+" - "+value)
+            if key == settings.language:
+                self.language_combobox.setCurrentIndex(index)
+        language_label = QLabel(settings.text_keys.get("settings_labels_application_language").get(settings.language), self)
+        language_layout = QHBoxLayout()
+        language_layout.addWidget(language_label)
+        language_layout.addWidget(self.language_combobox)
+        settings_layout.addLayout(language_layout)
+
+        # Connect the ComboBox's item selection to a slot
+        self.language_combobox.currentIndexChanged.connect(self.onLanguageSelected)
+
+    def onLanguageSelected(self, index):
+        settings.settings["language"] = self.language_combobox.currentText()[:2]
+        settings.write_settings_file()
 
 class StandardizeFilenames(QObject):
     # The purpose of this class is to rename files systematically. The naming pattern in the files will be

@@ -1,6 +1,8 @@
 import json
 import os
 
+version = "1.1.0"
+
 # Make location for Application, if missing
 app_data_location = os.path.join(os.environ.get("ProgramData"),"Memory Mate")
 if not os.path.isdir(app_data_location):
@@ -12,27 +14,44 @@ settings_path = os.path.join(app_data_location,"settings.json")
 # Set path to queue-file
 queue_file_path = os.path.join(app_data_location,"queue.json")
 
+def read_settings_file():
+    if os.path.isfile(settings_path):
+        with open(settings_path, 'r') as settings_file:
+            settings = json.load(settings_file)
+    else:
+        settings = {}
+    return settings
+
+def write_settings_file():
+    settings_json_object = json.dumps(settings, indent=4)
+    with open(settings_path, "w") as outfile:
+        outfile.write(settings_json_object)
+
 # Read settings-file, if it is there
-if os.path.isfile(settings_path):
-    with open(settings_path, 'r') as settings_file:
-        settings = json.load(settings_file)
+settings = read_settings_file()
 
-    file_types = settings.get("file_types")
-    languages = settings.get("languages")
-    language = settings.get("language")
-    logical_tags = settings.get("logical_tags")
-    tagss = settings.get("tags")
-    file_type_tags = settings.get("file_type_tags")
-    text_keys = settings.get("text_keys")
-    file_context_menu_actions = settings.get("file_context_menu_actions")
-    folder_context_menu_actions = settings.get("folder_context_menu_actions")
+# Set all variables from data in settingsfile
+settings_file_version = settings.get("version")        # Version according to settings-file
+file_types = settings.get("file_types")
+languages = settings.get("languages")
+language = settings.get("language")
+logical_tags = settings.get("logical_tags")
+tags = settings.get("tags")
+file_type_tags = settings.get("file_type_tags")
+text_keys = settings.get("text_keys")
+file_context_menu_actions = settings.get("file_context_menu_actions")
+folder_context_menu_actions = settings.get("folder_context_menu_actions")
+settings_labels = settings.get("settings_labels")
 
-# Make default settings-file, if it is missing
-if not os.path.isfile(settings_path):
+# Set default-values for missing settings
+if file_types is None:
     file_types = ["jpg", "jpeg", "png", "bmp", "cr3", "cr2", "dng", "arw", "nef", "heic", "tif", "gif", "mp4", "mov", "avi"]
+if languages is None:
     languages = {"DA": "Danish",
                  "EN": "English"}
+if language is None:
     language = "DA"
+if logical_tags is None:
     logical_tags = {
                     "orientation":       {"widget":                "orientation",
                                           "data_type":             "number"},
@@ -79,6 +98,7 @@ if not os.path.isfile(settings_path):
                                                                     {"type": "tag", "tag_name": "original_filename", "tag_label": True}
                                                                    ]}
                    }
+if tags is None:
     tags = {"XMP:Title": {"access": "Read/Write"},
             "EXIF:XPTitle": {"access": "Read/Write"},
             "IPTC:ObjectName": {"access": "Read/Write"},
@@ -119,6 +139,7 @@ if not os.path.isfile(settings_path):
             "EXIF:Orientation#:": {"access": "Read/Write"},
             "QuickTime:Rotation#": {"access": "Read/Write"}
             }
+if file_type_tags is None:
     file_type_tags = {
         "jpg": {"orientation": ["EXIF:Orientation#"],
                 "title": ["XMP:Title", "EXIF:XPTitle", "IPTC:ObjectName"],
@@ -293,6 +314,7 @@ if not os.path.isfile(settings_path):
         "avi": {"date": ["RIFF:DateTimeOriginal", "File:FileCreateDate"]
                 }
     }
+if text_keys is None:
     text_keys = {"tag_label_title":
                      {"DA": "Titel",
                       "EN": "Title"},
@@ -345,8 +367,16 @@ if not os.path.isfile(settings_path):
                      {"DA": "Standardiser filnavne",
                       "EN": "Standardize Filenames"},
                  "folder_menu_consolidate":
-                     {"DA": "Konsolider metadata", "EN": "Consolidate Metadata"}
+                     {"DA": "Konsolider metadata",
+                      "EN": "Consolidate Metadata"},
+                 "settings_window_title":
+                     {"DA": "Indstillinger",
+                      "EN": "Settings"},
+                 "settings_labels_application_language":
+                     {"DA": "Sprog",
+                      "EN": "Language"}
                 }
+if file_context_menu_actions is None:
     file_context_menu_actions = {"consolidate_metadata":
                                      {"text_key": "file_menu_consolidate"},
                                  "copy_metadata":
@@ -362,14 +392,22 @@ if not os.path.isfile(settings_path):
                                  "choose_tags_to_paste":
                                      {"text_key": "file_menu_chose_tags_to_paste"}
                                  }
+if folder_context_menu_actions is None:
     folder_context_menu_actions = {"standardize_filenames":
                                        {"text_key": "folder_menu_standardize"},
                                    "consolidate_metadata":
                                        {"text_key": "floder_menu_consolidate"}
-                                  }
+                                }
+if settings_labels is None:
+    settings_labels = {"application_language":
+                        {"text_key": "settings_labels_application_language"}
+                      }
+if version != settings_file_version:
+    # Do migration of settings at upgrade here, if needed
+    dummy = 0
 
-
-    settings = {"file_types": file_types,
+new_settings = {"version": version,
+                "file_types": file_types,
                 "languages": languages,
                 "language": language,
                 "logical_tags": logical_tags,
@@ -377,9 +415,10 @@ if not os.path.isfile(settings_path):
                 "file_type_tags": file_type_tags,
                 "text_keys": text_keys,
                 "file_context_menu_actions": file_context_menu_actions,
-                "folder_context_menu_actions": folder_context_menu_actions}
+                "folder_context_menu_actions": folder_context_menu_actions,
+                "settings_labels": settings_labels}
 
-    settings_json_object = json.dumps(settings, indent=4)
-    with open(settings_path, "w") as outfile:
-        outfile.write(settings_json_object)
+if new_settings != settings:
+    settings = new_settings
+    write_settings_file()
 
