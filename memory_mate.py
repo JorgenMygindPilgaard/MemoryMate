@@ -4,13 +4,14 @@ from PyQt6.QtWidgets import QWidget,QMainWindow,QApplication
 from exiftool_wrapper import ExifTool
 from file_metadata_util import QueueHost, QueueStatusMonitor
 from ui_status import UiStatusManager
-from ui_main import FilePanel, FileList
-
+from ui_main import FilePanel, FileList, SettingsWheeel
+from PyQt6.QtGui import QIcon
 
 class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
-        self.setWindowTitle("Memory Mate")
+        self.setWindowTitle("Memory Mate "+settings.version)
+        self.setWindowIcon(QIcon('memory_mate.ico'))
 
         # Get UI-status from last run from UI-status file
         self.ui_status = UiStatusManager.getInstance(os.path.join(settings.app_data_location, "ui_status.json"))
@@ -21,14 +22,16 @@ class MainWindow(QMainWindow):
         # File (Right part of MainWindow)
         self.file_panel = FilePanel.getInstance(self.ui_status.getStatusParameter('current_file'))
 
-        # File (Right part of MainWindow)
+        # Status of file-processing (Top line of main-window)
         self.queue_status_monitor = QueueStatusMonitor()
+
+        # Clickable settings-wheel in top line of main window
+        self.settings_wheel = SettingsWheeel()
 
         # File list (Left part of MainWindow)
         self.file_list = FileList(dir_path='')
         self.file_list.setOpenFolders(self.ui_status.getStatusParameter('open_folders'))
         self.file_list.setSelectedItems(self.ui_status.getStatusParameter('selected_items'))
-#        self.file_list.setFixedWidth(1200)
 
 
         # Main-widget (Central widget of MainWindow)
@@ -37,16 +40,17 @@ class MainWindow(QMainWindow):
         #-------------------------------------------------------------------------------------------------------------
         # Place Widgets in laqyout
         #-------------------------------------------------------------------------------------------------------------
-        main_layout = QHBoxLayout()
+        main_layout = QVBoxLayout()
+        controll_line_layout = QHBoxLayout()
+        main_layout.addLayout(controll_line_layout)
+        file_section_layout = QHBoxLayout()
+        main_layout.addLayout(file_section_layout)
         file_panel_layout = QVBoxLayout()
-
-        # main_layout.addWidget(folder_tree)         #Out
-        main_layout.addWidget(self.file_list)
-        main_layout.addLayout(file_panel_layout)
-        file_panel_layout.addLayout(self.queue_status_monitor)
+        file_section_layout.addWidget(self.file_list)
+        file_section_layout.addLayout(file_panel_layout)
         file_panel_layout.addWidget(self.file_panel)
-#        main_layout.addWidget(self.file_panel)   #file manages its own layout
-
+        controll_line_layout.addLayout(self.queue_status_monitor)
+        controll_line_layout.addWidget(self.settings_wheel)
         main_widget.setLayout(main_layout)
 
     def closeEvent(self, event):
