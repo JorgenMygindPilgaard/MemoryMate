@@ -1,3 +1,5 @@
+import sys
+
 from PyQt6.QtWidgets import QTreeView, QMenu, QScrollArea, QWidget, QHBoxLayout, QVBoxLayout, QLabel, QLineEdit,QPushButton, QAbstractItemView, QDialog, QComboBox
 from PyQt6.QtCore import Qt, QDir, QModelIndex,QItemSelectionModel, QObject, pyqtSignal
 from PyQt6.QtGui import QFileSystemModel,QAction
@@ -47,7 +49,8 @@ class FilePanel(QScrollArea):
     def getInstance(file_name):
         new_file_name = file_name
         if new_file_name == None:
-            new_file_name = ''
+            # Show sample photo in stead of an empty wndow
+            new_file_name = "Memory Mate Sample Photo.jpg"
         if new_file_name != '' and new_file_name != FilePanel.old_file_name:
             if not os.path.exists(new_file_name):
                 new_file_name = ''
