@@ -50,7 +50,7 @@ if languages is None:
     languages = {"DA": "Danish",
                  "EN": "English"}
 if language is None:
-    language = "DA"
+    language = "EN"
 if logical_tags is None:
     logical_tags = {
                     "orientation":       {"widget":                "orientation",
