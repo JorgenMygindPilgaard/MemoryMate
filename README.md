@@ -12,7 +12,7 @@ Greetings from passed times. I want to put greetings on "the back" of our digita
 The easiest way to get the application running on your computer is to use the installation-package.
 Go to https://github.com/JorgenMygindPilgaard/MemoryMate/releases. From here you can download and run the install.exe file.
 ### Get Source-code
-You can use the souce-code from repsitory freely, suggest changes etc. The application is created using Python 3.11 and PyQt5 5.17.7. 
+You can use the souce-code from repsitory freely, suggest changes etc. The application is created using Python 3.11 and PyQt5 6. 
 
 ## How does it work
 The application wrappes the amazing [ExifTool by Phil Harvey. ](https://exiftool.org/)
