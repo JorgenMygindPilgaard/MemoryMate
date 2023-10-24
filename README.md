@@ -32,6 +32,8 @@ The *Full Description* is a special type of logical tag called a *reference tag.
 ### Functionalities
 #### Edit Logical Tags
 Just select a file and start typing. The data is saved when you navigate away from image or close application.
+For editing geo-location, click the window just below tag neme Geo-location. This will open a bigger window where you can search and pick a location. (Notice that showing and editing geo-location requires intenet-access. If you don't have internet-access, you can still use the application, but you are not able to view/edit geolocation)
+For editing image orientation/rotation, use the rotation-buttons below the image.
 #### Consolidate metadata
 Do you have images with title, description etc. not written to all logical tags. No problem. Select the file/files/folder/folders, right-click and select "Consolidate metadata". The program will then make sure to "spread" the logical tags to all corresponding physical tags in the selected images.
 #### Copy metadata
@@ -103,5 +105,7 @@ Here you see the default-configuration of content for the *Full description* ref
     },
 ```
 
+#### Automatic backup running in background
+Memory Mate updates image-files when you change logical tag values. Some backup-solutions lock files when doing automatic backup. If an image is locked, Memory Mate will not be able to update the metadata. It is therefore recommended that you pause your backup-program while using Memory Mate to update metadata.
 
 
