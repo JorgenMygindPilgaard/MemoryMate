@@ -15,28 +15,31 @@ You can use the souce-code from repsitory freely, suggest changes etc. The appli
 
 ## How does it work
 The application wrappes the amazing [ExifTool by Phil Harvey. ](https://exiftool.org/)
-The application works with *logical tags*. These are tags that only the application knows of. The defaults are:
+The application works with what I have chosen to call *logical tags*. These are tags that only the application knows of. The defaults are:
 * Tille
 * Date
 * Description
 * People
+* Geo-location
 * Photographer
 * Source
 * Original Filename
 * Full Description
+These logical tags are all visible in the right hand section of the UI below the image preview.
 
-Each of the logical tags are written to one or more physical tags in the file metadata. 
+When you use Memory Mate to change the content of one of the logical tags (e.g. if you change the title of a photo), the program writes the changed value to one or more physical tags in the file metadata. 
 The *Full Description* is a special type of logical tag called a *reference tag.* In the default settings, *all* other logical tags are referenced in the *Full Description*. The *Full Description* reference tag is saved to commenly used physical tags for image-description, so that you will be sure to be able to see all information, also in programs only capable of showing one of the physical tags for description.
 ### Functionalities
 #### Edit Logical Tags
-Just select a file and start typing. The data is saved when you navigate away from image or close application,
+Just select a file and start typing. The data is saved when you navigate away from image or close application.
 #### Consolidate metadata
-Do you have images with Title, description etc. not written to all logical tags. No problem. Right-click the selected file/files/filder/folders and select "Consolidate metadata". The program will then make sure to "spread" the logical tags to all corresponding physical tags in the selected images. It will also find files with same filename (e.g my_file.jpg and my_file.cr2 or my_file.jpg in folder and subfolder) and and synchronize logical and physical tags across files, filling gaps.
+Do you have images with title, description etc. not written to all logical tags. No problem. Select the file/files/folder/folders, right-click and select "Consolidate metadata". The program will then make sure to "spread" the logical tags to all corresponding physical tags in the selected images.
 #### Copy metadata
-Right-click source-image and select "Copy Metadata". Then select target file/files/filder/folders, right-click, tick the tags you want to paste (take care not pasting all tags. Can't be regretted), and select "Paste Metadata"
+Mark the file/files/folder/folders. Then right-click the selection and select "Copy Metadata". Then select target file/files/filder/folders, right-click, tick the tags you want to paste (take care not pasting all tags. Can't be regretted), and select "Paste Metadata". If you have chosen more than one source-file, the "Paste Metadata" option is greyed out, and can't be used. You can in stead chose "Paste Metadata by Filename". When you paste using that option, Memory Mate will copy metadata from files in the selected source to metadata of files *with the same filename* in the target (ignoring the file type). That is very handy, if you store your original, raw files in a separate folder, and have edited metadata for all the corresponding edited jpg-files. You can then simply paste by filename to your original raw-files in one go.
 
 ## How to configure the application
-First time program launches, it generates a settings.json file in "\ProgramData\Memeory Mate"-folder on your computer. At future launches, the program will use the existing settings.json file. You can add or remove logical tags in the settings.json, if you would like the program to work with other logical tags that the defaults.
+First time program launches, the language is set to english. You can change that to danish (only additional language prepared so far) by clicking the settings-wheel in the top right corner. After changing the language, relaunch the program.
+Also at first launch the program generates a settings.json file in "\ProgramData\Memeory Mate"-folder on your computer. At future launches, the program will use the existing settings.json file. You can add or remove logical tags in the settings.json, if you would like the program to work with other logical tags that the defaults.
 If you want to revert to defaults after editing settings.json, then simply delete the file from "\ProgramData\Memeory Mate"-folder. At next program-launch, the default settings.json will be generated again.
 In settings.json, logical tags are mapped to one or more physical image-tags per image/video file type. Here is a snipit from the settings.json showing in which physical tags the program stores the Title in jpg-files.:
 ```json
