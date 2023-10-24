@@ -26,6 +26,7 @@ The application works with what I have chosen to call *logical tags*. These are 
 * Source
 * Original Filename
 * Full Description
+
 These logical tags are all visible in the right hand section of the UI below the image preview.
 
 When you use Memory Mate to change the content of one of the logical tags (e.g. if you change the title of a photo), the program writes the changed value to one or more physical tags in the file metadata. 
