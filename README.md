@@ -9,7 +9,8 @@ Greetings from passed times. I want to put greetings on "the back" of our digita
 ![The UI is kept simple...](MemoryMateUI.jpg)
 ## Installation
 ### Installation package
-The easiest way to get the application running on your computer is to use the installation-package......will follow later....
+The easiest way to get the application running on your computer is to use the installation-package.
+Go to https://github.com/JorgenMygindPilgaard/MemoryMate/releases. From here you can download and run the install.exe file.
 ### Get Source-code
 You can use the souce-code from repsitory freely, suggest changes etc. The application is created using Python 3.11 and PyQt5 5.17.7. 
 
