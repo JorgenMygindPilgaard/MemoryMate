@@ -110,6 +110,6 @@ Memory Mate updates image-files when you change logical tag values. Some backup-
 
 #### Donate
 Memory Mate is totally free for you to use. If you like the tool, you can donate an amount via paypal. It absolutly not needed:
-> > :Button label=Donate, url= https://www.paypal.com/paypalme/JorgenMygindPilgaard
+:Button label=Donate, url= https://www.paypal.com/paypalme/JorgenMygindPilgaard
 
 
