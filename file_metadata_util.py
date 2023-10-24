@@ -24,6 +24,8 @@ class FileMetadataChangedEmitter(QObject):
     def emit(self, file_name, old_logical_tag_values, new_logical_tag_values):
         self.change_signal.emit(file_name, old_logical_tag_values, new_logical_tag_values)
 
+
+
 class FileMetadata(QObject):
     app_path = sys.argv[0]
     app_dir = os.path.dirname(os.path.abspath(app_path))
@@ -41,8 +43,10 @@ class FileMetadata(QObject):
         super().__init__()
         # Check that instantiation is called from getInstance-method
         if not FileMetadata.getInstance_active:
-            raise Exception('Please use getInstance method')
+            raise FileException('Please use getInstance method')
         # Check existence of image_file. Raise exception if not existing
+        if not os.path.isfile(file_name):
+            raise FileNotFoundError('File '+file_name+' does not exist')
 
         # Set data for filename
         self.file_name = file_name
@@ -281,9 +285,11 @@ class QueueWorker(QThread):
                 file = queue_entry.get('file')
                 logical_tag_values = queue_entry.get('logical_tag_values')
                 force_rewrite = queue_entry.get('force_rewrite')
-                file_metadata = FileMetadata.getInstance(file)
- #               file_metadata.setLogicalTagValues(logical_tag_values)    # Not needed. file_metadata already updated when data enters queue
-                file_metadata.save(force_rewrite=force_rewrite, put_in_queue=False)
+                try:
+                    file_metadata = FileMetadata.getInstance(file)
+                    file_metadata.save(force_rewrite=force_rewrite, put_in_queue=False)
+                except FileNotFoundError:
+                    pass
                 json_queue_file.dequeue_commit()
             else:
                 self.waiting.emit()
