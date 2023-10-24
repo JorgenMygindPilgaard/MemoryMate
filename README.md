@@ -41,6 +41,13 @@ Do you have images with title, description etc. not written to all physical tags
 #### Copy metadata
 Mark the file/files/folder/folders. Then right-click the selection and select "Copy Metadata". Then select target file/files/filder/folders, right-click, tick the tags you want to paste (take care not pasting all tags. Can't be regretted), and select "Paste Metadata". If you have chosen more than one source-file, the "Paste Metadata" option is greyed out, and can't be used. You can in stead chose "Paste Metadata by Filename". When you paste using that option, Memory Mate will copy metadata from files in the selected source to metadata of files *with the same filename* in the target (ignoring the file type). That is very handy, if you store your original, raw files in a separate folder, and have edited metadata for all the corresponding jpg-files. You can then simply paste by filename to your original raw-files in one go.
 
+#### Standardize filenames
+If you have a folder with multible files and folders below, and you want to rename these files in a systematic way, ordered by date/time taken, the application can help you. Mark the files/folder/folders containing where renaming should take place. Right-click the selection and chose "Standardize Filenames". A popup will now ask you for prefix, numbering and postfix for your naming:
+![The UI is kept simple...](StandardizeFilenamesPopup.jpg)
+Enter the prefix if needed, the numberpattern (a string of x n's) and if needed a postfix. 
+The example above will name the first file "2023-F035-001.jpg", the next "2023-F035-002.jpg" etc. (jpg-files as example). Files with same name (ignoring filetype) will get the same name after renaming also. That way you make sure that original/editet filepairs having same name before standardizing filenames, will also have same name after renaming has taken place.
+
+
 ## How to configure the application
 First time you launch the program, the language is set to english. You can change that to danish (only additional language prepared so far) by clicking the settings-wheel in the top right corner. After changing the language, relaunch the program.
 Also at first launch the program generates a settings.json file in "\ProgramData\Memeory Mate"-folder on your computer. At future launches, the program will use the existing settings.json file. You can add or remove logical tags in the settings.json, if you would like the program to work with other logical tags that the defaults. Make sure to take a backup of the originl settings.json.
