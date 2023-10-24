@@ -43,7 +43,7 @@ Mark the file/files/folder/folders. Then right-click the selection and select "C
 
 #### Standardize filenames
 If you have a folder with multible files and folders below, and you want to rename these files in a systematic way, ordered by date/time taken, the application can help you. Mark the files/folder/folders containing where renaming should take place. Right-click the selection and chose "Standardize Filenames". A popup will now ask you for prefix, numbering and postfix for your naming:
-![The UI is kept simple...](StandardizeFilenamesPopup.jpg)
+![Popup for filename pattern](StandardizeFilenamesPopup.jpg)
 Enter the prefix if needed, the numberpattern (a string of x n's) and if needed a postfix. 
 The example above will name the first file "2023-F035-001.jpg", the next "2023-F035-002.jpg" etc. (jpg-files as example). Files with same name (ignoring filetype) will get the same name after renaming also. That way you make sure that original/editet filepairs having same name before standardizing filenames, will also have same name after renaming has taken place.
 
