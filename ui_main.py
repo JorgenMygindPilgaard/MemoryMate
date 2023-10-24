@@ -1,5 +1,3 @@
-import sys
-
 from PyQt6.QtWidgets import QTreeView, QMenu, QScrollArea, QWidget, QHBoxLayout, QVBoxLayout, QLabel, QLineEdit,QPushButton, QAbstractItemView, QDialog, QComboBox
 from PyQt6.QtCore import Qt, QDir, QModelIndex,QItemSelectionModel, QObject, pyqtSignal
 from PyQt6.QtGui import QFileSystemModel,QAction
@@ -615,7 +613,7 @@ class StandardizeFilenames(QObject):
     def start(self):
         file_name_pattern=[]
         for filetype in settings.file_types:
-            file_name_pattern.append(filetype)
+            file_name_pattern.append("*."+filetype)
 
         self.target_file_names = []
         if isinstance(self.target, list):
@@ -748,7 +746,7 @@ class CopyLogicalTags(QObject):
 #       Source and target converted to list of files
         file_name_pattern=[]
         for filetype in settings.file_types:
-            file_name_pattern.append(filetype)
+            file_name_pattern.append("*."+filetype)
         self.source_file_names = []
         if isinstance(source, list):
             for file_path in source:
@@ -819,7 +817,7 @@ class ConsolidateMetadata(QObject):
     def start(self):
         file_name_pattern=[]
         for filetype in settings.file_types:
-            file_name_pattern.append(filetype)
+            file_name_pattern.append("*."+filetype)
         file_names = []
         if isinstance(self.target, list):
             for file_path in self.target:
