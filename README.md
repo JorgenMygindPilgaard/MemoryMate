@@ -108,4 +108,8 @@ Here you see the default-configuration of content for the *Full description* ref
 #### Automatic backup running in background
 Memory Mate updates image-files when you change logical tag values. Some backup-solutions lock files when doing automatic backup. If an image is locked, Memory Mate will not be able to update the metadata. It is therefore recommended that you pause your backup-program while using Memory Mate to update metadata.
 
+#### Donate
+Memory Mate is totally free for you to use. If you like the tool, you can donate an amount via paypal. It absolutly not needed:
+> > :Button label=Donate, url= https://www.paypal.com/paypalme/JorgenMygindPilgaard
+
 
