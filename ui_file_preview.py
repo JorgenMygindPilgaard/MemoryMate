@@ -33,6 +33,9 @@ class FilePreview(QObject):
                 self.image = self.__movie_to_qimage(self.file_name)
             else:
                 self.image = self.__default_to_qimage(self.file_name)
+            if self.image != None:
+                if self.image.height()>1500 or self.image.width()>1500:
+                    self.image = self.image.scaled(1500,1500,Qt.AspectRatioMode.KeepAspectRatio)
 
         # Set right rotation/orientation
         if file_type == 'mov' or file_type == 'mp4':
@@ -43,9 +46,20 @@ class FilePreview(QObject):
             image = self.__orientedImage()
 
         # Set pixmap
+        dummy_width = image.width()
+        dummy_height = image.height()
+
         if image != None:
-            height = int(self.width * 9 / 16)
-            self.pixmap = QPixmap.fromImage(image).scaled(self.width, height, Qt.AspectRatioMode.KeepAspectRatio,Qt.TransformationMode.SmoothTransformation)
+            ratio_width  = self.width / image.width()
+            ratio_height = self.width / image.height() / 16 * 9   # Image same height as a 9/16 landscape filling screen-width
+            ratio = min(ratio_width,ratio_height)
+
+            width = int(image.width() * ratio)
+            height = int(image.height() * ratio)
+
+
+            self.pixmap = QPixmap.fromImage(image)
+            self.pixmap = self.pixmap.scaled(width, height, Qt.AspectRatioMode.KeepAspectRatio,Qt.TransformationMode.SmoothTransformation)
         else:
             self.pixmap = None
 
