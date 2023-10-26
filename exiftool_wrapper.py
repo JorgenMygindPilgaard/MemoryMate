@@ -66,15 +66,25 @@ class ExifTool(object):
         return self
 
     def __exit__(self, exc_type, exc_value, traceback):
-        ExifTool.read_process.stdin.flush()
-        ExifTool.write_process.stdin.flush()
+        if ExifTool.read_process != None:
+            ExifTool.read_process.stdin.flush()
+        if ExifTool.write_process != None:
+            ExifTool.write_process.stdin.flush()
 
     @staticmethod
     def close(close_read_process=True, close_write_process=True):
         if close_read_process:
             if ExifTool.read_process!=None:                    # Process exist
-                ExifTool.read_process.send_signal(signal.CTRL_C_EVENT)                    # Terminate whatever process is currently doing
-                ExifTool.read_process.stdin.flush()                                       # Send termination at once
+                # ExifTool.read_process.send_signal(signal.CTRL_C_EVENT)                    # Terminate whatever process is currently doing
+                # ExifTool.read_process.stdin.flush()                                       # Send termination at once
+                #
+                # ExifTool.read_process.stdin.write("-ver\n -execute\n")                    # Make sure that exiftool is done with terminating process
+                # ExifTool.read_process.stdin.flush()                                       # by asking for version and waiting for answer back
+                # fd = ExifTool.read_process.stdout.fileno()
+                # output = ""
+                # while not output.endswith(ExifTool.sentinel):
+                #     output += os.read(fd, 4096).decode('utf-8', errors='replace')
+
                 ExifTool.read_process.stdin.write("-stay_open\nFalse\n -execute\n")       # Set process to terminate when done with last command
                 ExifTool.read_process.stdin.flush()
                 ExifTool.read_process.wait()
@@ -82,12 +92,21 @@ class ExifTool(object):
 
         if close_write_process:
             if ExifTool.write_process!=None:                 # Process exist
-                ExifTool.write_process.send_signal(signal.CTRL_C_EVENT)                    # Terminate whatever process is currently doing
-                ExifTool.write_process.stdin.flush()                                       # Send termination at once
+                # ExifTool.write_process.send_signal(signal.CTRL_C_EVENT)                    # Terminate whatever process is currently doing
+                # ExifTool.write_process.stdin.flush()                                       # Send termination at once
+                #
+                # ExifTool.write_process.stdin.write("-ver\n -execute\n")                    # Make sure that exiftool is done with terminating process
+                # ExifTool.write_process.stdin.flush()                                       # by asking for version and waiting for answer back
+                # fd = ExifTool.write_process.stdout.fileno()
+                # output = ""
+                # while not output.endswith(ExifTool.sentinel):
+                #     output += os.read(fd, 4096).decode('utf-8', errors='replace')
+
                 ExifTool.write_process.stdin.write("-stay_open\nFalse\n -execute\n")       # Set process to terminate when done with last command
                 ExifTool.write_process.stdin.flush()
                 ExifTool.write_process.wait()
                 ExifTool.write_process = None
+
 
     def execute(self, args,process):
         args.append('-charset')                        # This and the next line tells exiftool which encoding to expect
