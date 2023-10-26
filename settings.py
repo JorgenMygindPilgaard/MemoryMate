@@ -1,7 +1,7 @@
 import json
 import os
 
-version = "1.1.1"
+version = "1.1.2"
 
 # Make location for Application, if missing
 app_data_location = os.path.join(os.environ.get("ProgramData"),"Memory Mate")

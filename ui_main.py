@@ -73,8 +73,8 @@ class FilePanel(QScrollArea):
     @staticmethod
     def updateFilename(file_name):
         FilePanel.file_name = file_name
-        FilePanel.file_metadata = FileMetadata.getInstance(FilePanel.file_name)
-        FilePanel.instance.prepareFilePanel()
+#       FilePanel.file_metadata = FileMetadata.getInstance(FilePanel.file_name)
+#       FilePanel.instance.prepareFilePanel()
 
     @staticmethod
     def saveMetadata():
