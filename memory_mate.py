@@ -59,6 +59,7 @@ class MainWindow(QMainWindow):
                                               'open_folders':   self.file_list.getOpenFolders(),
                                               'selected_items': self.file_list.getSelectedItems()})
         self.ui_status.save()
+        QueueHost.get_instance().stop_queue_worker()
         ExifTool.close()              # Close exiftool process
         super().closeEvent(event)
 
