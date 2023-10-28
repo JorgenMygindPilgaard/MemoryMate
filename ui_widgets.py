@@ -1,6 +1,6 @@
-from PyQt6.QtWidgets import QWidget, QHBoxLayout, QVBoxLayout, QLabel, QLineEdit, QPlainTextEdit, QDateTimeEdit, QDateEdit, QPushButton, QListWidget, QAbstractItemView, QDialog
-from PyQt6.QtCore import Qt, QDateTime, QDate, QTimer, QObject, pyqtSignal
-from PyQt6.QtGui import QFontMetrics,QPixmap
+from PyQt6.QtWidgets import QWidget, QHBoxLayout, QVBoxLayout, QLabel, QLineEdit, QPlainTextEdit, QDateTimeEdit, QDateEdit, QPushButton, QListWidget, QAbstractItemView, QSpacerItem, QSizePolicy
+from PyQt6.QtCore import Qt, QDateTime, QDate, QTimer, QObject, pyqtSignal, QSize
+from PyQt6.QtGui import QFontMetrics,QPixmap,QIcon
 import settings
 from file_metadata_util import FileMetadata
 from ui_util import AutoCompleteList
@@ -21,7 +21,6 @@ class ImageRotatedEmitter(QObject):
         return ImageRotatedEmitter.instance
     def emit(self, file_name):
         self.rotate_signal.emit(file_name)
-
 
 class TextLine(QLineEdit):
     def __init__(self, file_name, logical_tag):
@@ -55,7 +54,7 @@ class TextLine(QLineEdit):
             self.auto_complete_list.collectItem(logical_tag_value)
         return logical_tag_value
 
-    def updateFilename(self,file_name):
+    def updateFilename(self, file_name):
         self.file_name = file_name
 class Text(QPlainTextEdit):
     instance_index = {}
@@ -388,6 +387,17 @@ class GeoLocation(MapView):
         self.setLocationZoom(location=self.marker_location, zoom=15)
         self.setMarkerLocation(self.marker_location)
 
+        self.enterEvent = self.onEnter
+        self.leaveEvent = self.onLeave
+
+    def onEnter(self,event):
+        self.setCursor(Qt.CursorShape.PointingHandCursor)  # Change cursor to pointing hand when mouse enters
+
+    def onLeave(self,event):
+        self.setCursor(Qt.CursorShape.ArrowCursor)  # Change cursor back tor arrow
+
+
+
     def onMarkerLocationChanged(self, marker_location=[]):
         self.marker_location = marker_location
         self.setLocationZoom(location=self.marker_location, zoom=15)
@@ -595,3 +605,103 @@ class Rotation(QWidget):
 
     def onLeaveRight(self,event):
         self.right_image_label.setCursor(Qt.CursorShape.ArrowCursor)  # Change cursor back tor arrow
+
+class Rating(QWidget):
+    def __init__(self, file_name, logical_tag):
+        super().__init__()
+        self.file_name = file_name
+        self.logical_tag = logical_tag                                    #Widget should remember who it serves
+        self.setMaximumWidth(200)
+        self.auto_complete_list = None
+        self.rating = 0
+
+        #Get attributes of tag
+        tag_attributes = settings.logical_tags.get(self.logical_tag)
+
+        self.initUI()
+        self.readFromImage()
+
+    def initUI(self):
+        self.stars = []
+        self.layout = QHBoxLayout()
+
+        button_and_star_style = (
+            "border: none;"
+            "background: transparent;"
+            "outline: none;"
+        )
+
+        star_size = 15  # Define the size for stars (adjust as needed)
+        button_size = 15  # Define the size for the reset button (adjust as needed)
+
+        for i in range(5):
+            star = QPushButton()
+            star.setIcon(QIcon('grey_star.png'))  # Load a grey star icon
+            star.setIconSize(QSize(star_size, star_size))
+            star.clicked.connect(self.onStarClick)
+            star.setStyleSheet(button_and_star_style)
+            self.stars.append(star)
+            self.layout.addWidget(star)
+
+#        spacer = QSpacerItem(100, 100, QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Minimum)
+#        self.layout.addItem(spacer)  # Add a spacer to create space
+
+        self.reset_button = QPushButton()
+        self.reset_button.setIcon(QIcon('reset_icon.png'))  # Load a reset icon
+        self.reset_button.setIconSize(QSize(button_size, button_size))
+        self.reset_button.clicked.connect(self.resetStars)
+        self.reset_button.setStyleSheet(button_and_star_style)
+        self.layout.addWidget(self.reset_button)
+
+        self.setLayout(self.layout)
+
+        self.enterEvent = self.onEnter
+        self.leaveEvent = self.onLeave
+
+    def onEnter(self,event):
+        self.setCursor(Qt.CursorShape.PointingHandCursor)  # Change cursor to pointing hand when mouse enters
+
+    def onLeave(self,event):
+        self.setCursor(Qt.CursorShape.ArrowCursor)  # Change cursor back tor arrow
+
+
+
+    def onStarClick(self):
+        sender = self.sender()
+        star_index = self.stars.index(sender)
+
+        for i, star in enumerate(self.stars):
+            if i <= star_index:
+                star.setIcon(QIcon('yellow_star.png'))  # Load a yellow star icon
+                self.rating = i + 1
+            else:
+                star.setIcon(QIcon('grey_star.png'))  # Load a grey star icon
+
+    def resetStars(self):
+        for star in self.stars:
+            star.setIcon(QIcon('grey_star.png'))  # Load a grey star icon
+        self.rating = 0
+
+    def setYellowStars(self, value):
+        if value is None:
+            self.yellow_stars = 0.
+        else:
+            self.yellow_stars = min(max(value, 0), 5)  # Ensure value is between 0 and 5
+        for i, star in enumerate(self.stars):
+            if i < self.yellow_stars:
+                star.setIcon(QIcon('yellow_star.png'))  # Load a yellow star icon
+            else:
+                star.setIcon(QIcon('grey_star.png'))  # Load a grey star icon
+
+    def readFromImage(self):
+        file_metadata = FileMetadata.getInstance(self.file_name)
+        if file_metadata:
+            self.rating = file_metadata.logical_tag_values.get(self.logical_tag)
+            self.setYellowStars(self.rating)
+
+    def logical_tag_value(self):
+        logical_tag_value = self.rating
+        return logical_tag_value
+
+    def updateFilename(self, file_name):
+        self.file_name = file_name
