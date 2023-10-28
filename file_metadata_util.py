@@ -43,7 +43,7 @@ class FileMetadata(QObject):
         super().__init__()
         # Check that instantiation is called from getInstance-method
         if not FileMetadata.getInstance_active:
-            raise FileException('Please use getInstance method')
+            raise Exception('Please use getInstance method')
         # Check existence of image_file. Raise exception if not existing
         if not os.path.isfile(file_name):
             raise FileNotFoundError('File '+file_name+' does not exist')
@@ -89,9 +89,11 @@ class FileMetadata(QObject):
             if tag_value != None and tag_value != "" and tag_value != []:
                 if isinstance(tag_value,list):
                     tag_value = list(map(str, tag_value))
-
                 if tag_alone == 'Composite:GPSPosition':
                     tag_value = tag_value.replace(' ',',',1)    # Hack: ExifTool delivers space-saparated but expect comma-separated on updates
+                if tag_alone == 'XMP-microsoft:RatingPercent':  # Hack: Map rating-percent to a scale from 0-5 1>1, 25>2, 50>3, 75>4, 100>5
+                    if tag_value != 1:
+                        tag_value = int((tag_value + 25)/25)
                 tag_values[tag] = tag_value
 
         # Finally map tag_values to logical_tag_values
@@ -114,7 +116,7 @@ class FileMetadata(QObject):
                 tag_value = tag_values.get(tag)
                 if tag_value:
                     logical_tag_value_found = True
-                if logical_tag_data_type != 'list' and isinstance(tag_value, list):     #E.g. Author contains multiple entries. Concatenate ti a string then
+                if logical_tag_data_type != 'list' and isinstance(tag_value, list):     #E.g. Author contains multiple entries. Concatenate t0 a string then
                     tag_value = ', '.join(str(tag_value))
                 if tag_value != None and tag_value != '':
                     self.logical_tag_values[logical_tag] = tag_value
@@ -214,6 +216,9 @@ class FileMetadata(QObject):
                     tags = logical_tags_tags.get(logical_tag)  # All physical tags for logical tag"
                     for tag in tags:
                         tag_value = self.logical_tag_values[logical_tag]
+                        if tag == 'XMP-microsoft:RatingPercent':
+                            if tag_value != 1:                      # Hack: Map rating scale from 0-5 to rating-percent 1>1, 2>25, 3>50, 4>75, 5>100
+                                tag_value = (tag_value-1) * 25
                         tag_values[tag] = tag_value
 
             if tag_values != {} and tag_values != None:

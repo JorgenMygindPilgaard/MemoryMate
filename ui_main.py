@@ -6,7 +6,7 @@ from file_metadata_util import FileMetadata, QueueHost, FileMetadataChangedEmitt
 from file_util import FileNameChangedEmitter
 from ui_util import ProgressBarWidget
 import os
-from ui_widgets import TextLine, Text, DateTime, Date, TextSet, GeoLocation, Orientation, Rotation, ImageRotatedEmitter
+from ui_widgets import TextLine, Text, DateTime, Date, TextSet, GeoLocation, Orientation, Rotation, Rating, ImageRotatedEmitter
 import file_util
 from collections import OrderedDict
 from exiftool_wrapper import ExifTool
@@ -183,6 +183,9 @@ class FilePanel(QScrollArea):
                 FilePanel.tags[logical_tag] = [label_widget, tag_widget, tag_widget_type]
             elif tag_widget_type == "rotation":
                 tag_widget = Rotation(FilePanel.file_name, logical_tag)
+                FilePanel.tags[logical_tag] = [label_widget, tag_widget, tag_widget_type]
+            elif tag_widget_type == "rating":
+                tag_widget = Rating(FilePanel.file_name, logical_tag)
                 FilePanel.tags[logical_tag] = [label_widget, tag_widget, tag_widget_type]
             else:
                 pass
@@ -581,7 +584,7 @@ class SettingsWindow(QWidget):
 
     def onLanguageSelected(self, index):
         settings.settings["language"] = self.language_combobox.currentText()[:2]
-        settings.write_settings_file()
+        settings.writeSettingsFile()
 
 class StandardizeFilenames(QObject):
     # The purpose of this class is to rename files systematically. The naming pattern in the files will be
