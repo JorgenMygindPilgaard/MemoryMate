@@ -3,7 +3,7 @@ import os
 import copy
 from util import insertDictionary
 
-version = "1.2.0"   # Version with rating added
+version = "1.3.0"   # Version with preview context menu and read ahead
 
 # Make location for Application, if missing
 app_data_location = os.path.join(os.environ.get("ProgramData"),"Memory Mate")
@@ -55,6 +55,14 @@ def migrateVersion(version,settings):
             if settings["text_keys"].get("tag_label_rating") is None:
                 settings["text_keys"]["tag_label_rating"] = {"DA": "Bedømmelse", "EN": "Rating"}
 
+    def rule02():  # Add text_keys for file-preview context menut
+        if old_ver_num <= 10299 and new_ver_num >= 10300:  # Context-menu for file-preview added in version 01.03.00
+            if settings["text_keys"].get("preview_menu_open_in_default_program") is None:
+                settings["text_keys"]["preview_menu_open_in_default_program"] = {"DA": "Åben",
+                                                                                 "EN": "Open"}
+            if settings["text_keys"].get("preview_menu_open_in_browser") is None:
+                settings["text_keys"]["preview_menu_open_in_browser"] = {"DA": "Åben i webbrowser",
+                                                                         "EN": "Open in Web Browser"}
 
     old_ver_num = versionNumber(settings.get("version"))
     new_ver_num = versionNumber(version)
@@ -64,7 +72,8 @@ def migrateVersion(version,settings):
     if old_ver_num == 0:
         return
     else:
-        rule01()    # Add rating
+        rule01()    # Add rating in settings
+        rule02()    # Add context menu to preview
 
 # Read settings-file, if it is there
 settings = readSettingsFile()
@@ -385,7 +394,7 @@ if settings.get("text_keys") is None:
                                   "EN": "Source"},
                              "tag_label_original_filename":
                                  {"DA": "Oprindeligt filnavn",
-                                  "EN": "Original filename"},
+                                  "EN": "Original Filename"},
                              "tag_label_geo_location":
                                  {"DA": "Geo-lokation",
                                   "EN": "Geo-location"},
@@ -406,10 +415,10 @@ if settings.get("text_keys") is None:
                                   "EN": "Patch Metadata"},
                              "file_menu_paste_by_filename":
                                  {"DA": "Indsæt metadata efter filnavn",
-                                  "EN": "Paste Metadata by filename"},
+                                  "EN": "Paste Metadata by Filename"},
                              "file_menu_patch_by_filename":
                                  {"DA": "Udfyld metadata efter filnavn",
-                                  "EN": "Patch Metadata by filename"},
+                                  "EN": "Patch Metadata by Filename"},
                              "file_menu_chose_tags_to_paste":
                                  {"DA": "Vælg hvad du vil overføre:",
                                   "EN": "Choose what to transfer:"},
@@ -424,8 +433,14 @@ if settings.get("text_keys") is None:
                                   "EN": "Settings"},
                              "settings_labels_application_language":
                                  {"DA": "Sprog",
-                                  "EN": "Language"}
-                            }
+                                  "EN": "Language"},
+                             "preview_menu_open_in_default_program":
+                                 {"DA": "Åben",
+                                  "EN": "Open"},
+                             "preview_menu_open_in_browser":
+                                 {"DA": "Åben i webbrowser",
+                                  "EN": "Open in Web Browser"},
+                             }
 if settings.get("file_context_menu_actions") is None:
     settings["file_context_menu_actions"] = {"consolidate_metadata":
                                                  {"text_key": "file_menu_consolidate"},

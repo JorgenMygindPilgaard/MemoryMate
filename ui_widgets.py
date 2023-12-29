@@ -1,4 +1,4 @@
-from PyQt6.QtWidgets import QWidget, QHBoxLayout, QVBoxLayout, QLabel, QLineEdit, QPlainTextEdit, QDateTimeEdit, QDateEdit, QPushButton, QListWidget, QAbstractItemView, QSpacerItem, QSizePolicy
+from PyQt6.QtWidgets import QWidget, QHBoxLayout, QVBoxLayout, QLabel, QLineEdit, QPlainTextEdit, QDateTimeEdit, QDateEdit, QPushButton, QListWidget, QAbstractItemView
 from PyQt6.QtCore import Qt, QDateTime, QDate, QTimer, QObject, pyqtSignal, QSize
 from PyQt6.QtGui import QFontMetrics,QPixmap,QIcon
 import settings
@@ -42,7 +42,7 @@ class TextLine(QLineEdit):
     def readFromImage(self):
         file_metadata = FileMetadata.getInstance(self.file_name)
         if file_metadata:
-            text_line = file_metadata.logical_tag_values.get(self.logical_tag)
+            text_line = file_metadata.getLogicalTagValues().get(self.logical_tag)
             if text_line == None:
                 return
             self.setText(text_line)
@@ -56,6 +56,7 @@ class TextLine(QLineEdit):
 
     def updateFilename(self, file_name):
         self.file_name = file_name
+
 class Text(QPlainTextEdit):
     instance_index = {}
     def __init__(self, file_name, logical_tag):
@@ -88,7 +89,7 @@ class Text(QPlainTextEdit):
     def readFromImage(self):
         file_metadata = FileMetadata.getInstance(self.file_name)
         if file_metadata:
-            text = file_metadata.logical_tag_values.get(self.logical_tag)
+            text = file_metadata.getLogicalTagValues().get(self.logical_tag)
             if text == None:
                 return
             self.setPlainText(text)
@@ -145,6 +146,7 @@ class Text(QPlainTextEdit):
         text_height = int(num_lines * line_height)
 
         return text_height
+
 class DateTime(QDateTimeEdit):
     def __init__(self, file_name, logical_tag):
         super().__init__()
@@ -175,7 +177,7 @@ class DateTime(QDateTimeEdit):
     def readFromImage(self):
         file_metadata = FileMetadata.getInstance(self.file_name)
         if file_metadata:
-            date_time = file_metadata.logical_tag_values.get(self.logical_tag)
+            date_time = file_metadata.getLogicalTagValues().get(self.logical_tag)
             if date_time == None:
                 return
             self.clear()
@@ -225,7 +227,7 @@ class Date(QDateEdit):
     def readFromImage(self):
         file_metadata = FileMetadata.getInstance(self.file_name)
         if file_metadata:
-            date = file_metadata.logical_tag_values.get(self.logical_tag)
+            date = file_metadata.getLogicalTagValues().get(self.logical_tag)
             if date == None:
                 return
             self.setDate(QDate(1752,1,1))
@@ -286,7 +288,7 @@ class TextSet(QWidget):
     def readFromImage(self):
         file_metadata = FileMetadata.getInstance(self.file_name)
         if file_metadata:
-            tags = file_metadata.logical_tag_values.get(self.logical_tag)
+            tags = file_metadata.getLogicalTagValues().get(self.logical_tag)
             if tags == None:
                 return
             if type(tags) == str:
@@ -414,7 +416,7 @@ class GeoLocation(MapView):
     def readFromImage(self):
         file_metadata = FileMetadata.getInstance(self.file_name)
         if file_metadata:
-            gps_position_string = file_metadata.logical_tag_values.get(self.logical_tag)    # "50.454545 -0.959595"
+            gps_position_string = file_metadata.getLogicalTagValues().get(self.logical_tag)    # "50.454545 -0.959595"
             if gps_position_string == None:
                 return
             if gps_position_string != "" and gps_position_string != None:
@@ -475,7 +477,7 @@ class Orientation(QWidget):
     def readFromImage(self):
         file_metadata = FileMetadata.getInstance(self.file_name)
         if file_metadata:
-            orientation = file_metadata.logical_tag_values.get(self.logical_tag)
+            orientation = file_metadata.getLogicalTagValues().get(self.logical_tag)
             if orientation == None:
                 return
             self.orientation = orientation
@@ -558,7 +560,7 @@ class Rotation(QWidget):
     def readFromImage(self):
         file_metadata = FileMetadata.getInstance(self.file_name)
         if file_metadata:
-            rotation = file_metadata.logical_tag_values.get(self.logical_tag)
+            rotation = file_metadata.getLogicalTagValues().get(self.logical_tag)
             if rotation == None:
                 return
             self.rotation = rotation
@@ -696,7 +698,7 @@ class Rating(QWidget):
     def readFromImage(self):
         file_metadata = FileMetadata.getInstance(self.file_name)
         if file_metadata:
-            self.rating = file_metadata.logical_tag_values.get(self.logical_tag)
+            self.rating = file_metadata.getLogicalTagValues().get(self.logical_tag)
             self.setYellowStars(self.rating)
 
     def logical_tag_value(self):

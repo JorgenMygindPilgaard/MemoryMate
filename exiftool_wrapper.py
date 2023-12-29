@@ -8,6 +8,7 @@ from datetime import datetime
 import time
 
 class ExifTool(object):
+    processes = {}
     read_process=None    # Two exiftool-processes runs in memory, one for read and one for write.
     write_process=None   # ..that way user does not have to wait for background processor to finalize writes from queue
     configuration=''
@@ -23,89 +24,56 @@ class ExifTool(object):
     # To tell exiftool what encoding was used, we pass parameter -charset <sys_encoding> (e.g. -charset cp1252) to
     # Exiftool along with the other parameters. (see below in execute-method).
 
-    def __init__(self,executable='exiftool', configuration='' ):
+    def __init__(self,executable='exiftool', configuration=''):
         ExifTool.executable = executable
         ExifTool.configuration = configuration
 
     def __enter__(self):
-        # Prepare read-process of exiftool.exe
-        if ExifTool.read_process!=None:               #Process created
-            if ExifTool.read_process.poll()!=None:    #Process not running
-                ExifTool.read_process=None
-        if ExifTool.read_process==None:
-            if ExifTool.configuration!='':
-                ExifTool.read_process = subprocess.Popen([ExifTool.executable, "-config", ExifTool.configuration, "-stay_open", "True", "-@", "-"],
-                                                      universal_newlines=True,
-                                                      stdin=subprocess.PIPE,
-                                                      stdout=subprocess.PIPE,
-                                                      creationflags=subprocess.CREATE_NO_WINDOW)
-            else:
-                ExifTool.read_process = subprocess.Popen([ExifTool.executable, "-stay_open", "True",  "-@", "-"],
-                                                      universal_newlines=True,
-                                                      stdin=subprocess.PIPE,
-                                                      stdout=subprocess.PIPE,
-                                                      creationflags=subprocess.CREATE_NO_WINDOW)
-
-#      Prepare write-process of exiftool.exe
-        if ExifTool.write_process!=None:               #Process created
-            if ExifTool.write_process.poll()!=None:    #Process not running
-                ExifTool.write_process=None
-        if ExifTool.write_process==None:
-            if ExifTool.configuration!='':
-                ExifTool.write_process = subprocess.Popen([ExifTool.executable, "-config", ExifTool.configuration, "-stay_open", "True", "-@", "-"],
-                                                      universal_newlines=True,
-                                                      stdin=subprocess.PIPE,
-                                                      stdout=subprocess.PIPE,
-                                                      creationflags=subprocess.CREATE_NO_WINDOW)
-            else:
-                ExifTool.write_process = subprocess.Popen([ExifTool.executable, "-stay_open", "True",  "-@", "-"],
-                                                      universal_newlines=True,
-                                                      stdin=subprocess.PIPE,
-                                                      stdout=subprocess.PIPE,
-                                                      creationflags=subprocess.CREATE_NO_WINDOW)
         return self
 
     def __exit__(self, exc_type, exc_value, traceback):
-        if ExifTool.read_process != None:
-            ExifTool.read_process.stdin.flush()
-        if ExifTool.write_process != None:
-            ExifTool.write_process.stdin.flush()
+        pass
+    @staticmethod
+    def getProcess(process_id):
+        if ExifTool.processes.get(process_id)!=None:                      #Process created
+            if ExifTool.processes.get(process_id).poll()!=None:           #Process not running
+                del ExifTool.processes[process_id]
+        if ExifTool.processes.get(process_id)==None:
+            if ExifTool.configuration!='':
+                ExifTool.processes[process_id] = subprocess.Popen([ExifTool.executable, "-config", ExifTool.configuration, "-stay_open", "True", "-@", "-"],
+                                                                  universal_newlines=True,
+                                                                  stdin=subprocess.PIPE,
+                                                                  stdout=subprocess.PIPE,
+                                                                  creationflags=subprocess.CREATE_NO_WINDOW)
+            else:
+                ExifTool.processes[process_id] = subprocess.Popen([ExifTool.executable, "-stay_open", "True",  "-@", "-"],
+                                                                   universal_newlines=True,
+                                                                   stdin=subprocess.PIPE,
+                                                                   stdout=subprocess.PIPE,
+                                                                   creationflags=subprocess.CREATE_NO_WINDOW)
+        return ExifTool.processes.get(process_id)
 
     @staticmethod
-    def close(close_read_process=True, close_write_process=True):
-        if close_read_process:
-            if ExifTool.read_process!=None:                    # Process exist
-                # ExifTool.read_process.send_signal(signal.CTRL_C_EVENT)                    # Terminate whatever process is currently doing
-                # ExifTool.read_process.stdin.flush()                                       # Send termination at once
-                #
-                # ExifTool.read_process.stdin.write("-ver\n -execute\n")                    # Make sure that exiftool is done with terminating process
-                # ExifTool.read_process.stdin.flush()                                       # by asking for version and waiting for answer back
-                # fd = ExifTool.read_process.stdout.fileno()
-                # output = ""
-                # while not output.endswith(ExifTool.sentinel):
-                #     output += os.read(fd, 4096).decode('utf-8', errors='replace')
-
-                ExifTool.read_process.stdin.write("-stay_open\nFalse\n -execute\n")       # Set process to terminate when done with last command
-                ExifTool.read_process.stdin.flush()
-                ExifTool.read_process.wait()
-                ExifTool.read_process = None
-
-        if close_write_process:
-            if ExifTool.write_process!=None:                 # Process exist
-                # ExifTool.write_process.send_signal(signal.CTRL_C_EVENT)                    # Terminate whatever process is currently doing
-                # ExifTool.write_process.stdin.flush()                                       # Send termination at once
-                #
-                # ExifTool.write_process.stdin.write("-ver\n -execute\n")                    # Make sure that exiftool is done with terminating process
-                # ExifTool.write_process.stdin.flush()                                       # by asking for version and waiting for answer back
-                # fd = ExifTool.write_process.stdout.fileno()
-                # output = ""
-                # while not output.endswith(ExifTool.sentinel):
-                #     output += os.read(fd, 4096).decode('utf-8', errors='replace')
-
-                ExifTool.write_process.stdin.write("-stay_open\nFalse\n -execute\n")       # Set process to terminate when done with last command
-                ExifTool.write_process.stdin.flush()
-                ExifTool.write_process.wait()
-                ExifTool.write_process = None
+    def closeProcess(process_id='$all'):
+        closed_processes = []
+        for id, process in ExifTool.processes.items():
+            if process_id == '$all' or id == process_id:
+                if process!=None:
+                    # ExifTool.read_process.send_signal(signal.CTRL_C_EVENT)                    # Terminate whatever process is currently doing
+                    # ExifTool.read_process.stdin.flush()                                       # Send termination at once
+                    #
+                    # ExifTool.read_process.stdin.write("-ver\n -execute\n")                    # Make sure that exiftool is done with terminating process
+                    # ExifTool.read_process.stdin.flush()                                       # by asking for version and waiting for answer back
+                    # fd = ExifTool.read_process.stdout.fileno()
+                    # output = ""
+                    # while not output.endswith(ExifTool.sentinel):
+                    #     output += os.read(fd, 4096).decode('utf-8', errors='replace')
+                    process.stdin.write("-stay_open\nFalse\n -execute\n")  # Set process to terminate when done with last command
+                    process.stdin.flush()
+                    process.wait()
+                    closed_processes.append(id)
+        for id in closed_processes:
+            del ExifTool.processes[id]
 
 
     def execute(self, args,process):
@@ -162,9 +130,11 @@ class ExifTool(object):
 
         while not output.endswith(self.sentinel):
             output += os.read(fd, 4096).decode('utf-8', errors='replace')
+
+        process.stdin.flush()    #Don't know if it is needed
         return output[:-len(self.sentinel)]
 
-    def getTags(self, filenames, tags=[]):           #Gets all metadata of files if tags is empty or not supplied
+    def getTags(self, filenames, tags=[],process_id='READ'):           #Gets all metadata of files if tags is empty or not supplied
         args = []
         tags.append('XMP:MemoryMateSaveDateTime')
         for tag in tags:
@@ -180,10 +150,10 @@ class ExifTool(object):
         else:
             for filename in filenames:
                 args.append(filename)
-        output = self.execute((args),ExifTool.read_process)
+        output = self.execute((args),ExifTool.getProcess(process_id))
         return json.loads(output)
 
-    def setTags(self, filenames, tag_values={}):
+    def setTags(self, filenames, tag_values={},process_id='WRITE'):
         if tag_values=={}:
             pass                                    #Quick return if no tags to set
         tag_values['XMP:MemoryMateSaveDateTime']=datetime.now().strftime("%Y:%m:%d %H:%M:%S")
@@ -221,7 +191,7 @@ class ExifTool(object):
             except OSError as e:
                 pass
 
-        output = self.execute(args,ExifTool.write_process)
+        output = self.execute(args,ExifTool.getProcess(process_id))
         return output
 
 
