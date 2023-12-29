@@ -2,7 +2,7 @@ from PyQt6.QtWidgets import QTreeView, QMenu, QScrollArea, QWidget, QHBoxLayout,
 from PyQt6.QtCore import Qt, QDir, QModelIndex,QItemSelectionModel, QObject, pyqtSignal
 from PyQt6.QtGui import QFileSystemModel,QAction
 import settings
-from file_metadata_util import FileMetadata, QueueHost, FileMetadataChangedEmitter
+from file_metadata_util import FileMetadata, QueueHost, FileMetadataChangedEmitter, FileReadQueue, FileReadyEmitter, FilePreview
 from file_util import FileNameChangedEmitter
 from ui_util import ProgressBarWidget
 import os
@@ -10,8 +10,8 @@ from ui_widgets import TextLine, Text, DateTime, Date, TextSet, GeoLocation, Ori
 import file_util
 from collections import OrderedDict
 from exiftool_wrapper import ExifTool
-from ui_file_preview import FilePreview
 from PyQt6.QtGui import QPixmap
+import webbrowser
 
 class FileMetadataPastedEmitter(QObject):
     instance = None
@@ -31,6 +31,8 @@ class FileMetadataPastedEmitter(QObject):
 class FilePanel(QScrollArea):
     instance = None
     file_metadata = None
+    file_preview = None
+    preview_widget = None
     file_name = ''
     old_file_name = ''
 
@@ -55,30 +57,42 @@ class FilePanel(QScrollArea):
         FilePanel.old_file_name = FilePanel.file_name
         FilePanel.file_name = new_file_name
 
-        FilePanel.focus_tag = ''  # Forget focus-tag when changing to different photo
-        if FilePanel.file_metadata != None and FilePanel.old_file_name != '':  # Changing to different picture: Save this pictures metadata
-            FilePanel.file_metadata.save()
+        # If first chosen image, instantiate filepanel
         if FilePanel.instance == None:
             FilePanel.instance = FilePanel()
+
+        # Save metadata from previous file
+        FilePanel.focus_tag = ''  # Forget focus-tag when changing to different photo
+        if FilePanel.file_metadata != None and FilePanel.old_file_name != '':  # Changing to different picture: Save this pictures metadata
+            if FilePanel.file_metadata.getStatus() == '':    # File being processed proves that metadata not changed by user in UI. No need for update from screen
+                FilePanel.file_metadata.save()
+
+        # Get instances of metadata and preview
         if FilePanel.file_name == '':
             FilePanel.file_metadata = None
+            FilePanel.file_preview = None
         else:
             if os.path.isfile(FilePanel.file_name):
                 FilePanel.file_metadata = FileMetadata.getInstance(FilePanel.file_name)
+                FilePanel.file_preview = FilePreview.getInstance(FilePanel.file_name)
 
-        FilePanel.instance.prepareFilePanel()
-        FilePanel.old_file_name = FilePanel.file_name
+        # Prepare panel, if preview and metadata is ready (else, the file-ready-event will trigger preparing panel later
+        if FilePanel.file_metadata != None and FilePanel.file_preview != None:
+            if FilePanel.file_metadata.getStatus() == '' and FilePanel.file_preview.getStatus() == '':
+                FilePanel.instance.prepareFilePanel()
         return FilePanel.instance
 
     @staticmethod
     def updateFilename(file_name):
         FilePanel.file_name = file_name
-#       FilePanel.file_metadata = FileMetadata.getInstance(FilePanel.file_name)
+        FilePanel.file_metadata = FileMetadata.getInstance(FilePanel.file_name)
 #       FilePanel.instance.prepareFilePanel()
 
     @staticmethod
     def saveMetadata():
         if FilePanel.file_metadata != None:
+            if FilePanel.file_metadata.getStatus() != '':    # File being processed proves that metadata not changed by user in UI. No need for update from screen
+                return
             logical_tag_values = {}
             for logical_tag in FilePanel.tags:
                 tag_widget = FilePanel.tags[logical_tag][1]
@@ -89,6 +103,10 @@ class FilePanel(QScrollArea):
                 FilePanel.file_metadata.save()
 
     def prepareFilePanel(self):  # Happens each time a new filename is assigned or panel is resized
+        if FilePanel.file_metadata != None and FilePanel.file_preview != None:      # Skip, if metadata or preview not yet ready
+            if FilePanel.file_metadata.getStatus() != '' or FilePanel.file_preview.getStatus() != '':
+                return
+
         scroll_position = FilePanel.instance.verticalScrollBar().value()  # Remember scroll-position
         self.takeWidget()
 
@@ -100,11 +118,16 @@ class FilePanel(QScrollArea):
         if FilePanel.file_name != None and FilePanel.file_name != '':
             # Prepare file-preview widget
             FilePanel.preview_widget = QLabel()
-            FilePanel.file_preview = FilePreview.getInstance(FilePanel.file_name, self.width() - 60)
-            if FilePanel.file_preview.pixmap != None:
-                FilePanel.preview_widget.setPixmap(FilePanel.file_preview.pixmap)
+            file_preview_pixmap = FilePanel.file_preview.getPixmap(panel_width=self.width() - 60)
+            if file_preview_pixmap != None:
+                FilePanel.preview_widget.setPixmap(file_preview_pixmap)
                 FilePanel.preview_widget.setAlignment(Qt.AlignmentFlag.AlignHCenter)
                 FilePanel.main_layout.addWidget(FilePanel.preview_widget)
+
+                # Connect the context menu to the QLabel
+                FilePanel.preview_widget.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
+                FilePanel.preview_widget.customContextMenuRequested.connect(self.showContextMenu)
+
             dummy_widget_for_width = QWidget()
             dummy_widget_for_width.setFixedWidth(self.width() - 60)
             FilePanel.main_layout.addWidget(dummy_widget_for_width)
@@ -112,7 +135,7 @@ class FilePanel(QScrollArea):
             # Prepare metadata widgets and place them all in metadata_layout.
             FilePanel.metadata_layout.setSizeConstraint(QVBoxLayout.SizeConstraint.SetNoConstraint)  # No constraints
             tags = {}
-            for logical_tag in FilePanel.file_metadata.logical_tag_values:
+            for logical_tag in FilePanel.file_metadata.getLogicalTagValues():
                 if settings.logical_tags.get(logical_tag).get("widget") == None:
                     continue
                 tags[logical_tag] = FilePanel.tags.get(logical_tag)
@@ -133,6 +156,39 @@ class FilePanel(QScrollArea):
 
 
             FilePanel.instance.verticalScrollBar().setValue(scroll_position)  # Remember scroll-position
+
+    def showContextMenu(self, pos):
+        context_menu = QMenu()
+
+        # Add the "Open in Browser" action to the context menu
+        open_in_browser_action_text = settings.text_keys.get("preview_menu_open_in_browser").get(settings.language)
+        open_in_browser_action = QAction(open_in_browser_action_text)
+        open_in_browser_action.triggered.connect(FilePanel.openInBrowser)
+        context_menu.addAction(open_in_browser_action)
+
+        # Add the "Open in Default Program" action to the context menu
+        open_in_default_program_action_text = settings.text_keys.get("preview_menu_open_in_default_program").get(settings.language)
+        open_in_default_program_action = QAction(open_in_default_program_action_text)
+        open_in_default_program_action.triggered.connect(FilePanel.openInDefaultProgram)
+        context_menu.addAction(open_in_default_program_action)
+
+
+        # Show the context menu at the specified position
+        context_menu.exec(FilePanel.preview_widget.mapToGlobal(pos))
+
+    def openInBrowser(self):
+        if FilePanel.file_preview != None:
+            current_image_path = os.path.join(settings.app_data_location, "current_image.jpg")
+            FilePanel.file_preview.getImage().save(current_image_path)
+            current_image_html_path = os.path.join(settings.app_data_location, "current_image.html")
+            webbrowser.open(current_image_html_path)
+
+    def openInDefaultProgram(self):
+        try:
+            os.startfile(FilePanel.file_name)
+        except Exception as e:
+            pass
+
 
     @staticmethod
     def __initializeLayout():
@@ -509,6 +565,14 @@ class FileList(QTreeView):
                     stack.append(child_index)
         return list(set(open_folders))
 
+    def setOpenFolders(self, open_folders=[]):
+        if open_folders:
+            for open_folder in open_folders:
+                # Find the QModelIndex corresponding to the folder_path
+                folder_index = self.model.index(open_folder)
+                if folder_index.isValid():  # Check if the folder exists in the model
+                    # Expand the folder
+                    self.setExpanded(folder_index, True)
     def getSelectedItems(self):
         selected_items = []
         selected_indexes = self.selectedIndexes()
@@ -519,15 +583,6 @@ class FileList(QTreeView):
                 selected_items.append(selected_file_info.absoluteFilePath())
         return list(set(selected_items))
 
-    def setOpenFolders(self, open_folders=[]):
-        if open_folders:
-            for open_folder in open_folders:
-                # Find the QModelIndex corresponding to the folder_path
-                folder_index = self.model.index(open_folder)
-                if folder_index.isValid():  # Check if the folder exists in the model
-                    # Expand the folder
-                    self.setExpanded(folder_index, True)
-
     def setSelectedItems(self, selected_items=[]):
         self.clearSelection()
         if selected_items:
@@ -537,6 +592,27 @@ class FileList(QTreeView):
                 if item_index.isValid():  # Check if the item exists in the model
                     # Select the item
                     self.selectionModel().select(item_index, QItemSelectionModel.SelectionFlag.Select)
+
+    def getCurrentItem(self):
+        current_index = self.currentIndex()
+        if current_index.isValid():
+            current_item = self.model.filePath(self.currentIndex())
+        else:
+            current_item = ''
+        return current_item
+
+    def setCurrentItem(self, current_path):
+        current_index = self.model.index(current_path)
+        if current_index.isValid():
+            self.setCurrentIndex(current_index)
+
+    def getVerticalScrollPosition(self):
+       return self.verticalScrollBar().value()
+
+    def setVerticalScrollPosition(self, scroll_position):
+        if scroll_position != None:
+
+            self.verticalScrollBar().setValue(scroll_position)
 
 class SettingsWheeel(QLabel):
     def __init__(self):
@@ -633,7 +709,7 @@ class StandardizeFilenames(QObject):
         for index, file_name in enumerate(self.target_file_names):
             self.progress_signal.emit(index+1)
             file_metadata = FileMetadata.getInstance(file_name)
-            files.append({"file_name": file_name, "path": file_metadata.path, "name_alone": file_metadata.name_alone, "type": file_metadata.type, "date": file_metadata.logical_tag_values.get("date")})
+            files.append({"file_name": file_name, "path": file_metadata.path, "name_alone": file_metadata.name_alone, "type": file_metadata.type, "date": file_metadata.getLogicalTagValues().get("date")})
 
         # Try find date on at least one of the files (Raw or jpg) and copy to the other
         sorted_files = sorted(files, key=lambda x: (x['name_alone'], x['date']), reverse=True)       # Sort files in reverse order to get the file with date first
@@ -708,8 +784,7 @@ class StandardizeFilenames(QObject):
         if files_for_renaming != []:
             renamer=file_util.FileRenamer.getInstance(files_for_renaming)
             try:
-                ExifTool.close(close_read_process=False,
-                               close_write_process=True)  # Close write-process, so that data in queue can be changed safely
+                ExifTool.closeProcess(process_id='WRITE')  # Close write-process, so that data in queue can be changed safely
                 QueueHost.get_instance().stop_queue_worker()  # Make sure not to collide with update of metadata
 
                 renamer.start()
@@ -792,7 +867,7 @@ class CopyLogicalTags(QObject):
             target_tag_values = {}
             for logical_tag in self.logical_tags:
                 source_tag_value = None
-                source_tag_value = source_file_metadata.logical_tag_values.get(logical_tag)
+                source_tag_value = source_file_metadata.getLogicalTagValues().get(logical_tag)
                 if source_tag_value != None:
                     target_tag_values[logical_tag] = source_tag_value
             target_file_metadata.setLogicalTagValues(target_tag_values, self.overwrite)
@@ -928,6 +1003,8 @@ def onFileRenamed(old_file_name, new_file_name):     # reacts on change filename
 def onCurrentFileChanged(new_file_name):
     FilePanel.saveMetadata()                      # Saves metadata for file currently in filepanel (if any)
     dummy = FilePanel.getInstance(new_file_name)  # Puts new file in file-panel
+    FileReadQueue.appendQueue(new_file_name)
+
 
 def onImageRotated(file_name):
     if file_name == FilePanel.file_name:
@@ -935,7 +1012,11 @@ def onImageRotated(file_name):
         file_preview = FilePreview.instance_index.get(file_name)  # Get existing preview, if exist
         if file_preview:
             file_preview.updatePixmap()
-            FilePanel.preview_widget.setPixmap(file_preview.pixmap)
+            FilePanel.preview_widget.setPixmap(file_preview.getPixmap(FilePreview.latest_panel_width))
+
+def onFileReady(file_name):
+    if file_name == FilePanel.file_name:
+        FilePanel.instance.prepareFilePanel()
 
 
 file_metadata_changed_emitter = FileMetadataChangedEmitter.getInstance()
@@ -953,3 +1034,5 @@ file_metadata_pasted_emitter.paste_signal.connect(onMetadataPasted)
 image_rotated_emitter = ImageRotatedEmitter.getInstance()
 image_rotated_emitter.rotate_signal.connect(onImageRotated)
 
+file_ready_emitter = FileReadyEmitter.getInstance()
+file_ready_emitter.ready_signal.connect(onFileReady)

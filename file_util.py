@@ -42,12 +42,24 @@ def getFileList(root_folder='',recursive=False, pattern='*.*'):
     return all_files
 
 def splitFileName(file_name):
-    file_type = file_name.split(".")[-1]
-    short_file_name = file_name.split("\\")[-1]  # Take last part of string splitted at ""
-    short_file_name = short_file_name.split("/")[-1]  # Take last part of string splitted at "/"
-    short_file_name_ex_type = rreplace(short_file_name, "." + file_type, "")  # Remove .jpg
-    file_path = rreplace(file_name, short_file_name, "")
-    return [file_path, short_file_name_ex_type, file_type]
+    if os.path.isfile(file_name):
+        short_file_name = file_name.split("\\")[-1]  # Take last part of string splitted at ""
+        short_file_name = short_file_name.split("/")[-1]  # Take last part of string splitted at "/"
+        short_file_name_ex_type = short_file_name
+        file_type = ""
+        if file_name.find(".") != -1:
+            file_type = file_name.split(".")[-1]
+            short_file_name_ex_type = rreplace(short_file_name, "." + file_type, "")  # Remove .jpg
+        file_path = rreplace(file_name, short_file_name, "")
+        return [file_path, short_file_name_ex_type, file_type]
+    elif os.path.isdir(file_name):
+        file_path = file_name
+        if file_path[-1] != "\\" and file_path[-1] != "/":
+            if file_path.find("/") != -1:  # If "/" is used as separator in path, then append this separator in end of string
+                file_path = file_path + "/"
+            else:
+                file_path = file_path + "\\"
+        return [file_path, "", ""]
 
 class FileNameChangedEmitter(QObject):
     instance = None
