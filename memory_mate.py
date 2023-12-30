@@ -26,7 +26,13 @@ class MainWindow(QMainWindow):
             FilePreview.getInstance(current_file).readImage()
         else:
         # Start loading files in current folder
-            FileReadQueue.appendQueue(current_file)
+            try:
+                FileMetadata.getInstance(current_file).readLogicalTagValues()
+                FilePreview.getInstance(current_file).readImage()
+                FileReadQueue.appendQueue(current_file)    # Triggers other files in folder to be read
+            except Exception as e:
+                current_file = ''
+#
 
         #-------------------------------------------------------------------------------------------------------------
         # Prepare widgets for MainWindow
@@ -67,10 +73,12 @@ class MainWindow(QMainWindow):
         controll_line_layout.addLayout(self.queue_status_monitor)
         controll_line_layout.addWidget(self.settings_wheel)
         main_widget.setLayout(main_layout)
-        if self.ui_status.getStatusParameter('is_maximized'):
+        self.setGeometry(100, 100, 1600, 800)
+        is_maximized = self.ui_status.getStatusParameter('is_maximized')
+        if is_maximized == None:
+            is_maximized = True
+        if is_maximized:
             self.showMaximized()
-        else:
-            self.setGeometry(100, 100, 2000, 1000)
 
         self.file_list.setVerticalScrollPosition(self.ui_status.getStatusParameter('vertical_scroll_position'))
         # if self.ui_status.getStatusParameter('geometry'):

@@ -862,7 +862,9 @@ class CopyLogicalTags(QObject):
             source_file_name = source_target[0]
             target_file_name = source_target[1]
             source_file_metadata = FileMetadata.getInstance(source_file_name)
+            source_file_metadata.readLogicalTagValues()
             target_file_metadata = FileMetadata.getInstance(target_file_name)
+            target_file_metadata.readLogicalTagValues()
             self.progress_signal.emit(index + 1)
             target_tag_values = {}
             for logical_tag in self.logical_tags:
