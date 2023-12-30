@@ -3,7 +3,7 @@ import os
 import copy
 from util import insertDictionary
 
-version = "1.3.0"   # Version with preview context menu and read ahead
+version = "1.3.1"   # Bugfix for copy to corresponding files
 
 # Make location for Application, if missing
 app_data_location = os.path.join(os.environ.get("ProgramData"),"Memory Mate")
@@ -55,7 +55,7 @@ def migrateVersion(version,settings):
             if settings["text_keys"].get("tag_label_rating") is None:
                 settings["text_keys"]["tag_label_rating"] = {"DA": "Bedømmelse", "EN": "Rating"}
 
-    def rule02():  # Add text_keys for file-preview context menut
+    def rule02():  # Add text_keys for file-preview context menu
         if old_ver_num <= 10299 and new_ver_num >= 10300:  # Context-menu for file-preview added in version 01.03.00
             if settings["text_keys"].get("preview_menu_open_in_default_program") is None:
                 settings["text_keys"]["preview_menu_open_in_default_program"] = {"DA": "Åben",

@@ -343,10 +343,10 @@ class QueueWorker(QThread):
                 logical_tag_values = queue_entry.get('logical_tag_values')
                 force_rewrite = queue_entry.get('force_rewrite')
                 try:
-                    FileReadQueue.getInstance().appendQueue(file)
                     file_metadata = FileMetadata.getInstance(file)
+                    file_metadata.readLogicalTagValues()
                     while file_metadata.getStatus() != '':    # If instance being processed, wait for it to finalize
-                        status = file_metadata.getStatus()
+                        status = file_metadata.getStatus()     # Line added to be able to see status during debugging
                         time.sleep(self.delay)
                     file_metadata.save(force_rewrite=force_rewrite, put_in_queue=False)
                 except FileNotFoundError:
