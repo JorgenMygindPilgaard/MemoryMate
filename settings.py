@@ -3,7 +3,7 @@ import os
 import copy
 from util import insertDictionary
 
-version = "1.3.1"   # Bugfix for copy to corresponding files
+version = "1.3.2"   # Bugfix for file-renamer errorgit checkout
 
 # Make location for Application, if missing
 app_data_location = os.path.join(os.environ.get("ProgramData"),"Memory Mate")
