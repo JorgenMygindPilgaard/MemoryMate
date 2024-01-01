@@ -709,7 +709,8 @@ class StandardizeFilenames(QObject):
         for index, file_name in enumerate(self.target_file_names):
             self.progress_signal.emit(index+1)
             file_metadata = FileMetadata.getInstance(file_name)
-            files.append({"file_name": file_name, "path": file_metadata.path, "name_alone": file_metadata.name_alone, "type": file_metadata.type, "date": file_metadata.getLogicalTagValues().get("date")})
+            file_metadata.readLogicalTagValues()
+            files.append({"file_name": file_name, "path": file_metadata.path, "name_alone": file_metadata.name_alone, "type": file_metadata.getFileType(), "date": file_metadata.getLogicalTagValues().get("date")})
 
         # Try find date on at least one of the files (Raw or jpg) and copy to the other
         sorted_files = sorted(files, key=lambda x: (x['name_alone'], x['date']), reverse=True)       # Sort files in reverse order to get the file with date first
@@ -805,6 +806,7 @@ class StandardizeFilenames(QObject):
                     new_name_alone = file.get('new_name_alone')
                     if new_name_alone !='' and new_name_alone != None:
                         logical_tags = {'original_filename': new_name_alone}
+                        file_metadata.readLogicalTagValues()
                         file_metadata.setLogicalTagValues(logical_tags)
                         file_metadata.save()
                         file_metadata_pasted_emitter = FileMetadataPastedEmitter.getInstance()
