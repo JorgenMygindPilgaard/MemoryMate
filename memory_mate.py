@@ -25,13 +25,13 @@ class MainWindow(QMainWindow):
             FileMetadata.getInstance(current_file).readLogicalTagValues()
             FilePreview.getInstance(current_file).readImage()
         else:
-        # Start loading files in current folder
+          # Start loading files in current folder
             try:
-                FileMetadata.getInstance(current_file).readLogicalTagValues()
-                FilePreview.getInstance(current_file).readImage()
-                FileReadQueue.appendQueue(current_file)    # Triggers other files in folder to be read
+               FileMetadata.getInstance(current_file).readLogicalTagValues()
+               FilePreview.getInstance(current_file).readImage()
+               FileReadQueue.appendQueue(current_file)    # Triggers other files in folder to be read
             except Exception as e:
-                current_file = ''
+               current_file = ''
 #
 
         #-------------------------------------------------------------------------------------------------------------
@@ -99,7 +99,7 @@ class MainWindow(QMainWindow):
 
 app = QApplication(sys.argv)
 window = MainWindow()
-QueueHost.get_instance().start_queue_worker()    #Start Queue-processing
 window.show()
+QueueHost.get_instance().start_queue_worker()    #Start Queue-processing
 app.exec()
 

@@ -258,9 +258,10 @@ class FileMetadata(QObject):
             self.saved_logical_tag_values = copy.deepcopy(self.logical_tag_values)
 
     def setLogicalTagValues(self,logical_tag_values,overwrite=True,supress_signal=False):
+
         if self.metadata_status == '':     # Ready to set values, when status in blank
             pass
-        elif supress_signal and self.metadata_status == 'READING':    # Setting values from queue furing read is allowed
+        elif supress_signal and self.metadata_status == 'READING':    # Setting values from queue during read is allowed
             pass
         else:
             raise Exception('Can´t set tag-values. Status is ' + self.metadata_status)   # setting values during read, write or if read is pending, is not allowed
@@ -274,6 +275,7 @@ class FileMetadata(QObject):
                 continue
             old_logical_tag_value = self.logical_tag_values.get(logical_tag)
             if old_logical_tag_value != logical_tag_values[logical_tag]:
+
                 if overwrite:
                     self.logical_tag_values[logical_tag] = logical_tag_values[logical_tag]
                 else:
@@ -290,6 +292,8 @@ class FileMetadata(QObject):
             self.metadata_status = ''
         if self.logical_tag_values != old_logical_tag_values and not supress_signal:
             self.change_signal.emit(self.file_name, old_logical_tag_values, self.logical_tag_values)
+
+
     def updateFilename(self, new_file_name):
         old_file_name = self.file_name
         self.file_name = new_file_name
@@ -344,10 +348,12 @@ class QueueWorker(QThread):
                 force_rewrite = queue_entry.get('force_rewrite')
                 try:
                     file_metadata = FileMetadata.getInstance(file)
-                    file_metadata.readLogicalTagValues()
+                    FileReadQueue.appendQueue(file)
+#                   file_metadata.readLogicalTagValues()
                     while file_metadata.getStatus() != '':    # If instance being processed, wait for it to finalize
-                        status = file_metadata.getStatus()     # Line added to be able to see status during debugging
                         time.sleep(self.delay)
+                        status = file_metadata.getStatus()     # Line added to be able to see status during debugging
+
                     file_metadata.save(force_rewrite=force_rewrite, put_in_queue=False)
                 except FileNotFoundError:
                     pass
@@ -498,7 +504,7 @@ class FileReadQueue(QThread):
     def appendQueue(file_name):     #Will extract folder-path from path and queue it if not already queued or processed
         if file_name:
             if os.path.isfile(file_name):
-                FileReadQueue.last_appended_file = file_name
+                FileReadQueue.last_appended_file = file_name      # Last appended file gets first priority when reading metadata
             split_file_name = file_util.splitFileName(file_name)  # ["c:\pictures\", "my_picture", "jpg"]
             path = split_file_name[0]                             # "c:\pictures\"
             if not path in FileReadQueue.read_folders_done and not path in FileReadQueue.read_folders_queue:
