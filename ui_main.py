@@ -85,7 +85,7 @@ class FilePanel(QScrollArea):
     @staticmethod
     def updateFilename(file_name):
         FilePanel.file_name = file_name
-        FilePanel.file_metadata = FileMetadata.getInstance(FilePanel.file_name)
+#       FilePanel.file_metadata = FileMetadata.getInstance(FilePanel.file_name)
 #       FilePanel.instance.prepareFilePanel()
 
     @staticmethod
@@ -701,7 +701,7 @@ class StandardizeFilenames(QObject):
         else:
             self.target_file_names.extend(file_util.getFileList(root_folder=self.target, recursive=True, pattern=file_name_pattern))
 
-        file_count=len(self.target_file_names)*2     # What takes time is 1. Read metadata for files, 2. Write original filename to metadata
+        file_count=len(self.target_file_names)     # What takes time is 1. Read metadata for files, 2. Write original filename to metadata
 
         #Instanciate file metadata instances for all files
         files = []
@@ -796,21 +796,21 @@ class StandardizeFilenames(QObject):
                 return
 
         # Set original filename tag in all files
-        if settings.logical_tags.get('original_filename'):
-            for file in files:
-                index+=1
-                self.progress_signal.emit(index+1)
-                file_name = file.get('new_file_name')
-                if file_name != '' and file_name != None:
-                    file_metadata = FileMetadata.getInstance(file_name)
-                    new_name_alone = file.get('new_name_alone')
-                    if new_name_alone !='' and new_name_alone != None:
-                        logical_tags = {'original_filename': new_name_alone}
-                        file_metadata.readLogicalTagValues()
-                        file_metadata.setLogicalTagValues(logical_tags)
-                        file_metadata.save()
-                        file_metadata_pasted_emitter = FileMetadataPastedEmitter.getInstance()
-                        file_metadata_pasted_emitter.emit(file_name)
+        # if settings.logical_tags.get('original_filename'):
+        #     for file in files:
+        #         index+=1
+        #         self.progress_signal.emit(index+1)
+        #         file_name = file.get('new_file_name')
+        #         if file_name != '' and file_name != None:
+        #             file_metadata = FileMetadata.getInstance(file_name)
+        #             new_name_alone = file.get('new_name_alone')
+        #             if new_name_alone !='' and new_name_alone != None:
+        #                 logical_tags = {'original_filename': new_name_alone}
+        #                 file_metadata.readLogicalTagValues()
+        #                 file_metadata.setLogicalTagValues(logical_tags)
+        #                 file_metadata.save()
+        #                 file_metadata_pasted_emitter = FileMetadataPastedEmitter.getInstance()
+        #                 file_metadata_pasted_emitter.emit(file_name)
 
         self.done_signal.emit()
 
@@ -1003,6 +1003,21 @@ def onFileRenamed(old_file_name, new_file_name):     # reacts on change filename
     # Update fileename in queue
     json_queue_file = file_util.JsonQueue.getInstance(settings.queue_file_path)
     json_queue_file.change_queue(find={'file': old_file_name}, change={'file': new_file_name})
+
+
+# Set original filename tag in all files
+    if settings.logical_tags.get('original_filename'):
+        if new_file_name != '' and new_file_name != None:
+            file_metadata = FileMetadata.getInstance(new_file_name)
+            new_name_alone = file_util.splitFileName(new_file_name)[1]
+            if new_name_alone != '' and new_name_alone != None:
+                logical_tags = {'original_filename': new_name_alone}
+                file_metadata.readLogicalTagValues()
+                file_metadata.setLogicalTagValues(logical_tags)
+                file_metadata.save()
+                file_metadata_pasted_emitter = FileMetadataPastedEmitter.getInstance()
+                file_metadata_pasted_emitter.emit(new_file_name)
+
 
 def onCurrentFileChanged(new_file_name):
     FilePanel.saveMetadata()                      # Saves metadata for file currently in filepanel (if any)

@@ -2,7 +2,6 @@ import os
 import json
 from fnmatch import fnmatch
 from PyQt6.QtCore import QObject,pyqtSignal
-from util import rreplace
 import threading
 import time
 
@@ -42,16 +41,28 @@ def getFileList(root_folder='',recursive=False, pattern='*.*'):
     return all_files
 
 def splitFileName(file_name):
-
+    dummy = 'mmmmmmm'
     if '.' in file_name:
-        directory, full_filename = os.path.split(file_name)
-        filename, file_extension = os.path.splitext(full_filename)
-        if len(file_extension) > 0:
-            file_extension = file_extension[1:]    # .jpg --> jpg
-        directory = directory + os.sep             # c:\mydir --> c:\mydir\
+        dir_end_pos = file_name.rfind('/')
+        if dir_end_pos != -1:
+            directory = file_name[:dir_end_pos+1]
+            full_filename = file_name[dir_end_pos + 1:]
+        else:
+            directory = ''
+            full_filename = file_name
+
+        ext_start_pos = full_filename.rfind('.')
+        filename = full_filename[:ext_start_pos]
+        file_extension = full_filename[ext_start_pos+1:]
         return [directory, filename, file_extension]
     else:
-        directory = os.path.normpath(file_name) + os.sep
+        if file_name != '':
+            if file_name.endswith('/'):
+                directory = file_name
+            else:
+                directory = file_name + '/'
+        else:
+            directory = ''
         return [directory, '', '']
 
 class FileNameChangedEmitter(QObject):
