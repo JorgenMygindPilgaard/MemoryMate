@@ -1,5 +1,5 @@
 from PyQt6.QtWidgets import QTreeView, QMenu, QScrollArea, QWidget, QHBoxLayout, QVBoxLayout, QLabel, QLineEdit,QPushButton, QAbstractItemView, QDialog, QComboBox
-from PyQt6.QtCore import Qt, QDir, QModelIndex,QItemSelectionModel, QObject, pyqtSignal
+from PyQt6.QtCore import QModelIndex, Qt, QDir, QModelIndex,QItemSelectionModel, QObject, pyqtSignal
 from PyQt6.QtGui import QFileSystemModel,QAction
 import settings
 from file_metadata_util import FileMetadata, QueueHost, FileMetadataChangedEmitter, FileReadQueue, FileReadyEmitter, FilePreview
@@ -257,7 +257,6 @@ class FilePanel(QScrollArea):
 class FileList(QTreeView):
     def __init__(self, dir_path=''):
         super().__init__()
-
         # Many files can be selected in one go
         self.setSelectionMode(QAbstractItemView.SelectionMode.ExtendedSelection)
         #        self.setSelectionBehavior(QAbstractItemView.SelectItems)   #6-problem guess right
@@ -420,6 +419,7 @@ class FileList(QTreeView):
                 self.source = []  # No item was clicked
             for sorrce_file_name in self.source:
                 onMetadataCopied(sorrce_file_name)
+
         elif action == self.paste_metadata:
             index = self.indexAt(position)  # Get index in File-list
             # Check if an item was clicked
@@ -428,7 +428,7 @@ class FileList(QTreeView):
                 for index in self.selectedIndexes():
                     target.append(self.model.filePath(index))
                 target = list(set(target))  # Remove duplicate filenames. Row contains one index per column
-
+                self.clearSelection()
                 target_logical_tags = []
                 for logical_tag in self.logical_tag_actions:
                     if self.logical_tag_actions[logical_tag].isChecked():
@@ -795,23 +795,6 @@ class StandardizeFilenames(QObject):
                 self.done_signal.emit()
                 return
 
-        # Set original filename tag in all files
-        # if settings.logical_tags.get('original_filename'):
-        #     for file in files:
-        #         index+=1
-        #         self.progress_signal.emit(index+1)
-        #         file_name = file.get('new_file_name')
-        #         if file_name != '' and file_name != None:
-        #             file_metadata = FileMetadata.getInstance(file_name)
-        #             new_name_alone = file.get('new_name_alone')
-        #             if new_name_alone !='' and new_name_alone != None:
-        #                 logical_tags = {'original_filename': new_name_alone}
-        #                 file_metadata.readLogicalTagValues()
-        #                 file_metadata.setLogicalTagValues(logical_tags)
-        #                 file_metadata.save()
-        #                 file_metadata_pasted_emitter = FileMetadataPastedEmitter.getInstance()
-        #                 file_metadata_pasted_emitter.emit(file_name)
-
         self.done_signal.emit()
 
 class CopyLogicalTags(QObject):
@@ -972,6 +955,7 @@ class CurrentFileChangedEmitter(QObject):
             CurrentFileChangedEmitter.instance = CurrentFileChangedEmitter()
         return CurrentFileChangedEmitter.instance
     def emit(self, new_file_name):
+        pass
         self.change_signal.emit(new_file_name)
 
 def onMetadataChanged(file_name,old_logical_tags,new_logical_tags):

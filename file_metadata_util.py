@@ -47,7 +47,7 @@ class FileMetadata(QObject):
             raise Exception('Please use getInstance method')
         # Check existence of image_file. Raise exception if not existing
         if not os.path.isfile(file_name):
-            raise FileNotFoundError('File '+file_name+' does not exist')
+             raise FileNotFoundError('File '+file_name+' does not exist')
 
         # Set data for filename
         FileMetadata.instance_index[file_name]=self
@@ -93,7 +93,7 @@ class FileMetadata(QObject):
 
     def readLogicalTagValues(self):
         if self.metadata_status != 'PENDING_READ':   # Means that some other thread is reading or writing to metadata-variables
-            return
+            return 'NOTHING DONE'
         self.metadata_status = 'READING'
         self.__readFileType()
         #Get names of tags in tags for the filetype from settings
@@ -178,6 +178,7 @@ class FileMetadata(QObject):
                     if fallback_tag_value:
                         self.logical_tag_values[logical_tag] = fallback_tag_value
         self.metadata_status = ''
+        return 'DATA READ'
 
 
     def __updateReferenceTags(self):
@@ -291,6 +292,7 @@ class FileMetadata(QObject):
         if not supress_signal:    # If not reading, clear status
             self.metadata_status = ''
         if self.logical_tag_values != old_logical_tag_values and not supress_signal:
+            pass
             self.change_signal.emit(self.file_name, old_logical_tag_values, self.logical_tag_values)
 
 
@@ -349,11 +351,10 @@ class QueueWorker(QThread):
                 try:
                     file_metadata = FileMetadata.getInstance(file)
                     FileReadQueue.appendQueue(file)
-#                   file_metadata.readLogicalTagValues()
+# #                   file_metadata.readLogicalTagValues()
                     while file_metadata.getStatus() != '':    # If instance being processed, wait for it to finalize
                         time.sleep(self.delay)
                         status = file_metadata.getStatus()     # Line added to be able to see status during debugging
-
                     file_metadata.save(force_rewrite=force_rewrite, put_in_queue=False)
                 except FileNotFoundError:
                     pass
@@ -528,9 +529,10 @@ class FileReadQueue(QThread):
             return
         if file_name == FileReadQueue.last_appended_file:
             FileReadQueue.last_appended_file = ''
-        FileMetadata.getInstance(file_name).readLogicalTagValues()
-        FilePreview.getInstance(file_name).readImage()
-        FileReadyEmitter.getInstance().emit(file_name)
+        metadata_action_done = FileMetadata.getInstance(file_name).readLogicalTagValues()
+        image_action_done = FilePreview.getInstance(file_name).readImage()
+        if metadata_action_done != 'NOTHING DONE' or image_action_done != 'NOTHING DONE':
+            FileReadyEmitter.getInstance().emit(file_name)
 
 #----------------------------------------------------------------------------------------#
 # File Preview
@@ -583,7 +585,7 @@ class FilePreview(QObject):
 
     def readImage(self):
         if self.status != 'PENDING_READ':
-            return
+            return 'NOTHING DONE'
         file_type = FileMetadata.getInstance(self.file_name).getFileType()
 
         # Read image from file
@@ -602,6 +604,7 @@ class FilePreview(QObject):
         if FilePreview.latest_panel_width != 0:
             self.__setPixmap(FilePreview.latest_panel_width)
         self.status = ''
+        return 'IMAGE READ'
 
 
     def getStatus(self):
