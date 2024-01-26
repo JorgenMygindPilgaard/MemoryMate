@@ -7,6 +7,7 @@ from ui_status import UiStatusManager
 from ui_main import FilePanel, FileList, SettingsWheeel
 from PyQt6.QtGui import QIcon
 from file_metadata_util import FileMetadata, FilePreview
+import settings
 
 
 class MainWindow(QMainWindow):
