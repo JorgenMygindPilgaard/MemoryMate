@@ -3,7 +3,7 @@ import os
 import copy
 from util import insertDictionary
 
-version = "1.3.4"   # Bugfix for not all files updated during paste
+version = "1.3.3"   # Bugfix for not all files updated during paste
 
 # Make location for Application, if missing
 app_data_location = os.path.join(os.environ.get("ProgramData"),"Memory Mate")
