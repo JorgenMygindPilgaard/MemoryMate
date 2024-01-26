@@ -233,7 +233,7 @@ class JsonQueue(QObject):
         self.queue_being_changed = False
 
     def dequeue_commit(self):
-        self.committed_index = self.index
+        self.committed_index = self.index - 1
 
     def dequeue_from_file(self, delay=5):
         if time.time() - self.last_file_write_time < delay:

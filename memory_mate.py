@@ -53,8 +53,6 @@ class MainWindow(QMainWindow):
         self.file_list.setCurrentItem(self.ui_status.getStatusParameter('current_file'))
 
 
-
-
         # Main-widget (Central widget of MainWindow)
         main_widget = QWidget()
         self.setCentralWidget(main_widget)
