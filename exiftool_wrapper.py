@@ -153,6 +153,7 @@ class ExifTool(object):
         output = self.execute((args),ExifTool.getProcess(process_id))
         return json.loads(output)
 
+
     def setTags(self, filenames, tag_values={},process_id='WRITE'):
         if tag_values=={}:
             pass                                    #Quick return if no tags to set
