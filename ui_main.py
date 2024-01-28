@@ -12,6 +12,7 @@ from collections import OrderedDict
 from exiftool_wrapper import ExifTool
 from PyQt6.QtGui import QPixmap
 import webbrowser
+import time
 
 class FileMetadataPastedEmitter(QObject):
     instance = None
@@ -875,6 +876,7 @@ class ConsolidateMetadata(QObject):
     def __init__(self,target, await_start_signal=False):
         # target is a filename, a foldername, a list of filenames or a list of folder-names
         super().__init__()
+        self.delay = 1
         self.target=target
         if not await_start_signal:
             self.start()
@@ -895,8 +897,15 @@ class ConsolidateMetadata(QObject):
         # Consolidate file metadata force-saving
         for index, file_name in enumerate(file_names):
             self.progress_signal.emit(index+1)
+
             file_metadata = FileMetadata.getInstance(file_name)
+            FileReadQueue.appendQueue(file_name)
+            # #                   file_metadata.readLogicalTagValues()
+            while file_metadata.getStatus() != '':  # If instance being processed, wait for it to finalize
+                time.sleep(self.delay)
+                status = file_metadata.getStatus()  # Line added to be able to see status during debugging
             file_metadata.save(force_rewrite=True)
+
             file_metadata_pasted_emitter = FileMetadataPastedEmitter.getInstance()
             file_metadata_pasted_emitter.emit(file_name)
 

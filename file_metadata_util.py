@@ -623,15 +623,18 @@ class FilePreview(QObject):
         image = self.getImage()
 
         if image != None:
-            ratio_width  = panel_width / image.width()
-            ratio_height = panel_width / image.height() / 16 * 9   # Image same height as a 9/16 landscape filling screen-width
-            ratio = min(ratio_width,ratio_height)
+            if image.width() > 0:
+                ratio_width  = panel_width / image.width()
+                ratio_height = panel_width / image.height() / 16 * 9   # Image same height as a 9/16 landscape filling screen-width
+                ratio = min(ratio_width,ratio_height)
 
-            width = int(image.width() * ratio)
-            height = int(image.height() * ratio)
+                width = int(image.width() * ratio)
+                height = int(image.height() * ratio)
 
-            self.pixmap = QPixmap.fromImage(image)
-            self.pixmap = self.pixmap.scaled(width, height, Qt.AspectRatioMode.KeepAspectRatio,Qt.TransformationMode.SmoothTransformation)
+                self.pixmap = QPixmap.fromImage(image)
+                self.pixmap = self.pixmap.scaled(width, height, Qt.AspectRatioMode.KeepAspectRatio,Qt.TransformationMode.SmoothTransformation)
+            else:
+                self.pixmap = None
         else:
             self.pixmap = None
 
