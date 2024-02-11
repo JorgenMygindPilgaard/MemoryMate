@@ -64,9 +64,6 @@ class FilePanel(QScrollArea):
 
         # Save metadata from previous file
         FilePanel.focus_tag = ''  # Forget focus-tag when changing to different photo
-        if FilePanel.file_metadata != None and FilePanel.old_file_name != '':  # Changing to different picture: Save this pictures metadata
-            if FilePanel.file_metadata.getStatus() == '':    # File being processed proves that metadata not changed by user in UI. No need for update from screen
-                FilePanel.file_metadata.save()
 
         # Get instances of metadata and preview
         if FilePanel.file_name == '':
@@ -86,8 +83,6 @@ class FilePanel(QScrollArea):
     @staticmethod
     def updateFilename(file_name):
         FilePanel.file_name = file_name
-#       FilePanel.file_metadata = FileMetadata.getInstance(FilePanel.file_name)
-#       FilePanel.instance.prepareFilePanel()
 
     @staticmethod
     def saveMetadata():
@@ -101,7 +96,6 @@ class FilePanel(QScrollArea):
                     logical_tag_values[logical_tag] = tag_widget.logical_tag_value()
             if logical_tag_values != {}:
                 FilePanel.file_metadata.setLogicalTagValues(logical_tag_values)
-                FilePanel.file_metadata.save()
 
     def prepareFilePanel(self):  # Happens each time a new filename is assigned or panel is resized
         if FilePanel.file_metadata != None and FilePanel.file_preview != None:      # Skip, if metadata or preview not yet ready
@@ -151,7 +145,6 @@ class FilePanel(QScrollArea):
                 FilePanel.metadata_layout.addWidget(space_label)
 
             FilePanel.main_layout.addLayout(FilePanel.metadata_layout)
-#            FilePanel.main_widget.setFixedWidth(self.width() - 30)
             FilePanel.main_widget.setLayout(FilePanel.main_layout)
             self.setWidget(FilePanel.main_widget)
 
@@ -260,7 +253,6 @@ class FileList(QTreeView):
         super().__init__()
         # Many files can be selected in one go
         self.setSelectionMode(QAbstractItemView.SelectionMode.ExtendedSelection)
-        #        self.setSelectionBehavior(QAbstractItemView.SelectItems)   #6-problem guess right
 
         # Only show image- and video-files
         self.model = QFileSystemModel()
@@ -330,14 +322,17 @@ class FileList(QTreeView):
             if settings.logical_tags.get(logical_tag).get(
                     "reference_tag"):  # Can't copy-paste a reference tag. It is derrived from the other tags
                 continue
-            if settings.logical_tags.get(logical_tag).get("widget") == None:  # Cant copy-paste tags now shown in widget
+            if settings.logical_tags.get(logical_tag).get("widget") == None:  # Cant copy-paste tags not shown in widget
                 continue
 
             tag_label_text_key = settings.logical_tags.get(logical_tag).get("label_text_key")
             if tag_label_text_key:
                 tag_label = settings.text_keys.get(tag_label_text_key).get(settings.language)
                 tag_action = QAction(tag_label, self, checkable=True)
-                tag_action.setChecked(True)
+                if settings.logical_tags.get(logical_tag).get("default_paste_select") == False:
+                    tag_action.setChecked(False)
+                else:
+                    tag_action.setChecked(True)
                 self.logical_tag_actions[logical_tag] = tag_action
                 self.menu.addAction(tag_action)
                 tag_action.triggered.connect(self.toggleAction)
@@ -682,6 +677,7 @@ class StandardizeFilenames(QObject):
 
     def __init__(self,target, prefix='', number_pattern='nnn', suffix='',await_start_signal=False):
         super().__init__()
+        self.delay = 1
         self.target=target
         self.prefix=prefix
         self.number_pattern=number_pattern
@@ -710,7 +706,11 @@ class StandardizeFilenames(QObject):
         for index, file_name in enumerate(self.target_file_names):
             self.progress_signal.emit(index+1)
             file_metadata = FileMetadata.getInstance(file_name)
-            file_metadata.readLogicalTagValues()
+            while file_metadata.getStatus() != '':
+                if file_metadata.getStatus() == 'PENDING_READ':
+                    FileReadQueue.appendQueue(file_name)
+                    time.sleep(self.delay)
+#           file_metadata.readLogicalTagValues()
             files.append({"file_name": file_name, "path": file_metadata.path, "name_alone": file_metadata.name_alone, "type": file_metadata.getFileType(), "date": file_metadata.getLogicalTagValues().get("date")})
 
         # Try find date on at least one of the files (Raw or jpg) and copy to the other
@@ -721,11 +721,6 @@ class StandardizeFilenames(QObject):
             if file.get('date') == '':   # Missing date
                 if file.get('name_alone') == previous_name_alone:
                     file['date'] = previous_date
-                    file_metadata = FileMetadata.getInstance(file.get('file_name'))
-                    # if previous_date !='':
-                    #     logical_tags = {'date': previous_date}
-                    #     file_metadata.setLogicalTagValues(logical_tags)
-                    #     file_metadata.save()
             previous_name_alone = file.get('name_alone')
             previous_date = file.get('date')
         sorted_files = sorted(sorted_files, key=lambda x: (x['name_alone'], x['date']))       # Sort files in order by filename and date
@@ -811,6 +806,7 @@ class CopyLogicalTags(QObject):
         file_name_pattern=[]
         for filetype in settings.file_types:
             file_name_pattern.append("*."+filetype)
+        self.delay = 1
         self.source_file_names = []
         if isinstance(source, list):
             for file_path in source:
@@ -848,9 +844,11 @@ class CopyLogicalTags(QObject):
             source_file_name = source_target[0]
             target_file_name = source_target[1]
             source_file_metadata = FileMetadata.getInstance(source_file_name)
-            source_file_metadata.readLogicalTagValues()
+            while source_file_metadata.getStatus() != '':
+                if source_file_metadata.getStatus() == 'PENDING_READ':
+                    FileReadQueue.appendQueue(source_file_name)
+                    time.sleep(self.delay)
             target_file_metadata = FileMetadata.getInstance(target_file_name)
-            target_file_metadata.readLogicalTagValues()
             self.progress_signal.emit(index + 1)
             target_tag_values = {}
             for logical_tag in self.logical_tags:
@@ -858,10 +856,10 @@ class CopyLogicalTags(QObject):
                 source_tag_value = source_file_metadata.getLogicalTagValues().get(logical_tag)
                 if source_tag_value != None:
                     target_tag_values[logical_tag] = source_tag_value
-            target_file_metadata.setLogicalTagValues(target_tag_values, self.overwrite)
-            target_file_metadata.save()
-            file_metadata_pasted_emitter = FileMetadataPastedEmitter.getInstance()
-            file_metadata_pasted_emitter.emit(target_file_name)
+            target_file_metadata.setLogicalTagValues(logical_tag_values=target_tag_values, overwrite=self.overwrite)
+            if target_file_metadata.getStatus() == '':
+                file_metadata_pasted_emitter = FileMetadataPastedEmitter.getInstance()
+                file_metadata_pasted_emitter.emit(target_file_name)
         self.done_signal.emit()
 
 class ConsolidateMetadata(QObject):
@@ -900,12 +898,10 @@ class ConsolidateMetadata(QObject):
 
             file_metadata = FileMetadata.getInstance(file_name)
             FileReadQueue.appendQueue(file_name)
-            # #                   file_metadata.readLogicalTagValues()
-            while file_metadata.getStatus() != '':  # If instance being processed, wait for it to finalize
+            while file_metadata.getStatus() == 'READ':  # If instance being read, wait for it to finalize
                 time.sleep(self.delay)
                 status = file_metadata.getStatus()  # Line added to be able to see status during debugging
-            file_metadata.save(force_rewrite=True)
-
+            file_metadata.setLogicalTagValues(logical_tag_values={},force_rewrite=True)
             file_metadata_pasted_emitter = FileMetadataPastedEmitter.getInstance()
             file_metadata_pasted_emitter.emit(file_name)
 
@@ -1005,9 +1001,7 @@ def onFileRenamed(old_file_name, new_file_name):     # reacts on change filename
             new_name_alone = file_util.splitFileName(new_file_name)[1]
             if new_name_alone != '' and new_name_alone != None:
                 logical_tags = {'original_filename': new_name_alone}
-                file_metadata.readLogicalTagValues()
                 file_metadata.setLogicalTagValues(logical_tags)
-                file_metadata.save()
                 file_metadata_pasted_emitter = FileMetadataPastedEmitter.getInstance()
                 file_metadata_pasted_emitter.emit(new_file_name)
 

@@ -18,7 +18,7 @@ def patchDefaultValues():
     if settings.get("version") is None:
         settings["version"] = "0.0.0"  # Initial installation
     if settings.get("file_types") is None:
-        settings["file_types"] = ["jpg", "jpeg", "png", "bmp", "cr3", "cr2", "dng", "arw", "nef", "heic", "tif", "gif",
+        settings["file_types"] = ["jpg", "jpeg", "png", "bmp", "cr3", "cr2", "dng", "arw", "nef", "heic", "tif", "tiff", "gif",
                                   "mp4", "mov", "avi"]
     if settings.get("languages") is None:
         settings["languages"] = {"DA": "Danish",
@@ -39,7 +39,8 @@ def patchDefaultValues():
                       "label_text_key": "tag_label_title"},
             "date": {"widget": "date_time",
                      "data_type": "string",
-                     "label_text_key": "tag_label_date"},
+                     "label_text_key": "tag_label_date",
+                     "default_paste_select": False},
             "description_only": {"widget": "text",
                                  "data_type": "string",
                                  "label_text_key": "tag_label_description_only",
@@ -62,7 +63,8 @@ def patchDefaultValues():
                                   "label_text_key": "tag_label_original_filename"},
             "geo_location": {"widget": "geo_location",
                              "data_type": "string",
-                             "label_text_key": "tag_label_geo_location"},
+                             "label_text_key": "tag_label_geo_location",
+                             "default_paste_select": False},
             "description": {"widget": "text",
                             "data_type": "string",
                             "label_text_key": "tag_label_description",
@@ -271,6 +273,22 @@ def patchDefaultValues():
                     "description": ["XMP:Description", "EXIF:XPComment", "EXIF:UserComment", "EXIF:ImageDescription",
                                     "IPTC:Caption-Abstract"]
                     },
+            "tiff": {"orientation": ["EXIF:Orientation#"],
+                    "rating": ["XMP:Rating", "XMP-microsoft:RatingPercent"],
+                    "title": ["XMP:Title", "EXIF:XPTitle", "IPTC:ObjectName"],
+                    "date": ["XMP:Date", "EXIF:DateTimeOriginal", "EXIF:CreateDate", "EXIF:ModifyDate",
+                             "IPTC:DateCreated", "File:FileCreateDate"],
+                    "description_only": ["XMP:DescriptionOnly"],
+                    "persons": ["XMP-iptcExt:PersonInImage", "XMP-MP:RegionPersonDisplayName", "XMP:Subject",
+                                "EXIF:XPKeywords", "IPTC:Keywords"],
+                    "photographer": ["XMP:Creator", "EXIF:Artist", "EXIF:XPAuthor", "IPTC:By-line"],
+                    "geo_location": ["Composite:GPSPosition#"],
+                    "source": ["XMP:Source"],
+                    "original_filename": ["XMP:PreservedFileName"],
+                    "description": ["XMP:Description", "EXIF:XPComment", "EXIF:UserComment", "EXIF:ImageDescription",
+                                    "IPTC:Caption-Abstract"]
+                    },
+
             "gif": {"orientation": ["EXIF:Orientation#"],
                     "rating": ["XMP:Rating", "XMP-microsoft:RatingPercent"],
                     "title": ["XMP:Title", "EXIF:XPTitle"],
@@ -449,13 +467,41 @@ def migrateVersion():
 
     def rule02():  # Add text_keys for file-preview context menu
         global settings
-        if old_ver_num <= 10299 and new_ver_num >= 10300:  # Context-menu for file-preview added in version 01.03.00
+        if old_ver_num <= 10399 and new_ver_num >= 10400:  # Tiff-support added in version 1.4.0
+            def rule02():  # Add text_keys for file-preview context menu
+                global settings
+                if old_ver_num <= 10299 and new_ver_num >= 10300:  # Context-menu for file-preview added in version 01.03.00
+                    if settings["text_keys"].get("preview_menu_open_in_default_program") is None:
+                        settings["text_keys"]["preview_menu_open_in_default_program"] = {"DA": "Åben",
+                                                                                         "EN": "Open"}
+                    if settings["text_keys"].get("preview_menu_open_in_browser") is None:
+                        settings["text_keys"]["preview_menu_open_in_browser"] = {"DA": "Åben i webbrowser",
+                                                                                 "EN": "Open in Web Browser"}
+
             if settings["text_keys"].get("preview_menu_open_in_default_program") is None:
                 settings["text_keys"]["preview_menu_open_in_default_program"] = {"DA": "Åben",
                                                                                  "EN": "Open"}
             if settings["text_keys"].get("preview_menu_open_in_browser") is None:
                 settings["text_keys"]["preview_menu_open_in_browser"] = {"DA": "Åben i webbrowser",
                                                                          "EN": "Open in Web Browser"}
+
+    def rule03():  # Add support for .tiff files to be the same as .tif files, as both extensions are used
+        global settings
+        if old_ver_num <= 10399 and new_ver_num >= 10400:  # Tiff-file support added in version 1.4.0
+            if not "tiff" in settings["file_types"]:
+                settings["file_types"].append("tiff")
+            settings["file_type_tags"]["tiff"] = settings["file_type_tags"].get("tif")
+
+    def rule04():   # By defaule, date and geolocation should not be selected for pasting
+        if old_ver_num <= 10399 and new_ver_num >= 10400:  # Tiff-file support added in version 1.4.0
+            date_logical_tag = settings["logical_tags"].get("date")
+            if date_logical_tag != None:
+                if date_logical_tag.get("default_paste_select") == None:
+                    date_logical_tag["default_paste_select"] = False
+            geo_location_logical_tag = settings["logical_tags"].get("geo_location")
+            if geo_location_logical_tag != None:
+                if geo_location_logical_tag.get("default_paste_select") == None:
+                    geo_location_logical_tag["default_paste_select"] = False
 
     old_ver_num = versionNumber(settings.get("version"))
     new_ver_num = versionNumber(version)
@@ -467,6 +513,8 @@ def migrateVersion():
     else:
         rule01()  # Add rating in settings
         rule02()  # Add context menu to preview
+        rule03()  # Add support for tiff-files
+        rule04()  # Don't select date and geo-location for pasting by default
 
 def writeSettingsFile():
     global settings, settings_path
@@ -475,7 +523,7 @@ def writeSettingsFile():
         outfile.write(settings_json_object)
 
 
-version = "1.3.4"   # Bugfix for consolidate crash and if trying to preview empty filey
+version = "1.4.0"   # Bugfix for consolidate crash and if trying to preview empty filey
 
 # Make location for Application, if missing
 app_data_location = os.path.join(os.environ.get("ProgramData"),"Memory Mate")
