@@ -95,7 +95,7 @@ class ExifTool(object):
         args.append(self.sys_encoding)
         args.append('-overwrite_original')
         args.append('-api')
-        args.append('-LargeFileSupport=1')
+        args.append('largefilesupport=1')
         args.append("-execute\n")
         args_tuple = tuple(args)
         file_args = str.join("\n", args_tuple)

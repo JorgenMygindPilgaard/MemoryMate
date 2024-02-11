@@ -32,8 +32,6 @@ class FileMetadata(QObject):
     app_dir = os.path.dirname(os.path.abspath(app_path))
     exif_executable = os.path.join(app_dir, 'exiftool_memory_mate.exe')
     exif_configuration = os.path.join(app_dir, 'exiftool_memory_mate.cfg')
-#    exif_executable = os.path.join(settings.app_data_location, 'exiftool_memory_mate.exe')
-#    exif_configuration = os.path.join(settings.app_data_location, 'exiftool.cfg')
     if not os.path.isfile(exif_configuration):
         exif_configuration=''
     getInstance_active = False  # To be able to give error when instantiated directly, outside getInstance
@@ -60,6 +58,7 @@ class FileMetadata(QObject):
         self.path = self.split_file_name[0]                        # "c:\pictures\"
         self.name_alone = self.split_file_name[1]                  # "my_picture"
         self.is_virgin=False                                       # "Virgin means memory_mate never wrote metadata to file before. Assume not virgin tll metadata has been read
+        self.force_rewrite=False                                   # If new tags are added in config, a consolidation can be triggered by user. The force_rewrite indicates that consolidation has been requested
 
     @staticmethod
     def getInstance(file_name):
@@ -108,7 +107,7 @@ class FileMetadata(QObject):
         # Now get values for these tags using exif-tool
         with ExifTool(executable=self.exif_executable,configuration=self.exif_configuration) as ex:
             exif_data = ex.getTags(self.file_name, tags,process_id='READ')
-        tag_values = {}
+        self.tag_values = {}
         for tag in tags:
             tag_alone = tag.rstrip('#')               #Remove #-character, as it is not a part of tag-name, it is a controll-character telling exiftool to deliver/recieve tag in nummeric format
             tag_value = exif_data[0].get(tag_alone)
@@ -120,11 +119,11 @@ class FileMetadata(QObject):
                 if tag_alone == 'XMP-microsoft:RatingPercent':  # Hack: Map rating-percent to a scale from 0-5 1>1, 25>2, 50>3, 75>4, 100>5
                     if tag_value != 1:
                         tag_value = int((tag_value + 25)/25)
-                tag_values[tag] = tag_value
+                self.tag_values[tag] = tag_value
 
         # Finally map tag_values to logical_tag_values
         self.logical_tag_values = {}
-        logical_tags_missing_value = []
+        self.logical_tags_missing_value = []
         for logical_tag in logical_tags_tags:
             logical_tag_data_type = settings.logical_tags.get(logical_tag).get("data_type")
             logical_tag_tags = logical_tags_tags.get(logical_tag)
@@ -139,7 +138,7 @@ class FileMetadata(QObject):
 
             logical_tag_value_found = False
             for tag in logical_tag_tags:
-                tag_value = tag_values.get(tag)
+                tag_value = self.tag_values.get(tag)
                 if tag_value:
                     logical_tag_value_found = True
                 if logical_tag_data_type != 'list' and isinstance(tag_value, list):     # If e.g. Author contains multiple entries. Concatenate to a string then
@@ -150,36 +149,50 @@ class FileMetadata(QObject):
                     self.logical_tag_values[logical_tag] = tag_value
                     break
             if not logical_tag_value_found:
-                logical_tags_missing_value.append(logical_tag)
+                self.logical_tags_missing_value.append(logical_tag)
 
         self.saved_logical_tag_values = copy.deepcopy(self.logical_tag_values)
-        self.confirmed_logical_tag_values = copy.deepcopy(self.logical_tag_values)
-
-        # Update logical tags in memory from queue-file (Queue originates from previous run)
-        json_queue = file_util.JsonQueue.getInstance(settings.queue_file_path)
-        for queue_entry in json_queue.queue:
-            if queue_entry.get('file') == self.file_name:
-                queue_logical_tag_values = queue_entry.get('logical_tag_values')
-                if queue_logical_tag_values != None and queue_logical_tag_values != {}:
-                    self.setLogicalTagValues(queue_logical_tag_values,supress_signal=True)
-                    for queue_logical_tag in queue_logical_tag_values:
-                        while queue_logical_tag in logical_tags_missing_value:
-                            logical_tags_missing_value.remove(queue_logical_tag)
-
-        self.confirmed_logical_tag_values = copy.deepcopy(self.logical_tag_values)    # Confirmed means that tag has been put in queue
+        self.__updateLogicalTagValuesFromQueue()
+        self.__updateLogicalTagValuesFromFallbackTags()
+        self.__updateReferenceTags()
 
         # Read fallback_tag (if assigned) into missing logical tags
-        if not tag_values.get('XMP:MemoryMateSaveDateTime'):     #Memory Mate never wrote to file before. Get fall-back tag-values for missing logical tags that has fall-back tag assigned
+        self.metadata_status = ''
+        return 'DATA READ'
+
+    def __updateLogicalTagValuesFromFallbackTags(self):
+        if not self.tag_values.get('XMP:MemoryMateSaveDateTime'):     #Memory Mate never wrote to file before. Get fall-back tag-values for missing logical tags that has fall-back tag assigned
             self.is_virgin=True
-            for logical_tag in logical_tags_missing_value:
+            for logical_tag in self.logical_tags_missing_value:
                 fallback_tag = settings.logical_tags.get(logical_tag).get('fallback_tag')
                 if fallback_tag:
                     fallback_tag_value = self.logical_tag_values.get(fallback_tag)
                     if fallback_tag_value:
                         self.logical_tag_values[logical_tag] = fallback_tag_value
-        self.metadata_status = ''
-        return 'DATA READ'
 
+
+    def __updateLogicalTagValues(self,logical_tag_values, overwrite=True):
+        if logical_tag_values != None and logical_tag_values != {}:
+            old_logical_tag_values = copy.deepcopy(self.logical_tag_values)
+            for logical_tag in logical_tag_values:
+                if not logical_tag in old_logical_tag_values:  # If the file-type does not support the logical tag, then skip it
+                    continue
+                old_logical_tag_value = self.logical_tag_values.get(logical_tag)
+                if old_logical_tag_value != logical_tag_values[logical_tag]:
+                    if not overwrite and old_logical_tag_value != '' and old_logical_tag_value != []:  # Don't overwrite, existing values
+                        pass
+                    else:
+                        self.logical_tag_values[logical_tag] = logical_tag_values[logical_tag]
+            for logical_tag in logical_tag_values:
+                while logical_tag in self.logical_tags_missing_value:
+                    self.logical_tags_missing_value.remove(logical_tag)
+
+    def __updateLogicalTagValuesFromQueue(self):
+        json_queue = file_util.JsonQueue.getInstance(settings.queue_file_path)
+        for queue_entry in json_queue.queue:
+            if queue_entry.get('file') == self.file_name:
+                queue_logical_tag_values = queue_entry.get('logical_tag_values')
+                self.__updateLogicalTagValues(queue_logical_tag_values,queue_entry.get('overwrite'))
 
     def __updateReferenceTags(self):
         first = True
@@ -220,29 +233,55 @@ class FileMetadata(QObject):
                                 logical_tag_value += ', '.join(ref_logical_tag_value)
             self.logical_tag_values[logical_tag]=logical_tag_value
 
-    def __put_in_queue(self,force_rewrite):
-        # Find updated logical tags
-        updated_logical_tag_values = {}
-        for logical_tag in self.logical_tag_values:
-            if self.logical_tag_values[logical_tag] != self.confirmed_logical_tag_values.get(logical_tag):
-                updated_logical_tag_values[logical_tag] = self.logical_tag_values[logical_tag]
 
-        # Put in queue if something to do
-        if updated_logical_tag_values != {} or force_rewrite:
-            json_queue_file=file_util.JsonQueue.getInstance(settings.queue_file_path)
-            json_queue_file.enqueue({'file': self.file_name, 'logical_tag_values': updated_logical_tag_values, 'force_rewrite': force_rewrite})
-            self.confirmed_logical_tag_values = copy.deepcopy(self.logical_tag_values)
-            QueueHost.get_instance().start_queue_worker()    # Make Queue-host instance start Queue-worker, if it is not running
+    def setLogicalTagValues(self,logical_tag_values,overwrite=True,force_rewrite = False):
+        dueue_for_queuing=False
 
-    def __update_file(self, force_rewrite):
-        if self.logical_tag_values != self.saved_logical_tag_values or force_rewrite or self.is_virgin:
+        # Update tag-values in instance from queue
+        if self.metadata_status == '':     # Metadata has already been read from file
+            old_logical_tag_values = copy.deepcopy(self.logical_tag_values)
+            self.__updateLogicalTagValues(logical_tag_values,overwrite)
+            self.__updateReferenceTags()
+            if self.logical_tag_values != old_logical_tag_values:
+                dueue_for_queuing=True
+                self.change_signal.emit(self.file_name, old_logical_tag_values, self.logical_tag_values)
+
+        if self.metadata_status != '':    # Put everything in queue, if file has not yet been read
+            dueue_for_queuing = True
+        if force_rewrite:
+            dueue_for_queuing = True
+
+        # Write tags to queue
+        if dueue_for_queuing:
+            self.file_status = 'QUEUING'
+            json_queue_file = file_util.JsonQueue.getInstance(settings.queue_file_path)
+            json_queue_file.enqueue({'file': self.file_name, 'overwrite': overwrite,'logical_tag_values': logical_tag_values, 'force_rewrite': force_rewrite})
+            self.file_status = ''
+
+        # Make Queue-host instance start Queue-worker, if it is not running
+            QueueHost.get_instance().start_queue_worker()
+
+    def updateFilename(self, new_file_name):
+        old_file_name = self.file_name
+        self.file_name = new_file_name
+        split_file_name = file_util.splitFileName(new_file_name)  # ["c:\pictures\", "my_picture", "jpg"]
+        self.path = split_file_name[0]                        # "c:\pictures\"
+        self.name_alone = split_file_name[1]                  # "my_picture"
+        self.type = split_file_name[2]                        # "jpg"
+        FileMetadata.instance_index[new_file_name] = self
+        del FileMetadata.instance_index[old_file_name]
+
+
+    def save(self):
+        if self.is_virgin or self.force_rewrite or self.logical_tag_values != self.saved_logical_tag_values:
+            self.file_status = 'WRITING'
             logical_tags_tags = settings.file_type_tags.get(self.type.lower())
             tag_values = {}
             for logical_tag in self.logical_tag_values:
 
                 #               logical_tag_type = settings.logical_tags.get(logical_tag)
                 if self.logical_tag_values[logical_tag] != self.saved_logical_tag_values.get(
-                        logical_tag) or force_rewrite or self.is_virgin:  # New value to be saved
+                        logical_tag) or self.force_rewrite or self.is_virgin:  # New value to be saved
                     tags = logical_tags_tags.get(logical_tag)  # All physical tags for logical tag"
                     for tag in tags:
                         tag_value = self.logical_tag_values[logical_tag]
@@ -255,73 +294,10 @@ class FileMetadata(QObject):
                 with ExifTool(executable=self.exif_executable, configuration=self.exif_configuration) as ex:
                     ex.setTags(self.file_name, tag_values,'WRITE')
 
-            self.confirmed_logical_tag_values = copy.deepcopy(self.logical_tag_values)
             self.saved_logical_tag_values = copy.deepcopy(self.logical_tag_values)
-
-    def setLogicalTagValues(self,logical_tag_values,overwrite=True,supress_signal=False):
-
-        if self.metadata_status == '':     # Ready to set values, when status in blank
-            pass
-        elif supress_signal and self.metadata_status == 'READING':    # Setting values from queue during read is allowed
-            pass
-        else:
-            raise Exception('Can´t set tag-values. Status is ' + self.metadata_status)   # setting values during read, write or if read is pending, is not allowed
-
-        if not supress_signal:    # If not reading, set status to updating
-            self.status = 'UPDATING'
-
-        old_logical_tag_values = copy.deepcopy(self.logical_tag_values)
-        for logical_tag in logical_tag_values:
-            if not logical_tag in old_logical_tag_values:          # If the file-type does not support the logical tag, then skip it
-                continue
-            old_logical_tag_value = self.logical_tag_values.get(logical_tag)
-            if old_logical_tag_value != logical_tag_values[logical_tag]:
-
-                if overwrite:
-                    self.logical_tag_values[logical_tag] = logical_tag_values[logical_tag]
-                else:
-                    if old_logical_tag_value == None:
-                        self.logical_tag_values[logical_tag] = logical_tag_values[logical_tag]
-                    else:
-                        if type(old_logical_tag_value) == str:
-                            if old_logical_tag_value == '':
-                                self.logical_tag_values[logical_tag] = logical_tag_values[logical_tag]
-                        elif type(old_logical_tag_value) == list:
-                            if old_logical_tag_value == []:
-                                self.logical_tag_values[logical_tag] = logical_tag_values[logical_tag]
-        if not supress_signal:    # If not reading, clear status
-            self.metadata_status = ''
-        if self.logical_tag_values != old_logical_tag_values and not supress_signal:
-            pass
-            self.change_signal.emit(self.file_name, old_logical_tag_values, self.logical_tag_values)
-
-
-    def updateFilename(self, new_file_name):
-        old_file_name = self.file_name
-        self.file_name = new_file_name
-        split_file_name = file_util.splitFileName(new_file_name)  # ["c:\pictures\", "my_picture", "jpg"]
-        self.path = split_file_name[0]                        # "c:\pictures\"
-        self.name_alone = split_file_name[1]                  # "my_picture"
-        self.type = split_file_name[2]                        # "jpg"
-        FileMetadata.instance_index[new_file_name] = self
-        del FileMetadata.instance_index[old_file_name]
-
-    def save(self,force_rewrite=False,put_in_queue=True):
-        if self.metadata_status != '':
-            raise Exception('Can´t save tag-values. Status is ' + self.metadata_status)   # saving values during read, write, update, queuing  or if read is pending, is not allowed
-
-        if put_in_queue:
-            self.file_status = 'QUEUING'
-            self.__updateReferenceTags()
-            self.__put_in_queue(force_rewrite)
             self.file_status = ''
-        else:
-            self.file_status = 'WRITING'
-            self.__updateReferenceTags()
-            self.__update_file(force_rewrite)
-            self.file_status = ''
-        self.is_virgin=False
-
+            self.is_virgin=False
+            self.force_rewrite=False
 
 #----------------------------------------------------------------------------------------#
 # Write Queue handling
@@ -335,34 +311,41 @@ class QueueWorker(QThread):
     def __init__(self,delay=5):
         super().__init__()
         self.delay = delay
+        self.paused = False
+        self.queue_host = QueueHost.get_instance()
 
     def run(self):
         self.waiting.emit()
         self.about_to_quit.connect(self.onAboutToQuit)
         json_queue_file = file_util.JsonQueue.getInstance(settings.queue_file_path)
         json_queue_file.queue_size_changed.connect(self.onQueueSizeChanged)
+        self.queue_size = json_queue_file.queue_size
+        self.queue_size_changed.emit(self.queue_size)
         while True:
-            queue_entry = json_queue_file.dequeue()
-            if queue_entry:
-                self.processing.emit()
-                file = queue_entry.get('file')
-                logical_tag_values = queue_entry.get('logical_tag_values')
-                force_rewrite = queue_entry.get('force_rewrite')
-                try:
-                    file_metadata = FileMetadata.getInstance(file)
-                    FileReadQueue.appendQueue(file)
-# #                   file_metadata.readLogicalTagValues()
-                    while file_metadata.getStatus() != '':    # If instance being processed, wait for it to finalize
-                        time.sleep(self.delay)
-                        status = file_metadata.getStatus()     # Line added to be able to see status during debugging
-                    file_metadata.save(force_rewrite=force_rewrite, put_in_queue=False)
-                except FileNotFoundError:
-                    pass
-                json_queue_file.dequeue_commit()
-            else:
-                self.waiting.emit()
+            if self.queue_host.queue_worker_paused:
                 time.sleep(self.delay)
-            json_queue_file.dequeue_from_file()    # Updates file every 5 seconds if anything to update
+            else:
+                queue_entry = json_queue_file.dequeue()
+                if queue_entry:
+                    self.processing.emit()
+                    file = queue_entry.get('file')
+                    logical_tag_values = queue_entry.get('logical_tag_values')
+                    force_rewrite = queue_entry.get('force_rewrite')
+                    try:
+                        file_metadata = FileMetadata.getInstance(file)
+                        FileReadQueue.appendQueue(file)
+    # #                   file_metadata.readLogicalTagValues()
+                        while file_metadata.getStatus() != '':    # If instance being processed, wait for it to finalize
+                            time.sleep(self.delay)
+                            status = file_metadata.getStatus()     # Line added to be able to see status during debugging
+                        file_metadata.save()
+                    except FileNotFoundError:
+                        pass
+                    json_queue_file.dequeue_commit()
+                else:
+                    self.waiting.emit()
+                    time.sleep(self.delay)
+                json_queue_file.dequeue_from_file()    # Updates file every 5 seconds if anything to update
     def onAboutToQuit(self):
         json_queue_file = file_util.JsonQueue.getInstance(settings.queue_file_path)
         json_queue_file.dequeue_from_file(delay=0)
@@ -381,6 +364,7 @@ class QueueHost(QObject):
         super().__init__()
         self.queue_worker_running = False
         self.queue_worker_processing = False
+        self.queue_worker_paused = False
 
     @staticmethod
     def get_instance():
@@ -413,18 +397,42 @@ class QueueHost(QObject):
     def stop_queue_worker(self):
         if self.queue_worker_running:
             self.queue_worker.terminate()
-            self.queue_worker = None
+#            self.queue_worker = None
             self.queue_worker_running = False
             self.queue_worker_processing = False
+
+    def pause_queue_worker(self):
+        if self.queue_worker_paused:
+            return
+        self.queue_worker_paused = True
+
+
+    def resume_queue_worker(self):
+        if not self.queue_worker_paused:
+            return
+        self.queue_worker_paused = False
 
 class QueueStatusMonitor(QHBoxLayout):
     def __init__(self, parent=None):
         super().__init__(parent)
-        self.init_ui()
         self.queue_host = QueueHost.get_instance()
         self.queue_host.queue_size_changed.connect(self.onQueueSizeChanged)
+        self.queue_size = 0
+        self.init_ui()
 
     def init_ui(self):
+        # Create a label for pause/play
+        self.play_pause_label = QLabel()
+        self.play_pixmap = QPixmap("play.png").scaled(12,12)
+        self.pause_pixmap = QPixmap("pause.png").scaled(12,12)
+        self.play_pause_label.setSizePolicy(QSizePolicy.Policy.Minimum, QSizePolicy.Policy.Minimum)
+        if self.queue_host.queue_worker_paused:
+            self.play_pause_label.setPixmap(self.play_pixmap)
+        else:
+            self.play_pause_label.setPixmap((self.pause_pixmap))
+        self.play_pause_label.mousePressEvent = self.onPlayPausePress
+        self.play_pause_label.enterEvent = self.onPlayPauseEnter
+        self.play_pause_label.leaveEvent = self.onPlayPauseLeave
 
         # Create a label for displaying the queue size
         self.queue_size_label = QLabel("")
@@ -445,17 +453,41 @@ class QueueStatusMonitor(QHBoxLayout):
         self.space_label.setSizePolicy(QSizePolicy.Policy.Expanding,QSizePolicy.Policy.Minimum)
 
         # Create a horizontal layout and add the widgets
+        self.addWidget(self.play_pause_label)
         self.addWidget(self.gif_label)
         self.addWidget(self.queue_size_label)
         self.addWidget(self.space_label)
 
+
+    def onPlayPauseEnter(self,event):
+        self.play_pause_label.setCursor(Qt.CursorShape.PointingHandCursor)  # Change cursor to pointing hand when mouse enters
+
+    def onPlayPauseLeave(self,event):
+        self.play_pause_label.setCursor(Qt.CursorShape.ArrowCursor)  # Change cursor back tor arrow
+
+    def onPlayPausePress(self,event):
+        if self.queue_host.queue_worker_paused:   # Toggle to playing if paused
+            self.play_pause_label.setPixmap(self.pause_pixmap)
+            if self.queue_size > 0:
+                self.gif_label.setMovie(self.movie)
+                self.movie.start()
+            self.queue_host.resume_queue_worker()
+        else:                                     # Toggle to paused if playing
+            self.play_pause_label.setPixmap(self.play_pixmap)
+            self.gif_label.clear()
+            self.movie.stop()
+            self.queue_host.pause_queue_worker()
+
     def onQueueSizeChanged(self, size):
-        self.queue_size_label.setText(str(size))
+        self.queue_size = size
         if size > 0:
+            self.queue_size_label.setText(str(size))
+        else:
+            self.queue_size_label.clear()
+        if size > 0 and not self.queue_host.queue_worker_paused:
             self.gif_label.setMovie(self.movie)
             self.movie.start()
         else:
-            self.queue_size_label.clear()
             self.gif_label.clear()
             self.movie.stop()
 
@@ -574,6 +606,7 @@ class FilePreview(QObject):
 
     def __init__(self,file_name):
         super().__init__()
+        self.sleep = 0.1
         self.file_name = file_name
         self.panel_width = 0
         self.image = None
@@ -586,6 +619,10 @@ class FilePreview(QObject):
     def readImage(self):
         if self.status != 'PENDING_READ':
             return 'NOTHING DONE'
+        file_metadata = FileMetadata.getInstance(self.file_name)
+        while file_metadata.getStatus() != '':
+            time.sleep(self.sleep)
+
         file_type = FileMetadata.getInstance(self.file_name).getFileType()
 
         # Read image from file

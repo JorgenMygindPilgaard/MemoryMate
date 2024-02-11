@@ -169,6 +169,7 @@ class JsonQueue(QObject):
         self.file_path = file_path
         self.lock = threading.Lock()
         self.queue = []             #Queue is empty list
+        self.queue_size = 0
         self.index = 0              #Current index to be processed
         self.committed_index = -1   #Last index for which processing has ended
         self.last_file_write_time = time.time()-10
@@ -185,6 +186,7 @@ class JsonQueue(QObject):
                     lines=file.readlines()
                     for line in lines:
                         self.queue.append(json.loads(line))
+            self.queue_size = len(self.queue)
 
     @staticmethod
     def getInstance(file_path):
@@ -199,7 +201,8 @@ class JsonQueue(QObject):
             with open(self.file_path, 'a') as file:
                 self.queue.append(data)                                          # Append data in memory
                 file.write(json.dumps(data).replace('\n','<newline>') + '\n')    # Append data in file instantly (prevent data-loss)
-        self.queue_size_changed.emit({self.file_path: len(self.queue)})
+                self.queue_size = len(self.queue)
+        self.queue_size_changed.emit({self.file_path: self.queue_size})
 
     def dequeue(self):
         if self.instance_just_created:
@@ -210,6 +213,9 @@ class JsonQueue(QObject):
             self.index += 1
         else:
             data = None
+        self.queue_size = len(self.queue)
+
+
         return data
 
     def change_queue(self, find={}, change={}):
@@ -259,6 +265,7 @@ class JsonQueue(QObject):
             self.last_file_write_time = time.time()
         self.queue_being_changed = False
         self.lock.release()
-        self.queue_size_changed.emit({self.file_path: len(self.queue)})
+        self.queue_size = len(self.queue)
+        self.queue_size_changed.emit({self.file_path: self.queue_size})
 
 

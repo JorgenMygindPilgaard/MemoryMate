@@ -28,9 +28,9 @@ class MainWindow(QMainWindow):
         else:
           # Start loading files in current folder
             try:
-               FileMetadata.getInstance(current_file).readLogicalTagValues()
-               FilePreview.getInstance(current_file).readImage()
-               FileReadQueue.appendQueue(current_file)    # Triggers other files in folder to be read
+                FileMetadata.getInstance(current_file).readLogicalTagValues()
+                FilePreview.getInstance(current_file).readImage()
+                FileReadQueue.appendQueue(current_file)    # Triggers other files in folder to be read
             except Exception as e:
                current_file = ''
 #
@@ -40,6 +40,10 @@ class MainWindow(QMainWindow):
         #-------------------------------------------------------------------------------------------------------------
         # File (Right part of MainWindow)
         self.file_panel = FilePanel.getInstance(current_file)
+
+        # Set Queue to paused/running from uu-status
+        if self.ui_status.getStatusParameter('is_paused'):
+            QueueHost.get_instance().pause_queue_worker()
 
         # Status of file-processing (Top line of main-window)
         self.queue_status_monitor = QueueStatusMonitor()
@@ -52,7 +56,6 @@ class MainWindow(QMainWindow):
         self.file_list.setOpenFolders(self.ui_status.getStatusParameter('open_folders'))
         self.file_list.setSelectedItems(self.ui_status.getStatusParameter('selected_items'))
         self.file_list.setCurrentItem(self.ui_status.getStatusParameter('current_file'))
-
 
         # Main-widget (Central widget of MainWindow)
         main_widget = QWidget()
@@ -89,8 +92,8 @@ class MainWindow(QMainWindow):
                                               'open_folders':   self.file_list.getOpenFolders(),
                                               'selected_items': self.file_list.getSelectedItems(),
                                               'vertical_scroll_position': self.file_list.getVerticalScrollPosition(),
-                                              'is_maximized': self.isMaximized()})
-#                                              'geometry': self.geometry().saveToVariant()})
+                                              'is_maximized': self.isMaximized(),
+                                              'is_paused': QueueHost.get_instance().queue_worker_paused})
         self.ui_status.save()
         QueueHost.get_instance().stop_queue_worker()
         ExifTool.closeProcess()              # Close exiftool processes
