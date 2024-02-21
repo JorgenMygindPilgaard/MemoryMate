@@ -237,7 +237,6 @@ class JsonQueue(QObject):
                     if self.queue[index].get(change_key):
                         self.queue[index][change_key] = change_value
         self.queue_being_changed = False
-
     def dequeue_commit(self):
         self.committed_index = self.index - 1
 
