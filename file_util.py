@@ -1,3 +1,4 @@
+import copy
 import os
 import json
 from fnmatch import fnmatch
@@ -67,7 +68,7 @@ def splitFileName(file_name):
 
 class FileNameChangedEmitter(QObject):
     instance = None
-    change_signal = pyqtSignal(str, str)  # old filename, new file name
+    change_signal = pyqtSignal(str, str, bool)  # old filename, new file name, update_original_filename_tag
 
     def __init__(self):
         super().__init__()
@@ -77,23 +78,23 @@ class FileNameChangedEmitter(QObject):
         if FileNameChangedEmitter.instance == None:
             FileNameChangedEmitter.instance = FileNameChangedEmitter()
         return FileNameChangedEmitter.instance
-    def emit(self, old_file_name, new_file_name):
-        self.change_signal.emit(old_file_name, new_file_name)
+    def emit(self, old_file_name, new_file_name, update_original_filename_tag):
+        self.change_signal.emit(old_file_name, new_file_name, update_original_filename_tag)
 
 class FileRenamer(QObject):
     __instance = None
-    change_signal = FileNameChangedEmitter.getInstance()  # Filename, old logical tag values, new logical tag values
+    change_signal = FileNameChangedEmitter.getInstance()  # Old filename, New filename
 
     def __init__(self, files=[]):
         super().__init__()
-        self.files=files
+        self.files = copy.deepcopy(files)
 
     @staticmethod
     def getInstance(files=[]):
         if FileRenamer.__instance==None:
             FileRenamer.__instance=FileRenamer(files)
         elif files!=[]:
-            FileRenamer.__instance.files = files
+            FileRenamer.__instance.files = copy.deepcopy(files)
         return FileRenamer.__instance
 
     def start(self):
@@ -101,9 +102,10 @@ class FileRenamer(QObject):
         renamed_files = []
 
         # Check that entries all have filenames
-        for index, file in enumerate(self.files):
+        for file in self.files:
             old_name = file.get('old_name')
             new_name = file.get('new_name')
+
             if old_name == None or old_name == '':
                 if new_name == None or new_name == '':
                     self.__roll_back(renamed_files)
@@ -115,43 +117,68 @@ class FileRenamer(QObject):
                 self.__roll_back(renamed_files)
                 raise FileRenameError('new_name is missing in files-entry number ' + str(index))
 
+        # Remove entries where old and new filename are the same
+        files_tmp = copy.deepcopy(self.files)
+        for file in files_tmp:
+            if file.get('old_name') == file.get('new_name'):
+                self.files.remove(file)
 
-        # Handle collisions (source-name also exist as target)
-        for index, file in enumerate(self.files):
-            old_name = file.get('old_name')
+        # Handle collisions by creating tmp-files if needed
+        flag_create_tmp_files=False
+        for file in self.files:
             new_name = file.get('new_name')
 
-            if os.path.exists(new_name):
-                # To prevent overwriting files, rename existing new_name files by appending _backup
-                backup_name = new_name + "_backup"
+            if os.path.isfile(new_name)==True:
+                flag_create_tmp_files=True
+                break
+
+        if flag_create_tmp_files==True:
+            for file in self.files:
+                old_name = file.get('old_name')
+                base_name, extension = old_name.split('.')
+                new_base_name = base_name + '_tmp'
+                tmp_name = new_base_name + '.' + extension
+                file['tmp_name'] = tmp_name
                 try:
-                    os.rename(new_name, backup_name)
-                    renamed_files.append({'old_name': new_name, 'new_name': backup_name})
+                    os.rename(old_name, tmp_name)
+                    renamed_files.append({'old_name': old_name, 'new_name': tmp_name})
                 except Exception as e:
                     self.__roll_back(renamed_files)
-                    raise FileRenameError('error renaming ' + new_name + ' to ' + backup_name)
-                # If the backup-file is also due for renaming, old_name for the entry
-                for backup_index, backup_file in enumerate(self.files):
-                    if backup_file['old_name'].lower() == new_name.lower():
-                        self.files[backup_index]['old_name'] = backup_name
+                    raise FileRenameError('error renaming ' + old_name + ' to ' + tmp_name)
 
         # Rename files
-        for index, file in enumerate(self.files):
+        for file in self.files:
             old_name = file.get('old_name')
             new_name = file.get('new_name')
+            tmp_name = file.get('tmp_name')
+            if tmp_name!=None:
+                try:
+                    os.rename(tmp_name, new_name)
+                    renamed_files.append({'old_name': tmp_name, 'new_name': new_name})
+                except Exception as e:
+                    self.__roll_back(renamed_files)
+                    raise FileRenameError('Error renaming ' + tmp_name + ' to ' + new_name + ':\n'+str(e))
+            else:
+                try:
+                    os.rename(old_name, new_name)
+                    renamed_files.append({'old_name': old_name, 'new_name': new_name})
+                except Exception as e:
+                    self.__roll_back(renamed_files)
+                    raise FileRenameError('Error renaming ' + old_name + ' to ' + new_name + ':\n'+str(e))
 
-            try:
-                os.rename(old_name, new_name)
-                renamed_files.append(file)
-            except Exception as e:
-                self.__roll_back(renamed_files)
-                raise FileRenameError('Error renaming ' + old_name + ' to ' + new_name + ':\n'+str(e))
+        # Send signal for renaming to tmp-filename
+        if flag_create_tmp_files==True:
+            for file in self.files:
+                self.change_signal.emit(file.get('old_name'), file.get('tmp_name'),False)
+        for file in self.files:
+            if flag_create_tmp_files==True:
+                self.change_signal.emit(file.get('tmp_name'), file.get('new_name'),True)
+            else:
+                self.change_signal.emit(file.get('old_name'), file.get('new_name'),True)
 
-        for file in renamed_files:
-            self.change_signal.emit(file.get('old_name'), file.get('new_name'))
 
     def __roll_back(self,files):
-        for file in files:
+        for file in files.reverse():
             old_name = file.get('old_name')
             new_name = file.get('new_name')
             os.rename(new_name, old_name)

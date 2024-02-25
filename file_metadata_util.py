@@ -64,6 +64,11 @@ class FileMetadata(QObject):
     def getInstance(file_name):
         file_metadata = FileMetadata.instance_index.get(file_name)
         if file_metadata is None:
+            while FileMetadata.getInstance_active:   # Could be that some other process is creating an instance. Wait for that to finalize, and recheck, if instance is now created
+                time.sleep(1)
+                file_metadata = FileMetadata.instance_index.get(file_name)
+                if file_metadata != None:
+                    return file_metadata
             FileMetadata.getInstance_active = True
             file_metadata = FileMetadata(file_name)
             FileMetadata.getInstance_active = False
@@ -81,7 +86,7 @@ class FileMetadata(QObject):
             raise Exception('Metadata not yet read. status is ' + self.metadata_status)
         return self.logical_tag_values
     def __readFileType(self):
-        file_type = self.split_file_name[2]
+        file_type = self.split_file_name[2].rstrip('_backup')   # Remove _backup from filetype
         tags = ['File:FileTypeExtension']
         with ExifTool(executable=self.exif_executable,configuration=self.exif_configuration) as ex:
             exif_data = ex.getTags(self.file_name, tags, process_id='READ')
@@ -197,6 +202,8 @@ class FileMetadata(QObject):
     def __updateReferenceTags(self):
         first = True
         logical_tags_tags = settings.file_type_tags.get(self.type.lower())  #Logical_tags for filetype with corresponding tags
+        if logical_tags_tags is None:
+            pass
         for logical_tag in logical_tags_tags:
             if not settings.logical_tags[logical_tag].get("reference_tag"):    #Continue if not a reference tag
                 continue

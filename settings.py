@@ -523,7 +523,7 @@ def writeSettingsFile():
         outfile.write(settings_json_object)
 
 
-version = "1.4.0"   # Bugfix for consolidate crash and if trying to preview empty filey
+version = "1.4.1"   # Bugfix for standardize filenames collision with existing file
 
 # Make location for Application, if missing
 app_data_location = os.path.join(os.environ.get("ProgramData"),"Memory Mate")
