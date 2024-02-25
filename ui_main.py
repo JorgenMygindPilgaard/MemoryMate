@@ -700,7 +700,7 @@ class StandardizeFilenames(QObject):
 
         file_count=len(self.target_file_names)     # What takes time is 1. Read metadata for files, 2. Write original filename to metadata
 
-        #Instanciate file metadata instances for all files
+        # Instanciate file metadata instances for all files
         files = []
         self.progress_init_signal.emit(file_count)
         for index, file_name in enumerate(self.target_file_names):
@@ -709,8 +709,7 @@ class StandardizeFilenames(QObject):
             while file_metadata.getStatus() != '':
                 if file_metadata.getStatus() == 'PENDING_READ':
                     FileReadQueue.appendQueue(file_name)
-                    time.sleep(self.delay)
-#           file_metadata.readLogicalTagValues()
+                time.sleep(self.delay)
             files.append({"file_name": file_name, "path": file_metadata.path, "name_alone": file_metadata.name_alone, "type": file_metadata.getFileType(), "date": file_metadata.getLogicalTagValues().get("date")})
 
         # Try find date on at least one of the files (Raw or jpg) and copy to the other
@@ -974,7 +973,7 @@ def onMetadataPasted(file_name):
     if file_name == FilePanel.file_name:
         dummy = FilePanel.getInstance(file_name)   #Triggers update of Filepanel
 
-def onFileRenamed(old_file_name, new_file_name):     # reacts on change filename signal from
+def onFileRenamed(old_file_name, new_file_name, update_original_filename_tag=False):     # reacts on change filename signal from
     # Update filename in file-panel
     if FilePanel.file_name == old_file_name:
         FilePanel.updateFilename(new_file_name)
@@ -995,15 +994,16 @@ def onFileRenamed(old_file_name, new_file_name):     # reacts on change filename
 
 
 # Set original filename tag in all files
-    if settings.logical_tags.get('original_filename'):
-        if new_file_name != '' and new_file_name != None:
-            file_metadata = FileMetadata.getInstance(new_file_name)
-            new_name_alone = file_util.splitFileName(new_file_name)[1]
-            if new_name_alone != '' and new_name_alone != None:
-                logical_tags = {'original_filename': new_name_alone}
-                file_metadata.setLogicalTagValues(logical_tags)
-                file_metadata_pasted_emitter = FileMetadataPastedEmitter.getInstance()
-                file_metadata_pasted_emitter.emit(new_file_name)
+    if update_original_filename_tag==True:
+        if settings.logical_tags.get('original_filename'):
+            if new_file_name != '' and new_file_name != None:
+                file_metadata = FileMetadata.getInstance(new_file_name)
+                new_name_alone = file_util.splitFileName(new_file_name)[1]
+                if new_name_alone != '' and new_name_alone != None:
+                    logical_tags = {'original_filename': new_name_alone}
+                    file_metadata.setLogicalTagValues(logical_tags)
+                    file_metadata_pasted_emitter = FileMetadataPastedEmitter.getInstance()
+                    file_metadata_pasted_emitter.emit(new_file_name)
 
 
 def onCurrentFileChanged(new_file_name):
