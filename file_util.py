@@ -135,9 +135,9 @@ class FileRenamer(QObject):
         if flag_create_tmp_files==True:
             for file in self.files:
                 old_name = file.get('old_name')
-                base_name, extension = old_name.split('.')
-                new_base_name = base_name + '_tmp'
-                tmp_name = new_base_name + '.' + extension
+                old_name_parts = splitFileName(old_name)
+
+                tmp_name = old_name_parts[0] + old_name_parts[1] + '_tmp.' + old_name_parts[2]
                 file['tmp_name'] = tmp_name
                 try:
                     os.rename(old_name, tmp_name)
