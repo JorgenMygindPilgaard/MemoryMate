@@ -710,7 +710,10 @@ class StandardizeFilenames(QObject):
                 if file_metadata.getStatus() == 'PENDING_READ':
                     FileReadQueue.appendQueue(file_name)
                 time.sleep(self.delay)
-            files.append({"file_name": file_name, "path": file_metadata.path, "name_alone": file_metadata.name_alone, "type": file_metadata.getFileType(), "date": file_metadata.getLogicalTagValues().get("date")})
+            file_date = file_metadata.getLogicalTagValues().get("date")
+            if file_date == None:
+                file_date = ''
+            files.append({"file_name": file_name, "path": file_metadata.path, "name_alone": file_metadata.name_alone, "type": file_metadata.getFileType(), "date": file_date})
 
         # Try find date on at least one of the files (Raw or jpg) and copy to the other
         sorted_files = sorted(files, key=lambda x: (x['name_alone'], x['date']), reverse=True)       # Sort files in reverse order to get the file with date first

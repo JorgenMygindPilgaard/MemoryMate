@@ -44,7 +44,9 @@ class FileMetadata(QObject):
         if not FileMetadata.getInstance_active:
             raise Exception('Please use getInstance method')
         # Check existence of image_file. Raise exception if not existing
-        if not os.path.isfile(file_name):
+        file_exist = os.path.isfile(file_name)
+        if not file_exist:
+             FileMetadata.getInstance_active = False
              raise FileNotFoundError('File '+file_name+' does not exist')
 
         # Set data for filename
@@ -103,7 +105,11 @@ class FileMetadata(QObject):
         #Get names of tags in tags for the filetype from settings
         logical_tags_tags = settings.file_type_tags.get(self.type.lower())  #Logical_tags for filetype with corresponding tags
         if logical_tags_tags is None:    # Filename blank or unknown filetype
-            return {}    # logical tag values as empty dictionary "
+            self.logical_tag_values = {}
+            self.saved_logical_tag_values = copy.deepcopy(self.logical_tag_values)
+            self.logical_tags_missing_value = []
+            self.metadata_status = ''
+            return 'DATA READ'
         tags = []                                           #These are the physical tags
 
         for logical_tag in logical_tags_tags:
@@ -638,7 +644,7 @@ class FilePreview(QObject):
                 self.image = self.__heic_to_qimage(self.file_name)
             elif file_type == 'cr2' or file_type == 'cr3' or file_type == 'arw' or file_type == 'nef' or file_type == 'dng':
                  self.image = self.__raw_to_qimage(self.file_name)
-            elif file_type == 'mov' or file_type == 'mp4':
+            elif file_type == 'mov' or file_type == 'mp4' or file_type == 'm2t' or file_type == 'm2ts' or file_type == 'mts':
                 self.image = self.__movie_to_qimage(self.file_name)
             else:
                 self.image = self.__default_to_qimage(self.file_name)
@@ -686,7 +692,7 @@ class FilePreview(QObject):
         file_type = FileMetadata.getInstance(self.file_name).type
 
         # Set right rotation/orientation
-        if file_type == 'mov' or file_type == 'mp4':
+        if file_type == 'mov' or file_type == 'mp4' or file_type == 'm2t' or file_type == 'm2ts' or file_type == 'mts':
             image = self.image
         elif file_type == 'heic':
             image = self.__rotatedImage()

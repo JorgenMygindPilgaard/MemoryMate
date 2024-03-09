@@ -19,7 +19,7 @@ def patchDefaultValues():
         settings["version"] = "0.0.0"  # Initial installation
     if settings.get("file_types") is None:
         settings["file_types"] = ["jpg", "jpeg", "png", "bmp", "cr3", "cr2", "dng", "arw", "nef", "heic", "tif", "tiff", "gif",
-                                  "mp4", "mov", "avi"]
+                                  "mp4", "mov", "avi", "m2t", "m2ts","mts"]
     if settings.get("languages") is None:
         settings["languages"] = {"DA": "Danish",
                                  "EN": "English"}
@@ -329,7 +329,10 @@ def patchDefaultValues():
                     "description": ["XMP:Description", "Quicktime:Comment"]
                     },
             "avi": {"date": ["RIFF:DateTimeOriginal", "File:FileCreateDate"]
-                    }
+                    },
+            "m2t": {},
+            "m2ts": {},
+            "mts": {},
         }
     if settings.get("text_keys") is None:
         settings["text_keys"] = {"tag_label_rating":
@@ -490,10 +493,25 @@ def migrateVersion():
         if old_ver_num <= 10399 and new_ver_num >= 10400:  # Tiff-file support added in version 1.4.0
             if not "tiff" in settings["file_types"]:
                 settings["file_types"].append("tiff")
-            settings["file_type_tags"]["tiff"] = settings["file_type_tags"].get("tif")
+            settings["file_type_tags"]["tiff"] = {"orientation": ["EXIF:Orientation#"],
+                "rating": ["XMP:Rating", "XMP-microsoft:RatingPercent"],
+                "title": ["XMP:Title", "EXIF:XPTitle", "IPTC:ObjectName"],
+                    "date": ["XMP:Date", "EXIF:DateTimeOriginal", "EXIF:CreateDate", "EXIF:ModifyDate",
+                             "IPTC:DateCreated", "File:FileCreateDate"],
+                    "description_only": ["XMP:DescriptionOnly"],
+                    "persons": ["XMP-iptcExt:PersonInImage", "XMP-MP:RegionPersonDisplayName", "XMP:Subject",
+                                "EXIF:XPKeywords", "IPTC:Keywords"],
+                    "photographer": ["XMP:Creator", "EXIF:Artist", "EXIF:XPAuthor", "IPTC:By-line"],
+                    "geo_location": ["Composite:GPSPosition#"],
+                    "source": ["XMP:Source"],
+                    "original_filename": ["XMP:PreservedFileName"],
+                    "description": ["XMP:Description", "EXIF:XPComment", "EXIF:UserComment", "EXIF:ImageDescription",
+                                    "IPTC:Caption-Abstract"]
+                }
 
-    def rule04():   # By defaule, date and geolocation should not be selected for pasting
-        if old_ver_num <= 10399 and new_ver_num >= 10400:  # Tiff-file support added in version 1.4.0
+
+    def rule04():  # By defaule, date and geolocation should not be selected for pasting
+        if old_ver_num <= 10399 and new_ver_num >= 10400:  # Date and geolocation not pasted by default
             date_logical_tag = settings["logical_tags"].get("date")
             if date_logical_tag != None:
                 if date_logical_tag.get("default_paste_select") == None:
@@ -502,6 +520,19 @@ def migrateVersion():
             if geo_location_logical_tag != None:
                 if geo_location_logical_tag.get("default_paste_select") == None:
                     geo_location_logical_tag["default_paste_select"] = False
+
+    def rule05():   # Add support for mt2- and m2ts-files
+        global settings
+        if old_ver_num <= 10401 and new_ver_num >= 10500:  # mt2- and m2ts-file support added in 1.5.0
+            if not "m2t" in settings["file_types"]:
+                settings["file_types"].append("m2t")
+                settings["file_type_tags"]["m2t"] = {}
+            if not "m2ts" in settings["file_types"]:
+                settings["file_types"].append("m2ts")
+                settings["file_type_tags"]["m2ts"] =  {}
+            if not "mts" in settings["file_types"]:
+                settings["file_types"].append("mts")
+                settings["file_type_tags"]["mts"] = {}
 
     old_ver_num = versionNumber(settings.get("version"))
     new_ver_num = versionNumber(version)
@@ -515,6 +546,7 @@ def migrateVersion():
         rule02()  # Add context menu to preview
         rule03()  # Add support for tiff-files
         rule04()  # Don't select date and geo-location for pasting by default
+        rule05()  # Add support for m2t- and m2ts-files
 
 def writeSettingsFile():
     global settings, settings_path
@@ -523,7 +555,7 @@ def writeSettingsFile():
         outfile.write(settings_json_object)
 
 
-version = "1.4.1"   # Bugfix for standardize filenames collision with existing file
+version = "1.5.0"   # m2t- and m2ts-file support (not tags, but file is shown)
 
 # Make location for Application, if missing
 app_data_location = os.path.join(os.environ.get("ProgramData"),"Memory Mate")
