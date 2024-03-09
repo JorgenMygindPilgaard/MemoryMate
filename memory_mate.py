@@ -21,19 +21,24 @@ class MainWindow(QMainWindow):
         self.setWindowIcon(QIcon('memory_mate.ico'))
 
         current_file = self.ui_status.getStatusParameter('current_file')
+        show_sample_photo = False
+
         if not current_file:
+            show_sample_photo = True
+
+        file_exist = os.path.isfile(current_file)
+        if not file_exist:
+            show_sample_photo = True
+
+        if show_sample_photo:
             current_file = "Memory Mate Sample Photo.jpg"       # Show sample-photo at first launch
             FileMetadata.getInstance(current_file).readLogicalTagValues()
             FilePreview.getInstance(current_file).readImage()
         else:
-          # Start loading files in current folder
-            try:
-                FileMetadata.getInstance(current_file).readLogicalTagValues()
-                FilePreview.getInstance(current_file).readImage()
-                FileReadQueue.appendQueue(current_file)    # Triggers other files in folder to be read
-            except Exception as e:
-               current_file = ''
-#
+            FileMetadata.getInstance(current_file).readLogicalTagValues()
+            FilePreview.getInstance(current_file).readImage()
+            FileMetadata.getInstance(current_file).readLogicalTagValues()
+            FileReadQueue.appendQueue(current_file)    # Triggers other files in folder to be read
 
         #-------------------------------------------------------------------------------------------------------------
         # Prepare widgets for MainWindow
