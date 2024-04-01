@@ -6,11 +6,14 @@ from PyQt6.QtGui import QMovie, QPixmap, QImage,QTransform, QImageReader
 from PyQt6.QtWidgets import QLabel, QHBoxLayout, QSizePolicy
 import settings
 import time
-import file_util, sys
+import file_util
+import sys
 import pillow_heif
 import rawpy
 from PIL import Image
 from moviepy.video.io.VideoFileClip import VideoFileClip
+import re
+import util
 
 class FileMetadataChangedEmitter(QObject):
     instance = None
@@ -56,9 +59,14 @@ class FileMetadata(QObject):
         self.metadata_status = 'PENDING_READ'   # A lock telling status of metadata-variables: PENDING_READ, READING, WRITING, <blank>
 
         self.file_name = file_name
-        self.split_file_name = file_util.splitFileName(file_name)  # ["c:\pictures\", "my_picture", "jpg"]
-        self.path = self.split_file_name[0]                        # "c:\pictures\"
-        self.name_alone = self.split_file_name[1]                  # "my_picture"
+        self.split_file_name = file_util.splitFileName(file_name)       # ["c:\pictures\", "copy_of_my_picture-Enhanced-NR-SAI", "jpg"]
+        self.path = self.split_file_name[0]                             # "c:\pictures\"
+        self.name = self.split_file_name[1]                             # "copy_of_my_picture-Enhanced-NR-SAI"
+        self.name_alone = self.split_file_name[1]                       # <---Remove this line whendepad method is ready
+        self.split_name = self.depad(self.split_file_name[1])           # ["copy_of_","my_picture", "-Enhanced-NR-SAI]]
+        self.name_prefix = self.split_name[0]                           # "copy_of_"
+        self.name_alone = self.split_name[1]                            # "my_picture"
+        self.name_postfix = self.split_name[2]                          # "-Enhanced-NR-SAI"
         self.is_virgin=False                                       # "Virgin means memory_mate never wrote metadata to file before. Assume not virgin tll metadata has been read
         self.force_rewrite=False                                   # If new tags are added in config, a consolidation can be triggered by user. The force_rewrite indicates that consolidation has been requested
 
@@ -75,6 +83,58 @@ class FileMetadata(QObject):
             file_metadata = FileMetadata(file_name)
             FileMetadata.getInstance_active = False
         return file_metadata
+
+    def escape_except_dot_star(self,pattern):
+        escaped_pattern = ''
+        for char in pattern:
+            if char == '.' or char == '*':
+                escaped_pattern += char
+            else:
+                escaped_pattern += re.escape(char)
+        return escaped_pattern
+
+    def depad(self,name):
+        name_alone = name
+        prefix = ""
+        postfix = ""
+
+        padding_patterns = settings.file_name_padding
+        if padding_patterns:
+            prefix_patterns = padding_patterns.get("file_name_prefix")
+            if prefix_patterns:
+                while True:
+                    prefix_found = False
+                    for prefix_pattern in prefix_patterns:
+                        escaped_prefix_pattern = self.escape_except_dot_star(prefix_pattern)
+                        match = re.search(escaped_prefix_pattern, name_alone)
+                        if match:
+                            prefix_found = True
+                            if match.start() == 0:
+                                found_prefix_pattern = match.group(0)
+                                prefix = prefix + found_prefix_pattern
+                                name_alone = name_alone.replace(found_prefix_pattern, '', 1)
+                    if not prefix_found:
+                        break
+
+            postfix_patterns = padding_patterns.get("file_name_postfix")
+            if postfix_patterns:
+                while True:
+                    postfix_found = False
+                    for postfix_pattern in postfix_patterns:
+                        escaped_postfix_pattern = self.escape_except_dot_star(postfix_pattern)
+                        match = re.search(escaped_postfix_pattern,
+                                          name_alone)  # ! added to make sure to find last occurrence postfix
+                        if match:
+                            postfix_found = True
+                            end_pos = len(name_alone)
+                            if match.end() == end_pos:
+                                found_postfix_pattern = match.group(0)  # Remove ! from found_postfix
+                                postfix = found_postfix_pattern + postfix
+                                name_alone = util.rreplace(name_alone, found_postfix_pattern, '')
+                    if not postfix_found:
+                        break
+
+        return [prefix, name_alone, postfix]
 
     def getStatus(self):       # Status can be PENDING_READ (Metadata not yet read from file), READ (Metadata being read) or <blank> (Metadata read)
         return self.metadata_status

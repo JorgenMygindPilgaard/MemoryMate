@@ -431,6 +431,19 @@ def patchDefaultValues():
         settings["settings_labels"] = {"application_language":
                                            {"text_key": "settings_labels_application_language"}
                                        }
+    # A file padded with one of the paddings are still considered coming from same source-file during standardization of filenames.
+    # Example: IMG_0920.jpg and IMG_0920-Enhanced-NR.jpg will end up being e.t 2024-F005-007.jpg and 2024-F005-007-Enhanced-NR.jpg.
+    #          The original filename tag will, however, hold 2024-F005-007 in both cases.
+    if settings.get("file_name_padding") is None:
+        settings["file_name_padding"] = {"file_name_postfix": ["-Enhanced-NR",              # Added by lightroom AI-enhancement
+                                                               "-gigapixel-*x",             # Added by Topaz gigapixel
+                                                               "-SAI",                      # Added by Topaz sharpen AI
+                                                                "-DeNoiseAI",               # Added by Topaz Denoise AI
+                                                                " - Copy",                  # Added by Windows when copying to place where target exist
+                                                                " - Copy (.)",              #                    "
+                                                                " - Copy (..)"              #                    "
+                                                               ],
+                                          "file_name_prefix": ["copy_of_"]}
 
 def migrateVersion():
     global version, settings
@@ -555,7 +568,7 @@ def writeSettingsFile():
         outfile.write(settings_json_object)
 
 
-version = "1.5.0"   # m2t- and m2ts-file support (not tags, but file is shown)
+version = "1.6.0"   # m2t- and m2ts-file support (not tags, but file is shown)
 
 # Make location for Application, if missing
 app_data_location = os.path.join(os.environ.get("ProgramData"),"Memory Mate")
@@ -593,6 +606,7 @@ text_keys = settings.get("text_keys")
 file_context_menu_actions = settings.get("file_context_menu_actions")
 folder_context_menu_actions = settings.get("folder_context_menu_actions")
 settings_labels = settings.get("settings_labels")
+file_name_padding = settings.get("file_name_padding")
 
 
 

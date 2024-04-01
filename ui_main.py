@@ -661,7 +661,7 @@ class SettingsWindow(QWidget):
 class StandardizeFilenames(QObject):
     # The purpose of this class is to rename files systematically. The naming pattern in the files will be
     # <prefix><number><suffix>.<ext>. Example: 2023-F001-001.jpg (prefix="2023-F001-', number='nnn',suffix='').
-    # If folders or subfolders holds files with same neme, but different extension (e.g. IMG_0021557.JPG and corresponding
+    # If folders or subfolders holds files with same name, but different extension (e.g. IMG_0021557.JPG and corresponding
     # raw-file, IMG_0021557.CR3) they will end up with same name.
     # Files will be numbered according to date/time where taken with oldest having lowest number. If files misses date
     # and a file with same name but other extension has a date, it is assumed that both files were taken on the same date
@@ -713,7 +713,7 @@ class StandardizeFilenames(QObject):
             file_date = file_metadata.getLogicalTagValues().get("date")
             if file_date == None:
                 file_date = ''
-            files.append({"file_name": file_name, "path": file_metadata.path, "name_alone": file_metadata.name_alone, "type": file_metadata.getFileType(), "date": file_date})
+            files.append({"file_name": file_name, "path": file_metadata.path, "name_alone": file_metadata.name_alone, "name_prefix": file_metadata.name_prefix, "name_postfix": file_metadata.name_postfix, "type": file_metadata.getFileType(), "date": file_date})
 
         # Try find date on at least one of the files (Raw or jpg) and copy to the other
         sorted_files = sorted(files, key=lambda x: (x['name_alone'], x['date']), reverse=True)       # Sort files in reverse order to get the file with date first
@@ -769,7 +769,7 @@ class StandardizeFilenames(QObject):
             new_name_alone = old_new_name_alone.get('new_name_alone')
             for file in files:
                 if file.get('name_alone') == old_name_alone:
-                    new_file_name = file.get('path') + new_name_alone + '.' + file.get('type')
+                    new_file_name = file.get('path') + file.get('name_prefix') + new_name_alone + file.get('name_postfix') + '.' + file.get('type')
                     file['new_name_alone'] = new_name_alone
                     file['new_file_name'] = new_file_name
 
@@ -836,7 +836,7 @@ class CopyLogicalTags(QObject):
         source_targets=[]
         for source_file_name in self.source_file_names:
             for target_file_name in self.target_file_names:
-                if self.match_file_name and file_util.splitFileName(target_file_name)[1] != file_util.splitFileName(source_file_name)[1]:
+                if self.match_file_name and FileMetadata.getInstance(target_file_name).name_alone != FileMetadata.getInstance(source_file_name).name_alone:
                     continue
                 source_targets.append([source_file_name,target_file_name])
         copy_file_count=len(source_targets)
