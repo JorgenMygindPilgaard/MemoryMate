@@ -704,7 +704,7 @@ class FilePreview(QObject):
                 self.image = self.__heic_to_qimage(self.file_name)
             elif file_type == 'cr2' or file_type == 'cr3' or file_type == 'arw' or file_type == 'nef' or file_type == 'dng':
                  self.image = self.__raw_to_qimage(self.file_name)
-            elif file_type == 'mov' or file_type == 'mp4' or file_type == 'm2t' or file_type == 'm2ts' or file_type == 'mts':
+            elif file_type == 'mov' or file_type == 'mp4' or file_type == 'm4v' or file_type == 'm2t' or file_type == 'm2ts' or file_type == 'mts':
                 self.image = self.__movie_to_qimage(self.file_name)
             else:
                 self.image = self.__default_to_qimage(self.file_name)
