@@ -19,7 +19,7 @@ def patchDefaultValues():
         settings["version"] = "0.0.0"  # Initial installation
     if settings.get("file_types") is None:
         settings["file_types"] = ["jpg", "jpeg", "png", "bmp", "cr3", "cr2", "dng", "arw", "nef", "heic", "tif", "tiff", "gif",
-                                  "mp4", "mov", "avi", "m2t", "m2ts","mts"]
+                                  "mp4", "m4v", "mov", "avi", "m2t", "m2ts","mts"]
     if settings.get("languages") is None:
         settings["languages"] = {"DA": "Danish",
                                  "EN": "English"}
@@ -315,6 +315,19 @@ def patchDefaultValues():
                     "original_filename": ["XMP:PreservedFileName"],
                     "description": ["XMP:Description", "Quicktime:Comment"]
                     },
+            "m4v": {"rating": ["XMP:Rating", "XMP-microsoft:RatingPercent"],
+                    "title": ["XMP:Title", "Quicktime:Title"],
+                    "date": ["XMP:Date", "Quicktime:CreateDate", "Quicktime:ModifyDate",
+                             "Quicktime:MediaModifyDate", "Quicktime:TrackCreateDate",
+                             "Quicktime:TrackModifyDate", "File:FileCreateDate"],
+                    "description_only": ["XMP:DescriptionOnly"],
+                    "persons": ["XMP:Subject", "Quicktime:Category"],
+                    "photographer": ["XMP:Creator", "Quicktime:Artist"],
+                    "geo_location": ["Composite:GPSPosition#"],
+                    "source": ["XMP:Source"],
+                    "original_filename": ["XMP:PreservedFileName"],
+                    "description": ["XMP:Description", "Quicktime:Comment"]
+                    },
             "mov": {"rating": ["XMP:Rating", "XMP-microsoft:RatingPercent"],
                     "title": ["XMP:Title", "Quicktime:Title"],
                     "date": ["XMP:Date", "Quicktime:CreateDate", "Quicktime:ModifyDate",
@@ -546,7 +559,24 @@ def migrateVersion():
             if not "mts" in settings["file_types"]:
                 settings["file_types"].append("mts")
                 settings["file_type_tags"]["mts"] = {}
-
+    def rule06():   # Add support for m4vgit-files
+        global settings
+        if old_ver_num <= 10600 and new_ver_num >= 10700:  # m4v added in version 1.7.0
+            if not "m4v" in settings["file_types"]:
+                settings["file_types"].append("m4v")
+                settings["file_type_tags"]["m4v"] = {"rating": ["XMP:Rating", "XMP-microsoft:RatingPercent"],
+                    "title": ["XMP:Title", "Quicktime:Title"],
+                    "date": ["XMP:Date", "Quicktime:CreateDate", "Quicktime:ModifyDate",
+                             "Quicktime:MediaModifyDate", "Quicktime:TrackCreateDate",
+                             "Quicktime:TrackModifyDate", "File:FileCreateDate"],
+                    "description_only": ["XMP:DescriptionOnly"],
+                    "persons": ["XMP:Subject", "Quicktime:Category"],
+                    "photographer": ["XMP:Creator", "Quicktime:Artist"],
+                    "geo_location": ["Composite:GPSPosition#"],
+                    "source": ["XMP:Source"],
+                    "original_filename": ["XMP:PreservedFileName"],
+                    "description": ["XMP:Description", "Quicktime:Comment"]
+                    }
     old_ver_num = versionNumber(settings.get("version"))
     new_ver_num = versionNumber(version)
 
@@ -560,6 +590,7 @@ def migrateVersion():
         rule03()  # Add support for tiff-files
         rule04()  # Don't select date and geo-location for pasting by default
         rule05()  # Add support for m2t- and m2ts-files
+        rule06()  # Add support for m4v-files
 
 def writeSettingsFile():
     global settings, settings_path
@@ -568,7 +599,7 @@ def writeSettingsFile():
         outfile.write(settings_json_object)
 
 
-version = "1.6.0"   # m2t- and m2ts-file support (not tags, but file is shown)
+version = "1.7.0"   # m4v-file support
 
 # Make location for Application, if missing
 app_data_location = os.path.join(os.environ.get("ProgramData"),"Memory Mate")
