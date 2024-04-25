@@ -440,89 +440,89 @@ class GeoLocation(MapView):
             self.auto_complete_list.collectItem(logical_tag_value)
         return logical_tag_value
 
-class Orientation(QWidget):
-    def __init__(self, file_name, logical_tag):
-        super().__init__()
-        self.file_name = file_name
-        self.logical_tag = logical_tag
-        self.orientation = None
-        self.initUI()
-
-    def initUI(self):
-        self.layout = QHBoxLayout()
-
-
-        # Create a QLabel for "rotate_left" image
-        self.left_image_label = QLabel()
-        self.left_image_label.setPixmap(QPixmap('rotate_left.png'))  # Replace with your image file
-        self.left_image_label.mousePressEvent = self.onRotateLeft
-        self.left_image_label.enterEvent = self.onEnterLeft
-        self.left_image_label.leaveEvent = self.onLeaveLeft
-
-        # Create a QLabel for "rotate_right" image
-        self.right_image_label = QLabel()
-        self.right_image_label.setPixmap(QPixmap('rotate_right.png'))  # Replace with your image file
-        self.right_image_label.mousePressEvent = self.onRotateRight
-        self.right_image_label.enterEvent = self.onEnterRight
-        self.right_image_label.leaveEvent = self.onLeaveRight
-
-
-        self.layout.addStretch(1)
-        self.layout.addWidget(self.left_image_label)
-        self.layout.addWidget(self.right_image_label)
-        self.layout.addStretch(1)
-
-        self.setLayout(self.layout)
-
-    def readFromImage(self):
-        file_metadata = FileMetadata.getInstance(self.file_name)
-        if file_metadata:
-            orientation = file_metadata.getLogicalTagValues().get(self.logical_tag)
-            if orientation == None:
-                return
-            self.orientation = orientation
-
-    def logical_tag_value(self):
-        return self.orientation
-
-    def onRotateLeft(self, event):
-        if self.orientation == 1 or self.orientation == None:     # 1: Not Rotated
-            self.orientation = 8                                  # 8: Rotated 270 CW
-        elif self.orientation == 8:                               # 8: Rotated 270 CW
-            self.orientation = 3                                  # 3: Rotated 180
-        elif self.orientation == 3:                               # 3: Rotated 180
-            self.orientation = 6                                  # 6: Rotated 90 CW
-        elif self.orientation == 6:                               # 6: Rotated 90 CW
-            self.orientation = 1                                  # 1: Not Rotated
-        else:
-            self.orientation = 1
-        image_rotated_emitter = ImageRotatedEmitter.getInstance()
-        image_rotated_emitter.emit(self.file_name)
-
-    def onRotateRight(self, event):
-        if self.orientation == 1 or self.orientation == None:     # 1: Not Rotated
-            self.orientation = 6                                  # 6: Rotated 90 CW
-        elif self.orientation == 6:                               # 6: Rotated 90 CW
-            self.orientation = 3                                  # 3: Rotated 180
-        elif self.orientation == 3:                               # 3: Rotated 180
-            self.orientation = 8                                  # 8: Rotated 270 CW
-        elif self.orientation == 8:                               # 8: Rotated 270 CW
-            self.orientation = 1                                  # 1: Not Rotated
-        else:
-            self.orientation = 1
-        image_rotated_emitter = ImageRotatedEmitter.getInstance()
-        image_rotated_emitter.emit(self.file_name)
-
-    def onEnterLeft(self,event):
-        self.left_image_label.setCursor(Qt.CursorShape.PointingHandCursor)  # Change cursor to pointing hand when mouse enters
-
-    def onLeaveLeft(self,event):
-        self.left_image_label.setCursor(Qt.CursorShape.ArrowCursor)  # Change cursor back tor arrow
-    def onEnterRight(self,event):
-        self.right_image_label.setCursor(Qt.CursorShape.PointingHandCursor)  # Change cursor to pointing hand when mouse enters
-
-    def onLeaveRight(self,event):
-        self.right_image_label.setCursor(Qt.CursorShape.ArrowCursor)  # Change cursor back tor arrow
+# class Orientation(QWidget):
+#     def __init__(self, file_name, logical_tag):
+#         super().__init__()
+#         self.file_name = file_name
+#         self.logical_tag = logical_tag
+#         self.orientation = None
+#         self.initUI()
+#
+#     def initUI(self):
+#         self.layout = QHBoxLayout()
+#
+#
+#         # Create a QLabel for "rotate_left" image
+#         self.left_image_label = QLabel()
+#         self.left_image_label.setPixmap(QPixmap('rotate_left.png'))  # Replace with your image file
+#         self.left_image_label.mousePressEvent = self.onRotateLeft
+#         self.left_image_label.enterEvent = self.onEnterLeft
+#         self.left_image_label.leaveEvent = self.onLeaveLeft
+#
+#         # Create a QLabel for "rotate_right" image
+#         self.right_image_label = QLabel()
+#         self.right_image_label.setPixmap(QPixmap('rotate_right.png'))  # Replace with your image file
+#         self.right_image_label.mousePressEvent = self.onRotateRight
+#         self.right_image_label.enterEvent = self.onEnterRight
+#         self.right_image_label.leaveEvent = self.onLeaveRight
+#
+#
+#         self.layout.addStretch(1)
+#         self.layout.addWidget(self.left_image_label)
+#         self.layout.addWidget(self.right_image_label)
+#         self.layout.addStretch(1)
+#
+#         self.setLayout(self.layout)
+#
+#     def readFromImage(self):
+#         file_metadata = FileMetadata.getInstance(self.file_name)
+#         if file_metadata:
+#             orientation = file_metadata.getLogicalTagValues().get(self.logical_tag)
+#             if orientation == None:
+#                 return
+#             self.orientation = orientation
+#
+#     def logical_tag_value(self):
+#         return self.orientation
+#
+#     def onRotateLeft(self, event):
+#         if self.orientation == 1 or self.orientation == None:     # 1: Not Rotated
+#             self.orientation = 8                                  # 8: Rotated 270 CW
+#         elif self.orientation == 8:                               # 8: Rotated 270 CW
+#             self.orientation = 3                                  # 3: Rotated 180
+#         elif self.orientation == 3:                               # 3: Rotated 180
+#             self.orientation = 6                                  # 6: Rotated 90 CW
+#         elif self.orientation == 6:                               # 6: Rotated 90 CW
+#             self.orientation = 1                                  # 1: Not Rotated
+#         else:
+#             self.orientation = 1
+#         image_rotated_emitter = ImageRotatedEmitter.getInstance()
+#         image_rotated_emitter.emit(self.file_name)
+#
+#     def onRotateRight(self, event):
+#         if self.orientation == 1 or self.orientation == None:     # 1: Not Rotated
+#             self.orientation = 6                                  # 6: Rotated 90 CW
+#         elif self.orientation == 6:                               # 6: Rotated 90 CW
+#             self.orientation = 3                                  # 3: Rotated 180
+#         elif self.orientation == 3:                               # 3: Rotated 180
+#             self.orientation = 8                                  # 8: Rotated 270 CW
+#         elif self.orientation == 8:                               # 8: Rotated 270 CW
+#             self.orientation = 1                                  # 1: Not Rotated
+#         else:
+#             self.orientation = 1
+#         image_rotated_emitter = ImageRotatedEmitter.getInstance()
+#         image_rotated_emitter.emit(self.file_name)
+#
+#     def onEnterLeft(self,event):
+#         self.left_image_label.setCursor(Qt.CursorShape.PointingHandCursor)  # Change cursor to pointing hand when mouse enters
+#
+#     def onLeaveLeft(self,event):
+#         self.left_image_label.setCursor(Qt.CursorShape.ArrowCursor)  # Change cursor back tor arrow
+#     def onEnterRight(self,event):
+#         self.right_image_label.setCursor(Qt.CursorShape.PointingHandCursor)  # Change cursor to pointing hand when mouse enters
+#
+#     def onLeaveRight(self,event):
+#         self.right_image_label.setCursor(Qt.CursorShape.ArrowCursor)  # Change cursor back tor arrow
 
 class Rotation(QWidget):
     def __init__(self, file_name, logical_tag):
@@ -570,12 +570,12 @@ class Rotation(QWidget):
 
     def onRotateLeft(self, event):
         if self.rotation == 0 or self.rotation == None:
-            self.rotation = 90
-        elif self.rotation == 90:
-            self.rotation = 180
-        elif self.rotation == 180:
-            self.rotation = 270
-        elif self.rotation == 270:
+            self.rotation = 90        #  90° CCW
+        elif self.rotation == 90:     #  90° CCW
+            self.rotation = 180       # 180°
+        elif self.rotation == 180:    # 180°
+            self.rotation = 270       # 270° CCW
+        elif self.rotation == 270:    # 270° CCW
             self.rotation = 0
         else:
             self.rotation = 0
@@ -585,12 +585,12 @@ class Rotation(QWidget):
 
     def onRotateRight(self, event):
         if self.rotation == 0 or self.rotation == None:
-            self.rotation = 270
-        elif self.rotation == 270:
-            self.rotation = 180
-        elif self.rotation == 180:
-            self.rotation = 90
-        elif self.rotation == 90:
+            self.rotation = 270      # 270° CCW
+        elif self.rotation == 270:   # 270° CCW
+            self.rotation = 180      # 180° CCW
+        elif self.rotation == 180:   # 180° CCW
+            self.rotation = 90       #  90° CCW
+        elif self.rotation == 90:    #  90° CCW
             self.rotation = 0
         else:
             self.rotation = 0
