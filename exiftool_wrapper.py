@@ -165,7 +165,7 @@ class ExifTool(object):
                     tag_value = tag_values[tag].replace('\n', '\\n')             # Hex 0A (newline) replaced by Hex 5C 6E (Characters \n )
                     args.append('#[CSTR]' + '-' + tag + '=' + tag_value)         # #[CSTR] tells exiftool to accept escape-caracter sequence in argument
                 else:
-                    args.append('-' + tag + '=' + tag_values[tag])
+                    args.append('-' + tag.replace('#','') + '=' + tag_values[tag])
             elif isinstance(tag_values[tag], list):
                 if tag_values[tag] == []:
                     args.append('-' + tag + '=')

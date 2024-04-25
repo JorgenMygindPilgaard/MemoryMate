@@ -6,7 +6,7 @@ from file_metadata_util import FileMetadata, QueueHost, FileMetadataChangedEmitt
 from file_util import FileNameChangedEmitter
 from ui_util import ProgressBarWidget
 import os
-from ui_widgets import TextLine, Text, DateTime, Date, TextSet, GeoLocation, Orientation, Rotation, Rating, ImageRotatedEmitter
+from ui_widgets import TextLine, Text, DateTime, Date, TextSet, GeoLocation, Rotation, Rating, ImageRotatedEmitter
 import file_util
 from collections import OrderedDict
 from exiftool_wrapper import ExifTool
@@ -227,9 +227,6 @@ class FilePanel(QScrollArea):
                 FilePanel.tags[logical_tag] = [label_widget, tag_widget, tag_widget_type]
             elif tag_widget_type == "geo_location":
                 tag_widget = GeoLocation(FilePanel.file_name,logical_tag)
-                FilePanel.tags[logical_tag] = [label_widget, tag_widget, tag_widget_type]
-            elif tag_widget_type == "orientation":
-                tag_widget = Orientation(FilePanel.file_name,logical_tag)
                 FilePanel.tags[logical_tag] = [label_widget, tag_widget, tag_widget_type]
             elif tag_widget_type == "rotation":
                 tag_widget = Rotation(FilePanel.file_name, logical_tag)

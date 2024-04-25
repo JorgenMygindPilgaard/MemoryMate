@@ -106,15 +106,16 @@ def patchDefaultValues():
                             "IPTC:By-line": {"access": "Read/Write"},
                             "XMP:Source": {"access": "Read/Write"},
                             "XMP:PreservedFileName": {"access": "Read/Write"},
-                            "Quicktime:Title": {"access": "Read/Write"},
-                            "Quicktime:CreateDate": {"access": "Read/Write"},
-                            "Quicktime:ModifyDate": {"access": "Read/Write"},
-                            "Quicktime:MediaModifyDate": {"access": "Read/Write"},
-                            "Quicktime:TrackCreateDate": {"access": "Read/Write"},
-                            "Quicktime:TrackModifyDate": {"access": "Read/Write"},
-                            "Quicktime:Comment": {"type": "text", "access": "Read/Write"},
-                            "Quicktime:Category": {"type": "text_set", "access": "Read/Write"},
-                            "Quicktime:Artist": {"access": "Read/Write"},
+                            "QuickTime:Title": {"access": "Read/Write"},
+                            "QuickTime:MediaCreateDate": {"access": "Read/Write"},
+                            "QuickTime:CreateDate": {"access": "Read/Write"},
+                            "QuickTime:ModifyDate": {"access": "Read/Write"},
+                            "QuickTime:MediaModifyDate": {"access": "Read/Write"},
+                            "QuickTime:TrackCreateDate": {"access": "Read/Write"},
+                            "QuickTime:TrackModifyDate": {"access": "Read/Write"},
+                            "QuickTime:Comment": {"type": "text", "access": "Read/Write"},
+                            "QuickTime:Category": {"type": "text_set", "access": "Read/Write"},
+                            "QuickTime:Artist": {"access": "Read/Write"},
                             "RIFF:DateTimeOriginal": {"access": "Read"},
                             "File:FileCreateDate": {"access": "Read"},
                             "Composite:GPSPosition#": {"access": "Read/Write"},
@@ -125,7 +126,7 @@ def patchDefaultValues():
                             }
     if settings.get("file_type_tags") is None:
         settings["file_type_tags"] = {
-            "jpg": {"orientation": ["EXIF:Orientation#"],
+            "jpg": {"rotation": ["EXIF:Orientation#"],
                     "rating": ["XMP:Rating", "XMP-microsoft:RatingPercent"],
                     "title": ["XMP:Title", "EXIF:XPTitle", "IPTC:ObjectName"],
                     "date": ["XMP:Date", "EXIF:DateTimeOriginal", "EXIF:CreateDate", "EXIF:ModifyDate",
@@ -140,7 +141,7 @@ def patchDefaultValues():
                     "description": ["XMP:Description", "EXIF:XPComment", "EXIF:UserComment", "EXIF:ImageDescription",
                                     "IPTC:Caption-Abstract"]
                     },
-            "jpeg": {"orientation": ["EXIF:Orientation#"],
+            "jpeg": {"rotation": ["EXIF:Orientation#"],
                      "rating": ["XMP:Rating", "XMP-microsoft:RatingPercent"],
                      "title": ["XMP:Title", "EXIF:XPTitle", "IPTC:ObjectName"],
                      "date": ["XMP:Date", "EXIF:DateTimeOriginal", "EXIF:CreateDate", "EXIF:ModifyDate",
@@ -155,7 +156,7 @@ def patchDefaultValues():
                      "description": ["XMP:Description", "EXIF:XPComment", "EXIF:UserComment", "EXIF:ImageDescription",
                                      "IPTC:Caption-Abstract"]
                      },
-            "png": {"orientation": ["EXIF:Orientation#"],
+            "png": {"rotation": ["EXIF:Orientation#"],
                     "rating": ["XMP:Rating", "XMP-microsoft:RatingPercent"],
                     "title": ["XMP:Title", "EXIF:XPTitle", "IPTC:ObjectName"],
                     "date": ["XMP:Date", "EXIF:DateTimeOriginal", "EXIF:CreateDate", "EXIF:ModifyDate",
@@ -171,7 +172,7 @@ def patchDefaultValues():
                                     "IPTC:Caption-Abstract"]
                     },
             "bmp": {},
-            "cr3": {"orientation": ["EXIF:Orientation#"],
+            "cr3": {"rotation": ["EXIF:Orientation#"],
                     "rating": ["XMP:Rating", "XMP-microsoft:RatingPercent"],
                     "title": ["XMP:Title", "EXIF:XPTitle"],
                     "date": ["XMP:Date", "EXIF:DateTimeOriginal", "EXIF:CreateDate", "EXIF:ModifyDate",
@@ -186,7 +187,7 @@ def patchDefaultValues():
                     "description": ["XMP:Description", "EXIF:XPComment", "EXIF:UserComment", "EXIF:ImageDescription"]
                     },
 
-            "cr2": {"orientation": ["EXIF:Orientation#"],
+            "cr2": {"rotation": ["EXIF:Orientation#"],
                     "rating": ["XMP:Rating", "XMP-microsoft:RatingPercent"],
                     "title": ["XMP:Title", "EXIF:XPTitle"],
                     "date": ["XMP:Date", "EXIF:DateTimeOriginal", "EXIF:CreateDate", "EXIF:ModifyDate",
@@ -200,7 +201,7 @@ def patchDefaultValues():
                     "original_filename": ["XMP:PreservedFileName"],
                     "description": ["XMP:Description", "EXIF:XPComment", "EXIF:UserComment", "EXIF:ImageDescription"]
                     },
-            "nef": {"orientation": ["EXIF:Orientation#"],
+            "nef": {"rotation": ["EXIF:Orientation#"],
                     "rating": ["XMP:Rating", "XMP-microsoft:RatingPercent"],
                     "title": ["XMP:Title", "EXIF:XPTitle"],
                     "date": ["XMP:Date", "EXIF:DateTimeOriginal", "EXIF:CreateDate", "EXIF:ModifyDate",
@@ -214,7 +215,7 @@ def patchDefaultValues():
                     "original_filename": ["XMP:PreservedFileName"],
                     "description": ["XMP:Description", "EXIF:XPComment", "EXIF:UserComment", "EXIF:ImageDescription"]
                     },
-            "dng": {"orientation": ["EXIF:Orientation#"],
+            "dng": {"rotation": ["EXIF:Orientation#"],
                     "rating": ["XMP:Rating", "XMP-microsoft:RatingPercent"],
                     "title": ["XMP:Title", "EXIF:XPTitle", "IPTC:ObjectName"],
                     "date": ["XMP:Date", "EXIF:DateTimeOriginal", "EXIF:CreateDate", "EXIF:ModifyDate",
@@ -229,7 +230,7 @@ def patchDefaultValues():
                     "description": ["XMP:Description", "EXIF:XPComment", "EXIF:UserComment", "EXIF:ImageDescription",
                                     "IPTC:Caption-Abstract"]
                     },
-            "arw": {"orientation": ["EXIF:Orientation#"],
+            "arw": {"rotation": ["EXIF:Orientation#"],
                     "rating": ["XMP:Rating", "XMP-microsoft:RatingPercent"],
                     "title": ["XMP:Title", "EXIF:XPTitle", "IPTC:ObjectName"],
                     "date": ["XMP:Date", "EXIF:DateTimeOriginal", "EXIF:CreateDate", "EXIF:ModifyDate",
@@ -258,7 +259,7 @@ def patchDefaultValues():
                      "original_filename": ["XMP:PreservedFileName"],
                      "description": ["XMP:Description", "EXIF:XPComment", "EXIF:UserComment", "EXIF:ImageDescription"]
                      },
-            "tif": {"orientation": ["EXIF:Orientation#"],
+            "tif": {"rotation": ["EXIF:Orientation#"],
                     "rating": ["XMP:Rating", "XMP-microsoft:RatingPercent"],
                     "title": ["XMP:Title", "EXIF:XPTitle", "IPTC:ObjectName"],
                     "date": ["XMP:Date", "EXIF:DateTimeOriginal", "EXIF:CreateDate", "EXIF:ModifyDate",
@@ -273,7 +274,7 @@ def patchDefaultValues():
                     "description": ["XMP:Description", "EXIF:XPComment", "EXIF:UserComment", "EXIF:ImageDescription",
                                     "IPTC:Caption-Abstract"]
                     },
-            "tiff": {"orientation": ["EXIF:Orientation#"],
+            "tiff": {"rotation": ["EXIF:Orientation#"],
                     "rating": ["XMP:Rating", "XMP-microsoft:RatingPercent"],
                     "title": ["XMP:Title", "EXIF:XPTitle", "IPTC:ObjectName"],
                     "date": ["XMP:Date", "EXIF:DateTimeOriginal", "EXIF:CreateDate", "EXIF:ModifyDate",
@@ -289,7 +290,7 @@ def patchDefaultValues():
                                     "IPTC:Caption-Abstract"]
                     },
 
-            "gif": {"orientation": ["EXIF:Orientation#"],
+            "gif": {"rotation": ["EXIF:Orientation#"],
                     "rating": ["XMP:Rating", "XMP-microsoft:RatingPercent"],
                     "title": ["XMP:Title", "EXIF:XPTitle"],
                     "date": ["XMP:Date", "EXIF:DateTimeOriginal", "EXIF:CreateDate", "EXIF:ModifyDate"],
@@ -303,43 +304,43 @@ def patchDefaultValues():
                     "description": ["XMP:Description", "EXIF:XPComment", "EXIF:UserComment", "EXIF:ImageDescription"]
                     },
             "mp4": {"rating": ["XMP:Rating", "XMP-microsoft:RatingPercent"],
-                    "title": ["XMP:Title", "Quicktime:Title"],
-                    "date": ["XMP:Date", "Quicktime:CreateDate", "Quicktime:ModifyDate",
-                             "Quicktime:MediaModifyDate", "Quicktime:TrackCreateDate",
-                             "Quicktime:TrackModifyDate", "File:FileCreateDate"],
+                    "title": ["XMP:Title", "QuickTime:Title"],
+                    "date": ["XMP:Date", "QuickTime:MediaCreateDate", "QuickTime:CreateDate", "QuickTime:ModifyDate",
+                             "QuickTime:MediaModifyDate", "QuickTime:TrackCreateDate",
+                             "QuickTime:TrackModifyDate", "File:FileCreateDate"],
                     "description_only": ["XMP:DescriptionOnly"],
-                    "persons": ["XMP:Subject", "Quicktime:Category"],
-                    "photographer": ["XMP:Creator", "Quicktime:Artist"],
+                    "persons": ["XMP:Subject", "QuickTime:Category"],
+                    "photographer": ["XMP:Creator", "QuickTime:Artist"],
                     "geo_location": ["Composite:GPSPosition#"],
                     "source": ["XMP:Source"],
                     "original_filename": ["XMP:PreservedFileName"],
-                    "description": ["XMP:Description", "Quicktime:Comment"]
+                    "description": ["XMP:Description", "QuickTime:Comment"]
                     },
             "m4v": {"rating": ["XMP:Rating", "XMP-microsoft:RatingPercent"],
-                    "title": ["XMP:Title", "Quicktime:Title"],
-                    "date": ["XMP:Date", "Quicktime:CreateDate", "Quicktime:ModifyDate",
-                             "Quicktime:MediaModifyDate", "Quicktime:TrackCreateDate",
-                             "Quicktime:TrackModifyDate", "File:FileCreateDate"],
+                    "title": ["XMP:Title", "QuickTime:Title"],
+                    "date": ["XMP:Date", "QuickTime:MediaCreateDate", "QuickTime:CreateDate", "QuickTime:ModifyDate",
+                             "QuickTime:MediaModifyDate", "QuickTime:TrackCreateDate",
+                             "QuickTime:TrackModifyDate", "File:FileCreateDate"],
                     "description_only": ["XMP:DescriptionOnly"],
-                    "persons": ["XMP:Subject", "Quicktime:Category"],
-                    "photographer": ["XMP:Creator", "Quicktime:Artist"],
+                    "persons": ["XMP:Subject", "QuickTime:Category"],
+                    "photographer": ["XMP:Creator", "QuickTime:Artist"],
                     "geo_location": ["Composite:GPSPosition#"],
                     "source": ["XMP:Source"],
                     "original_filename": ["XMP:PreservedFileName"],
-                    "description": ["XMP:Description", "Quicktime:Comment"]
+                    "description": ["XMP:Description", "QuickTime:Comment"]
                     },
             "mov": {"rating": ["XMP:Rating", "XMP-microsoft:RatingPercent"],
-                    "title": ["XMP:Title", "Quicktime:Title"],
-                    "date": ["XMP:Date", "Quicktime:CreateDate", "Quicktime:ModifyDate",
-                             "Quicktime:MediaModifyDate", "Quicktime:TrackCreateDate",
-                             "Quicktime:TrackModifyDate", "File:FileCreateDate"],
+                    "title": ["XMP:Title", "QuickTime:Title"],
+                    "date": ["XMP:Date", "QuickTime:MediaCreateDate", "QuickTime:CreateDate", "QuickTime:ModifyDate",
+                             "QuickTime:MediaModifyDate", "QuickTime:TrackCreateDate",
+                             "QuickTime:TrackModifyDate", "File:FileCreateDate"],
                     "description_only": ["XMP:DescriptionOnly"],
-                    "persons": ["XMP:Subject", "Quicktime:Category"],
-                    "photographer": ["XMP:Creator", "Quicktime:Artist"],
+                    "persons": ["XMP:Subject", "QuickTime:Category"],
+                    "photographer": ["XMP:Creator", "QuickTime:Artist"],
                     "geo_location": ["Composite:GPSPosition#"],
                     "source": ["XMP:Source"],
                     "original_filename": ["XMP:PreservedFileName"],
-                    "description": ["XMP:Description", "Quicktime:Comment"]
+                    "description": ["XMP:Description", "QuickTime:Comment"]
                     },
             "avi": {"date": ["RIFF:DateTimeOriginal", "File:FileCreateDate"]
                     },
@@ -519,7 +520,7 @@ def migrateVersion():
         if old_ver_num <= 10399 and new_ver_num >= 10400:  # Tiff-file support added in version 1.4.0
             if not "tiff" in settings["file_types"]:
                 settings["file_types"].append("tiff")
-            settings["file_type_tags"]["tiff"] = {"orientation": ["EXIF:Orientation#"],
+            settings["file_type_tags"]["tiff"] = {"rotation": ["EXIF:Orientation#"],
                 "rating": ["XMP:Rating", "XMP-microsoft:RatingPercent"],
                 "title": ["XMP:Title", "EXIF:XPTitle", "IPTC:ObjectName"],
                     "date": ["XMP:Date", "EXIF:DateTimeOriginal", "EXIF:CreateDate", "EXIF:ModifyDate",
@@ -565,18 +566,63 @@ def migrateVersion():
             if not "m4v" in settings["file_types"]:
                 settings["file_types"].append("m4v")
                 settings["file_type_tags"]["m4v"] = {"rating": ["XMP:Rating", "XMP-microsoft:RatingPercent"],
-                    "title": ["XMP:Title", "Quicktime:Title"],
-                    "date": ["XMP:Date", "Quicktime:CreateDate", "Quicktime:ModifyDate",
-                             "Quicktime:MediaModifyDate", "Quicktime:TrackCreateDate",
-                             "Quicktime:TrackModifyDate", "File:FileCreateDate"],
+                    "title": ["XMP:Title", "QuickTime:Title"],
+                    "date": ["XMP:Date", "QuickTime:CreateDate", "QuickTime:ModifyDate",
+                             "QuickTime:MediaModifyDate", "QuickTime:TrackCreateDate",
+                             "QuickTime:TrackModifyDate", "File:FileCreateDate"],
                     "description_only": ["XMP:DescriptionOnly"],
-                    "persons": ["XMP:Subject", "Quicktime:Category"],
-                    "photographer": ["XMP:Creator", "Quicktime:Artist"],
+                    "persons": ["XMP:Subject", "QuickTime:Category"],
+                    "photographer": ["XMP:Creator", "QuickTime:Artist"],
                     "geo_location": ["Composite:GPSPosition#"],
                     "source": ["XMP:Source"],
                     "original_filename": ["XMP:PreservedFileName"],
-                    "description": ["XMP:Description", "Quicktime:Comment"]
+                    "description": ["XMP:Description", "QuickTime:Comment"]
                     }
+    def rule07():   # Replace Quicktime with QuickTime in settings, and add QuickTime:MediaCreateDate as first quicktim-tag for date
+        global settings
+        if old_ver_num <= 10700 and new_ver_num >= 10701:
+            # Replace Quicktime with QuickTime in keys of tags-dictionary
+            old_tags = settings.get("tags").copy()
+            for tag in old_tags:     # Quicktime corrected to QuickTime in 1.7.1
+                if isinstance(tag, str):
+                    new_tag = tag.replace("Quicktime", "QuickTime")
+                    if new_tag != tag:
+                        settings["tags"][new_tag] = settings["tags"].pop(tag)
+            # Replace Quicktime with QuickTime in values of logical_tag_tags-list
+            for file_type in settings["file_type_tags"]:
+                for logical_tag in settings["file_type_tags"][file_type]:
+                    tags = settings["file_type_tags"][file_type][logical_tag]
+                    new_tags = [tag.replace("Quicktime", "QuickTime") for tag in tags]
+                    if new_tags != tags:
+                        settings["file_type_tags"][file_type][logical_tag] = new_tags
+            # Add QuickTime:MediaCreateDate in mp4, m4v and mov files
+            if settings["tags"].get("QuickTime:MediaCreateDate") is None:
+                settings["tags"]["QuickTime:MediaCreateDate"] = {"access": "Read/Write"}
+                for file_type in ["mp4","m4v","mov"]:
+                    if not settings["file_type_tags"].get(file_type) is None:
+                        if not settings["file_type_tags"][file_type].get("date") is None:
+                            pos = 0
+                            if len(settings["file_type_tags"][file_type]["date"]) > 0:
+                                if settings["file_type_tags"][file_type]["date"][0] == "XMP:Date":
+                                    pos = 1
+                            settings["file_type_tags"][file_type]["date"].insert(pos, "QuickTime:MediaCreateDate")
+
+            # use rotation and remove orientation logical tag
+            if 'orientation' in settings["logical_tags"]:
+                dummy = settings["logical_tags"].pop('orientation')
+
+            new_file_type_tags = {}
+            for file_type in settings["file_type_tags"]:
+                new_file_type_tags[file_type] = {}
+                for logical_tag in settings["file_type_tags"][file_type]:
+                    if logical_tag == 'orientation':
+                        new_logical_tag = 'rotation'
+                    else:
+                        new_logical_tag = logical_tag
+                    new_file_type_tags[file_type][new_logical_tag] = settings["file_type_tags"][file_type][logical_tag]
+            settings['file_type_tags'] = new_file_type_tags
+
+
     old_ver_num = versionNumber(settings.get("version"))
     new_ver_num = versionNumber(version)
 
@@ -591,6 +637,7 @@ def migrateVersion():
         rule04()  # Don't select date and geo-location for pasting by default
         rule05()  # Add support for m2t- and m2ts-files
         rule06()  # Add support for m4v-files
+        rule07()  # Change Quicktime to QuickTime, and add tag QuickTime:MediaCreateDate
 
 def writeSettingsFile():
     global settings, settings_path
@@ -599,7 +646,7 @@ def writeSettingsFile():
         outfile.write(settings_json_object)
 
 
-version = "1.7.0"   # m4v-file support
+version = "1.7.1"   # Quicktime replaced with QuickTime in settings
 
 # Make location for Application, if missing
 app_data_location = os.path.join(os.environ.get("ProgramData"),"Memory Mate")

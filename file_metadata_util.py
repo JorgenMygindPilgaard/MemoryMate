@@ -185,11 +185,6 @@ class FileMetadata(QObject):
             if tag_value != None and tag_value != "" and tag_value != []:
                 if isinstance(tag_value,list):
                     tag_value = list(map(str, tag_value))
-                if tag_alone == 'Composite:GPSPosition':
-                    tag_value = tag_value.replace(' ',',',1)    # Hack: ExifTool delivers space-saparated but expect comma-separated on updates
-                if tag_alone == 'XMP-microsoft:RatingPercent':  # Hack: Map rating-percent to a scale from 0-5 1>1, 25>2, 50>3, 75>4, 100>5
-                    if tag_value != 1:
-                        tag_value = int((tag_value + 25)/25)
                 self.tag_values[tag] = tag_value
 
         # Finally map tag_values to logical_tag_values
@@ -209,15 +204,15 @@ class FileMetadata(QObject):
 
             logical_tag_value_found = False
             for tag in logical_tag_tags:
-                tag_value = self.tag_values.get(tag)
-                if tag_value:
+                logical_tag_value = TagConverter.logicalTagRead(logical_tag,tag,self.tag_values.get(tag))
+                if logical_tag_value:
                     logical_tag_value_found = True
-                if logical_tag_data_type != 'list' and isinstance(tag_value, list):     # If e.g. Author contains multiple entries. Concatenate to a string then
-                    tag_value = ', '.join(str(tag_value))
-                if logical_tag_data_type == 'list' and isinstance(tag_value, str):      # If e.g. persons contains only one entrie, exiftool returns it as a string, not a list
-                    tag_value = [tag_value]
-                if tag_value != None and tag_value != '':
-                    self.logical_tag_values[logical_tag] = tag_value
+                if logical_tag_data_type != 'list' and isinstance(logical_tag_value, list):     # If e.g. Author contains multiple entries. Concatenate to a string then
+                    logical_tag_value = ', '.join(str(logical_tag_value))
+                if logical_tag_data_type == 'list' and isinstance(logical_tag_value, str):      # If e.g. persons contains only one entrie, exiftool returns it as a string, not a list
+                    logical_tag_value = [logical_tag_value]
+                if logical_tag_value != None and logical_tag_value != '':
+                    self.logical_tag_values[logical_tag] = logical_tag_value
                     break
             if not logical_tag_value_found:
                 self.logical_tags_missing_value.append(logical_tag)
@@ -357,10 +352,7 @@ class FileMetadata(QObject):
                         logical_tag) or self.force_rewrite or self.is_virgin:  # New value to be saved
                     tags = logical_tags_tags.get(logical_tag)  # All physical tags for logical tag"
                     for tag in tags:
-                        tag_value = self.logical_tag_values[logical_tag]
-                        if tag == 'XMP-microsoft:RatingPercent':
-                            if tag_value != 1 and tag_value != None:                      # Hack: Map rating scale from 0-5 to rating-percent 1>1, 2>25, 3>50, 4>75, 5>100
-                                tag_value = (tag_value-1) * 25
+                        tag_value = TagConverter.tagWrite(logical_tag,tag,self.logical_tag_values[logical_tag])
                         tag_values[tag] = tag_value
 
             if tag_values != {} and tag_values != None:
@@ -754,33 +746,9 @@ class FilePreview(QObject):
         # Set right rotation/orientation
         if file_type == 'mov' or file_type == 'mp4' or file_type == 'm2t' or file_type == 'm2ts' or file_type == 'mts':
             image = self.image
-        elif file_type == 'heic':
+        else:
             image = self.__rotatedImage()
-        else:
-            image = self.__orientedImage()
         return image
-
-    def __orientedImage(self):
-        # Apply transformations based on EXIF orientation
-        if self.image == None:
-            return None
-        else:
-            orientation = FileMetadata.getInstance(self.file_name).logical_tag_values.get("orientation")
-            transform = QTransform()
-            if orientation == None:
-                orientation = 1             #Horizontal (normal), Default orientation
-            if orientation == 1:            #Horizontal (normal)'
-                transform.rotate(0)
-            if orientation == 3:            #Rotate 180'
-                transform.rotate(180)
-            elif orientation == 6:          #Rotate 90 CW':
-                transform.rotate(90)
-            elif orientation == 8:          #Rotate 270 CW'
-                transform.rotate(270)
-
-            # Apply transformation to the QImage
-            oriented_image = self.image.transformed(transform)
-            return oriented_image
 
     def __rotatedImage(self):
         if self.image == None:
@@ -888,6 +856,62 @@ class FilePreview(QObject):
         self.file_name = new_file_name
         FilePreview.instance_index[new_file_name] = self
         del FilePreview.instance_index[old_file_name]
+
+class TagConverter():
+    @staticmethod
+    def logicalTagRead(logical_tag,tag,tag_value):
+        logical_tag_value = tag_value    # Almost always the case
+        if logical_tag_value == None:
+            return logical_tag_value
+
+        elif logical_tag == 'geo_location' and tag == 'Composite:GPSPosition#':
+            logical_tag_value = tag_value.replace(' ', ',',1)  # ExifTool delivers space-saparated but expect comma-separated on updates
+
+        elif logical_tag == 'rating' and tag == 'XMP-microsoft:RatingPercent':
+            if tag_value != 1:
+                logical_tag_value = int((tag_value + 25) / 25)
+
+        elif logical_tag == 'rotation' and tag == 'EXIF:Orientation#':
+
+
+
+            if tag_value == 1:
+                logical_tag_value = 0
+            elif tag_value == 8:
+                logical_tag_value = 90
+            elif tag_value == 3:
+                logical_tag_value = 180
+            elif tag_value == 6:
+                logical_tag_value = 2706
+            else:
+                logical_tag_value = 0
+        return logical_tag_value
+
+    @staticmethod
+    def tagWrite(logical_tag,tag,logical_tag_value):
+        tag_value = logical_tag_value    # Almost always the case
+
+        if logical_tag == 'rating' and tag == 'XMP-microsoft:RatingPercent':
+            if tag_value != 1 and tag_value != None:
+                tag_value = (tag_value - 1) * 25
+
+        elif logical_tag == 'rotation' and tag == 'EXIF:Orientation#':
+            if logical_tag_value == 0:
+                tag_value = 1
+            elif logical_tag_value == 90:
+                tag_value = 8
+            elif logical_tag_value == 180:
+                tag_value = 3
+            elif logical_tag_value == 270:
+                tag_value = 6
+            else:
+                tag_value = 1
+
+        return tag_value
+
+
+
+
 
 
 
