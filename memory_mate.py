@@ -23,10 +23,13 @@ class MainWindow(QMainWindow):
         current_file = self.ui_status.getStatusParameter('current_file')
         show_sample_photo = False
 
+        file_exist = False
         if not current_file:
             show_sample_photo = True
+        else:
+            if isinstance(current_file, str):
+                file_exist = os.path.isfile(current_file)
 
-        file_exist = os.path.isfile(current_file)
         if not file_exist:
             show_sample_photo = True
 

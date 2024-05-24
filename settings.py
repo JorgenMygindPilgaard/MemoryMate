@@ -646,8 +646,7 @@ def writeSettingsFile():
         outfile.write(settings_json_object)
 
 
-version = "1.7.1"   # Quicktime replaced with QuickTime in settings
-
+version = "1.7.2"   # Bug causing fresh installation to fail
 # Make location for Application, if missing
 app_data_location = os.path.join(os.environ.get("ProgramData"),"Memory Mate")
 if not os.path.isdir(app_data_location):
