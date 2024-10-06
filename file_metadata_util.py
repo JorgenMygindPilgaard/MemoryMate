@@ -14,6 +14,7 @@ from PIL import Image
 from moviepy.video.io.VideoFileClip import VideoFileClip
 import re
 import util
+from datetime import datetime, timedelta
 
 class FileMetadataChangedEmitter(QObject):
     instance = None
@@ -69,6 +70,7 @@ class FileMetadata(QObject):
         self.name_postfix = self.split_name[2]                          # "-Enhanced-NR-SAI"
         self.is_virgin=False                                       # "Virgin means memory_mate never wrote metadata to file before. Assume not virgin tll metadata has been read
         self.force_rewrite=False                                   # If new tags are added in config, a consolidation can be triggered by user. The force_rewrite indicates that consolidation has been requested
+        self.date_time_change = None
 
     @staticmethod
     def getInstance(file_name):
@@ -173,7 +175,11 @@ class FileMetadata(QObject):
         tags = []                                           #These are the physical tags
 
         for logical_tag in logical_tags_tags:
-            tags.extend(logical_tags_tags[logical_tag])
+            logical_tag_tags = logical_tags_tags[logical_tag]
+            for tag_set in logical_tag_tags:
+                if not isinstance(tag_set, list):
+                    tag_set = [tag_set]
+                tags.extend(tag_set)
 
         # Now get values for these tags using exif-tool
         with ExifTool(executable=self.exif_executable,configuration=self.exif_configuration) as ex:
@@ -203,8 +209,27 @@ class FileMetadata(QObject):
             self.logical_tag_values[logical_tag] = tag_value  # Set to empty value to begin with"
 
             logical_tag_value_found = False
-            for tag in logical_tag_tags:
-                logical_tag_value = TagConverter.logicalTagRead(logical_tag,tag,self.tag_values.get(tag))
+            for tag_set in logical_tag_tags:
+
+                # Physical tags can be a set of two tags together forming the value for logical tag.
+                # Exampel: ["EXIF:DateTimeOriginal", "EXIF:OffsetTimeOriginal"].
+                # Here DateTimeOriginal is local date/time and OffsetTimeOriginal is the UTC-offset.
+                if not isinstance(tag_set, list):
+                    tag_set = [tag_set]
+                tag_values = {}
+                for tag in tag_set:
+                    tag_access = settings.tags.get(tag).get('access')
+                    # Some tags can't be used when reading value into logical tag.tag not meant for reading, when setting value in logical_tag.
+                    # An example: Quicktime:CreateDate. It holds only the UTC date/time but no UTC-offset, so logical
+                    # tag date (date-time with offset) can't be set from this tag. However Quicktime:CreateDate can be set (written)
+                    # from logical tag date, as date holds both local time and offset, so utc date-time can be derrived from logical tag.
+                    if tag_access is not None:
+                        if 'Read' not in tag_access:
+                            continue
+                    tag_value = self.tag_values.get(tag)
+                    if tag_value is not None:
+                        tag_values[tag] = tag_value
+                logical_tag_value = TagConverter.logicalTagRead(logical_tag, tag_values)
                 if logical_tag_value:
                     logical_tag_value_found = True
                 if logical_tag_data_type != 'list' and isinstance(logical_tag_value, list):     # If e.g. Author contains multiple entries. Concatenate to a string then
@@ -249,6 +274,19 @@ class FileMetadata(QObject):
                         pass
                     else:
                         self.logical_tag_values[logical_tag] = logical_tag_values[logical_tag]
+                        if old_logical_tag_value != '' and old_logical_tag_value != []:
+                            if settings.logical_tags[logical_tag].get("widget") == "date_time":
+                                date_time_format = "%Y:%m:%d %H:%M:%S"
+                                old_dt_string = old_logical_tag_value[:19]
+                                old_dt = datetime.strptime(old_dt_string, date_time_format)
+                                dt_string = logical_tag_values[logical_tag][:19]
+                                dt = datetime.strptime(dt_string, date_time_format)
+                                self.date_time_change = dt - old_dt
+
+# Calculate change in date-tag:
+#  1. Look in settings if type is date/time. If it is, then store delta in a dictionary: { logical_tag: tag-value delta }
+
+
             for logical_tag in logical_tag_values:
                 while logical_tag in self.logical_tags_missing_value:
                     self.logical_tags_missing_value.remove(logical_tag)
@@ -350,10 +388,20 @@ class FileMetadata(QObject):
                 #               logical_tag_type = settings.logical_tags.get(logical_tag)
                 if self.logical_tag_values[logical_tag] != self.saved_logical_tag_values.get(
                         logical_tag) or self.force_rewrite or self.is_virgin:  # New value to be saved
-                    tags = logical_tags_tags.get(logical_tag)  # All physical tags for logical tag"
-                    for tag in tags:
-                        tag_value = TagConverter.tagWrite(logical_tag,tag,self.logical_tag_values[logical_tag])
-                        tag_values[tag] = tag_value
+                    logical_tag_tags = logical_tags_tags.get(logical_tag)  # All physical tags for logical tag"
+                    tag_set = []
+                    for tag_set_draft in logical_tag_tags:
+                        if not isinstance(tag_set_draft, list):
+                            tag_set_draft = [tag_set_draft]
+                        tag_set = []
+                        for tag in tag_set_draft:
+                            tag_access = settings.tags.get(tag).get('access')
+                            if 'Write' in tag_access:
+                                tag_set.append(tag)
+                        if not tag_set == []:
+                            tag_set_values = TagConverter.tagWrite(logical_tag, tag_set, self.logical_tag_values[logical_tag])
+                            for tag in tag_set_values:
+                                tag_values[tag] = tag_set_values.get(tag)
 
             if tag_values != {} and tag_values != None:
                 with ExifTool(executable=self.exif_executable, configuration=self.exif_configuration) as ex:
@@ -676,7 +724,7 @@ class FilePreview(QObject):
         self.panel_width = 0
         self.image = None
         self.pixmap = None
-        self.original_rotation = None
+        self.current_rotation = None
         self.status = 'PENDING_READ'   # A lock telling status of metadata-variables: PENDING_READ, READING, WRITING, <blank>
         FilePreview.instance_index[file_name] = self
         self.web_server = None
@@ -694,12 +742,16 @@ class FilePreview(QObject):
         if self.image == None:     # Only read image from file once
             if file_type == 'heic':
                 self.image = self.__heic_to_qimage(self.file_name)
+                self.original_image_rotated = True  # Conversion from HEIC takes rotation-metadata into account. Returned QImage is already rotated
             elif file_type == 'cr2' or file_type == 'cr3' or file_type == 'arw' or file_type == 'nef' or file_type == 'dng':
                  self.image = self.__raw_to_qimage(self.file_name)
+                 self.original_image_rotated = False # Conversion does not takes rotation-metadata into account. Returned QImage is not rotated
             elif file_type == 'mov' or file_type == 'mp4' or file_type == 'm4v' or file_type == 'm2t' or file_type == 'm2ts' or file_type == 'mts':
                 self.image = self.__movie_to_qimage(self.file_name)
+                self.original_image_rotated = False  # Conversion does not takes rotation-metadata into account. Returned QImage is not rotated
             else:
                 self.image = self.__default_to_qimage(self.file_name)
+                self.original_image_rotated = False  # Conversion does not takes rotation-metadata into account. Returned QImage is not rotated
             if self.image != None:
                 if self.image.height()>1500 or self.image.width()>1500:
                     self.image = self.image.scaled(1500,1500,Qt.AspectRatioMode.KeepAspectRatio)
@@ -757,14 +809,13 @@ class FilePreview(QObject):
             rotation = FileMetadata.getInstance(self.file_name).logical_tag_values.get("rotation")
             if rotation == None:
                 rotation = 0.
-            if self.original_rotation == None:
-                saved_rotation = FileMetadata.getInstance(self.file_name).saved_logical_tag_values.get("rotation")
-                if saved_rotation != None:
-                    self.original_rotation = saved_rotation
+            if self.current_rotation is None:
+                if self.original_image_rotated:
+                    self.current_rotation = rotation
                 else:
-                    self.original_rotation = 0
+                    self.current_rotation = 0
 
-            rotation_change = self.original_rotation - rotation
+            rotation_change = self.current_rotation - rotation
             if rotation_change != 0:
                 transform = QTransform()
                 transform.rotate(rotation_change)
@@ -859,8 +910,41 @@ class FilePreview(QObject):
 
 class TagConverter():
     @staticmethod
-    def logicalTagRead(logical_tag,tag,tag_value):
-        logical_tag_value = tag_value    # Almost always the case
+    def __localDateTimeToUtc(local_date_time_str):
+        # Define the date/time format
+        date_time_format = "%Y:%m:%d %H:%M:%S"
+
+        # Isolate date_time
+        date_time_str = local_date_time_str[:19]
+        date_time = datetime.strptime(date_time_str, date_time_format)
+
+        # Isolate utc_offset
+        utc_offset_str = local_date_time_str[19:]
+        utc_offset_hours, utc_offset_minutes = map(int, utc_offset_str[1:].split(':'))
+        utc_offset_sign = utc_offset_str[0]
+        utc_offset = timedelta(hours=utc_offset_hours, minutes=utc_offset_minutes)
+        if utc_offset_sign == '-':
+            utc_offset = -utc_offset
+
+        # Calculate utc_date_time
+        utc_date_time = date_time - utc_offset
+
+        # Convert utc_date_time to string
+        utc_date_time_str = utc_date_time.strftime(date_time_format)
+
+        return utc_date_time_str
+
+
+    @staticmethod
+    def logicalTagRead(logical_tag, tag_set_values):    # The input holds only one tag or tag_set in tag_values
+        logical_tag_value = None
+        tag_iterator = iter(tag_set_values.items())
+        try:
+            tag, tag_value = next(tag_iterator)
+            logical_tag_value = tag_value    # Almost always the case
+        except StopIteration:
+            pass
+
         if logical_tag_value == None:
             return logical_tag_value
 
@@ -872,9 +956,6 @@ class TagConverter():
                 logical_tag_value = int((tag_value + 25) / 25)
 
         elif logical_tag == 'rotation' and tag == 'EXIF:Orientation#':
-
-
-
             if tag_value == 1:
                 logical_tag_value = 0
             elif tag_value == 8:
@@ -882,32 +963,82 @@ class TagConverter():
             elif tag_value == 3:
                 logical_tag_value = 180
             elif tag_value == 6:
-                logical_tag_value = 2706
+                logical_tag_value = 270
             else:
                 logical_tag_value = 0
+        elif logical_tag == 'date':
+            second_tag = None
+            second_tag_value = None
+            try:
+                second_tag, second_tag_value = next(tag_iterator)
+            except StopIteration:
+                pass
+            if second_tag is not None:
+                if second_tag in ['EXIF:OffsetTimeOriginal', 'EXIF:OffsetTimeDigitized', 'EXIF:OffsetTime']:
+                    logical_tag_value = logical_tag_value + second_tag_value
+
         return logical_tag_value
 
     @staticmethod
-    def tagWrite(logical_tag,tag,logical_tag_value):
-        tag_value = logical_tag_value    # Almost always the case
+    def tagWrite(logical_tag, tag_set, logical_tag_value):    # The input holds only one tag or tag_set in tags_set
+        tag_values = {tag: logical_tag_value for tag in tag_set} # Almost always the case
 
-        if logical_tag == 'rating' and tag == 'XMP-microsoft:RatingPercent':
-            if tag_value != 1 and tag_value != None:
-                tag_value = (tag_value - 1) * 25
+        if logical_tag == 'rating':
+            tag_value = tag_values.get('XMP-microsoft:RatingPercent')
+            if tag_value is not None:
+                if tag_value != 1:
+                    tag_value = (tag_value - 1) * 25
+                    tag_values['XMP-microsoft:RatingPercent'] = tag_value
 
-        elif logical_tag == 'rotation' and tag == 'EXIF:Orientation#':
-            if logical_tag_value == 0:
-                tag_value = 1
-            elif logical_tag_value == 90:
-                tag_value = 8
-            elif logical_tag_value == 180:
-                tag_value = 3
-            elif logical_tag_value == 270:
-                tag_value = 6
-            else:
-                tag_value = 1
+        elif logical_tag == 'rotation':
+            if 'EXIF:Orientation#' in tag_set:
+                if logical_tag_value == 0:
+                    tag_value = 1
+                elif logical_tag_value == 90:
+                    tag_value = 8
+                elif logical_tag_value == 180:
+                    tag_value = 3
+                elif logical_tag_value == 270:
+                    tag_value = 6
+                else:
+                    tag_value = 1
+                tag_values['EXIF:Orientation#'] = tag_value
 
-        return tag_value
+        elif logical_tag == 'date':
+            tag_value = None
+            if tag_value == None:   # Always true. Just to keep pattern
+                tag_value = tag_values.get('EXIF:DateTimeOriginal')
+                if tag_value is not None:
+                    tag_values['EXIF:DateTimeOriginal'] = logical_tag_value[:19]
+                    if 'EXIF:OffsetTimeOriginal' in tag_set:
+                        tag_values['EXIF:OffsetTimeOriginal'] = logical_tag_value[19:]
+            if tag_value == None:
+                tag_value = tag_values.get('EXIF:CreateDate')
+                if tag_value is not None:
+                    tag_values['EXIF:CreateDate'] = logical_tag_value[:19]
+                    if 'EXIF:OffsetTimeDigitized' in tag_set:
+                        tag_values['EXIF:OffsetTimeDigitized'] = logical_tag_value[19:]
+            if tag_value == None:
+                tag_value = tag_values.get('EXIF:ModifyDate')
+                if tag_value is not None:
+                    tag_values['EXIF:ModifyDate'] = logical_tag_value[:19]
+                    if 'EXIF:OffsetTime' in tag_set:
+                        tag_values['EXIF:OffsetTime'] = logical_tag_value[19:]
+            if tag_value == None:
+                tag_value = tag_values.get('QuickTime:CreateDate')
+                if tag_value is not None:
+                    tag_values['QuickTime:CreateDate'] = TagConverter.__localDateTimeToUtc(logical_tag_value)
+            if tag_value == None:
+                tag_value = tag_values.get('QuickTime:TrackCreateDate')
+                if tag_value is not None:
+                    tag_values['QuickTime:TrackCreateDate'] = TagConverter.__localDateTimeToUtc(logical_tag_value)
+            if tag_value == None:
+                tag_value = tag_values.get('QuickTime:MediaCreateDate')
+                if tag_value is not None:
+                    tag_values['QuickTime:MediaCreateDate'] = TagConverter.__localDateTimeToUtc(logical_tag_value)
+
+        return tag_values
+
 
 
 

@@ -27,46 +27,53 @@ def patchDefaultValues():
         settings["language"] = "EN"
     if settings.get("logical_tags") is None:
         settings["logical_tags"] = {
-            "orientation": {"widget": "orientation",
-                            "data_type": "number"},
-            "rotation": {"widget": "rotation",
-                         "data_type": "number"},
-            "rating": {"widget": "rating",
-                       "data_type": "number",
+            "rotation": {"widget": "Rotation",
+                         "value_class": "RotationValue"},
+            "rating": {"widget": "Rating",
+                       "value_class": "RatingValue",
                        "label_text_key": "tag_label_rating"},
-            "title": {"widget": "text_line",
-                      "data_type": "string",
+            "title": {"widget": "TextLine",
+                      "value_class": "StringValue",
                       "label_text_key": "tag_label_title"},
-            "date": {"widget": "date_time",
-                     "data_type": "string",
+            "date": {"widget": "DateTime",
+                     "value_class": "DateTimeValue",    # An instance of the class holds value and value-parts and has a set-method and a get-method for value or value-parts.
                      "label_text_key": "tag_label_date",
-                     "default_paste_select": False},
-            "description_only": {"widget": "text",
-                                 "data_type": "string",
+                     "default_paste_select": False,
+                     "value": {"local_date_time": {"data_type": "string",
+                                                   "label_text_key": "tag_label_date.local_date_time",
+                                                   "default_paste_select": False},
+                                     "utc_offset": {"data_type": "string",
+                                                    "label_text_key": "tag_label_date.utc_offset",
+                                                    "default_paste_select": False},
+                                     "latest_change": {"data_type": "string",
+                                                       "label_text_key": "tag_label_date.latest_change",
+                                                       "default_paste_select": False}}},
+            "description_only": {"widget": "Text",
+                                 "value_class": "StringValue",
                                  "label_text_key": "tag_label_description_only",
                                  "fallback_tag": "description"},
             # If description_only is blank in metadata, it is populated from description
-            "persons": {"widget": "text_set",
-                        "data_type": "list",
+            "persons": {"widget": "TextSet",
+                        "value_class": "ListValue",
                         "label_text_key": "tag_label_persons",
                         "Autocomplete": True},
-            "photographer": {"widget": "text_line",
-                             "data_type": "string",
+            "photographer": {"widget": "TextLine",
+                             "value_class": "StringValue",
                              "label_text_key": "tag_label_photographer",
                              "Autocomplete": True},
-            "source": {"widget": "text_line",
-                       "data_type": "string",
+            "source": {"widget": "TextLine",
+                       "value_class": "StringValue",
                        "label_text_key": "tag_label_source",
                        "Autocomplete": True},
-            "original_filename": {"widget": "text_line",
-                                  "data_type": "string",
+            "original_filename": {"widget": "TextLine",
+                                  "value_class": "StringValue",
                                   "label_text_key": "tag_label_original_filename"},
-            "geo_location": {"widget": "geo_location",
-                             "data_type": "string",
+            "geo_location": {"widget": "GeoLocation",
+                             "value_class": "GeoLocationValue",
                              "label_text_key": "tag_label_geo_location",
                              "default_paste_select": False},
-            "description": {"widget": "text",
-                            "data_type": "string",
+            "description": {"widget": "Text",
+                            "valueClass": "StringValue",
                             "label_text_key": "tag_label_description",
                             "reference_tag": True,
                             "reference_tag_content": [{"type": "tag", "tag_name": "title", "tag_label": False},
@@ -86,8 +93,11 @@ def patchDefaultValues():
                             "IPTC:ObjectName": {"access": "Read/Write"},
                             "XMP:Date": {"access": "Read/Write"},
                             "EXIF:DateTimeOriginal": {"access": "Read/Write}"},
+                            "EXIF:OffsetTimeOriginal": {"access": "Read/Write}"},
                             "EXIF:CreateDate": {"access": "Read/Write}"},
+                            "EXIF:OffsetTimeDigitized": {"access": "Read/Write}"},
                             "EXIF:ModifyDate": {"access": "Read/Write}"},
+                            "EXIF:OffsetTime": {"access": "Read/Write}"},
                             "IPTC:DateCreated": {"access": "Read/Write}"},
                             "XMP:Description": {"type": "text", "access": "Read/Write}"},
                             "EXIF:XPComment": {"type": "text", "access": "Read/Write"},
@@ -107,19 +117,17 @@ def patchDefaultValues():
                             "XMP:Source": {"access": "Read/Write"},
                             "XMP:PreservedFileName": {"access": "Read/Write"},
                             "QuickTime:Title": {"access": "Read/Write"},
-                            "QuickTime:MediaCreateDate": {"access": "Read/Write"},
-                            "QuickTime:CreateDate": {"access": "Read/Write"},
-                            "QuickTime:ModifyDate": {"access": "Read/Write"},
-                            "QuickTime:MediaModifyDate": {"access": "Read/Write"},
-                            "QuickTime:TrackCreateDate": {"access": "Read/Write"},
-                            "QuickTime:TrackModifyDate": {"access": "Read/Write"},
+                            "QuickTime:MediaCreateDate": {"access": "Write"},
+                            "QuickTime:CreateDate": {"access": "Write"},
+                            "QuickTime:TrackCreateDate": {"access": "Write"},
                             "QuickTime:Comment": {"type": "text", "access": "Read/Write"},
                             "QuickTime:Category": {"type": "text_set", "access": "Read/Write"},
                             "QuickTime:Artist": {"access": "Read/Write"},
+                            "QuickTime:CreationDate": {"access":"Read/Write"},
                             "RIFF:DateTimeOriginal": {"access": "Read"},
                             "File:FileCreateDate": {"access": "Read"},
                             "Composite:GPSPosition#": {"access": "Read/Write"},
-                            "EXIF:Orientation#:": {"access": "Read/Write"},
+                            "EXIF:Orientation#": {"access": "Read/Write"},
                             "QuickTime:Rotation#": {"access": "Read/Write"},
                             "XMP:Rating": {"access": "Read/Write"},
                             "XMP-microsoft:RatingPercent": {"access": "Read/Write"}
@@ -129,8 +137,9 @@ def patchDefaultValues():
             "jpg": {"rotation": ["EXIF:Orientation#"],
                     "rating": ["XMP:Rating", "XMP-microsoft:RatingPercent"],
                     "title": ["XMP:Title", "EXIF:XPTitle", "IPTC:ObjectName"],
-                    "date": ["XMP:Date", "EXIF:DateTimeOriginal", "EXIF:CreateDate", "EXIF:ModifyDate",
-                             "IPTC:DateCreated", "File:FileCreateDate"],
+                    "date": ["XMP:Date", "IPTC:DateCreated", "File:FileCreateDate"],                                #Local date/time and utc-offset
+                    "date.local_date_time": ["EXIF:DateTimeOriginal","EXIF:CreateDate","EXIF:ModifyDate"],          #Local date/time without (sub-value of date)
+                    "date.utc_offset": ["EXIF:OffsetTimeOriginal", "EXIF:OffsetTimeDigitized", "EXIF:OffsetTime"],  #Utc-offset (sub-value of date)
                     "description_only": ["XMP:DescriptionOnly"],
                     "persons": ["XMP-iptcExt:PersonInImage", "XMP-MP:RegionPersonDisplayName", "XMP:Subject",
                                 "EXIF:XPKeywords", "IPTC:Keywords"],
@@ -144,8 +153,9 @@ def patchDefaultValues():
             "jpeg": {"rotation": ["EXIF:Orientation#"],
                      "rating": ["XMP:Rating", "XMP-microsoft:RatingPercent"],
                      "title": ["XMP:Title", "EXIF:XPTitle", "IPTC:ObjectName"],
-                     "date": ["XMP:Date", "EXIF:DateTimeOriginal", "EXIF:CreateDate", "EXIF:ModifyDate",
-                              "IPTC:DateCreated", "File:FileCreateDate"],
+                     "date": ["XMP:Date", "IPTC:DateCreated", "File:FileCreateDate"],                               # Local date/time and utc-offset
+                     "date.local_date_time": ["EXIF:DateTimeOriginal", "EXIF:CreateDate", "EXIF:ModifyDate"],       # Local date/time without (sub-value of date)
+                     "date.utc_offset": ["EXIF:OffsetTimeOriginal", "EXIF:OffsetTimeDigitized", "EXIF:OffsetTime"], # Utc-offset (sub-value of date)
                      "description_only": ["XMP:DescriptionOnly"],
                      "persons": ["XMP-iptcExt:PersonInImage", "XMP-MP:RegionPersonDisplayName", "XMP:Subject",
                                  "EXIF:XPKeywords", "IPTC:Keywords"],
@@ -159,8 +169,9 @@ def patchDefaultValues():
             "png": {"rotation": ["EXIF:Orientation#"],
                     "rating": ["XMP:Rating", "XMP-microsoft:RatingPercent"],
                     "title": ["XMP:Title", "EXIF:XPTitle", "IPTC:ObjectName"],
-                    "date": ["XMP:Date", "EXIF:DateTimeOriginal", "EXIF:CreateDate", "EXIF:ModifyDate",
-                             "IPTC:DateCreated", "File:FileCreateDate"],
+                    "date": ["XMP:Date", "IPTC:DateCreated", "File:FileCreateDate"],                                #Local date/time and utc-offset
+                    "date.local_date_time": ["EXIF:DateTimeOriginal","EXIF:CreateDate","EXIF:ModifyDate"],          #Local date/time without (sub-value of date)
+                    "date.utc_offset": ["EXIF:OffsetTimeOriginal", "EXIF:OffsetTimeDigitized", "EXIF:OffsetTime"],  #Utc-offset (sub-value of date)
                     "description_only": ["XMP:DescriptionOnly"],
                     "persons": ["XMP-iptcExt:PersonInImage", "XMP-MP:RegionPersonDisplayName", "XMP:Subject",
                                 "EXIF:XPKeywords", "IPTC:Keywords"],
@@ -175,8 +186,9 @@ def patchDefaultValues():
             "cr3": {"rotation": ["EXIF:Orientation#"],
                     "rating": ["XMP:Rating", "XMP-microsoft:RatingPercent"],
                     "title": ["XMP:Title", "EXIF:XPTitle"],
-                    "date": ["XMP:Date", "EXIF:DateTimeOriginal", "EXIF:CreateDate", "EXIF:ModifyDate",
-                             "File:FileCreateDate"],
+                    "date": ["XMP:Date", "IPTC:DateCreated", "File:FileCreateDate"],                                #Local date/time and utc-offset
+                    "date.local_date_time": ["EXIF:DateTimeOriginal","EXIF:CreateDate","EXIF:ModifyDate"],          #Local date/time without (sub-value of date)
+                    "date.utc_offset": ["EXIF:OffsetTimeOriginal", "EXIF:OffsetTimeDigitized", "EXIF:OffsetTime"],  #Utc-offset (sub-value of date)
                     "description_only": ["XMP:DescriptionOnly"],
                     "persons": ["XMP-iptcExt:PersonInImage", "XMP-MP:RegionPersonDisplayName", "XMP:Subject",
                                 "EXIF:XPKeywords"],
@@ -190,8 +202,9 @@ def patchDefaultValues():
             "cr2": {"rotation": ["EXIF:Orientation#"],
                     "rating": ["XMP:Rating", "XMP-microsoft:RatingPercent"],
                     "title": ["XMP:Title", "EXIF:XPTitle"],
-                    "date": ["XMP:Date", "EXIF:DateTimeOriginal", "EXIF:CreateDate", "EXIF:ModifyDate",
-                             "File:FileCreateDate"],
+                    "date": ["XMP:Date", "IPTC:DateCreated", "File:FileCreateDate"],                                #Local date/time and utc-offset
+                    "date.local_date_time": ["EXIF:DateTimeOriginal","EXIF:CreateDate","EXIF:ModifyDate"],          #Local date/time without (sub-value of date)
+                    "date.utc_offset": ["EXIF:OffsetTimeOriginal", "EXIF:OffsetTimeDigitized", "EXIF:OffsetTime"],  #Utc-offset (sub-value of date)
                     "description_only": ["XMP:DescriptionOnly"],
                     "persons": ["XMP-iptcExt:PersonInImage", "XMP-MP:RegionPersonDisplayName", "XMP:Subject",
                                 "EXIF:XPKeywords"],
@@ -204,8 +217,9 @@ def patchDefaultValues():
             "nef": {"rotation": ["EXIF:Orientation#"],
                     "rating": ["XMP:Rating", "XMP-microsoft:RatingPercent"],
                     "title": ["XMP:Title", "EXIF:XPTitle"],
-                    "date": ["XMP:Date", "EXIF:DateTimeOriginal", "EXIF:CreateDate", "EXIF:ModifyDate",
-                             "File:FileCreateDate"],
+                    "date": ["XMP:Date", "IPTC:DateCreated", "File:FileCreateDate"],                                #Local date/time and utc-offset
+                    "date.local_date_time": ["EXIF:DateTimeOriginal","EXIF:CreateDate","EXIF:ModifyDate"],          #Local date/time without (sub-value of date)
+                    "date.utc_offset": ["EXIF:OffsetTimeOriginal", "EXIF:OffsetTimeDigitized", "EXIF:OffsetTime"],  #Utc-offset (sub-value of date)
                     "description_only": ["XMP:DescriptionOnly"],
                     "persons": ["XMP-iptcExt:PersonInImage", "XMP-MP:RegionPersonDisplayName", "XMP:Subject",
                                 "EXIF:XPKeywords"],
@@ -218,8 +232,9 @@ def patchDefaultValues():
             "dng": {"rotation": ["EXIF:Orientation#"],
                     "rating": ["XMP:Rating", "XMP-microsoft:RatingPercent"],
                     "title": ["XMP:Title", "EXIF:XPTitle", "IPTC:ObjectName"],
-                    "date": ["XMP:Date", "EXIF:DateTimeOriginal", "EXIF:CreateDate", "EXIF:ModifyDate",
-                             "IPTC:DateCreated", "File:FileCreateDate"],
+                    "date": ["XMP:Date", "IPTC:DateCreated", "File:FileCreateDate"],                                #Local date/time and utc-offset
+                    "date.local_date_time": ["EXIF:DateTimeOriginal","EXIF:CreateDate","EXIF:ModifyDate"],          #Local date/time without (sub-value of date)
+                    "date.utc_offset": ["EXIF:OffsetTimeOriginal", "EXIF:OffsetTimeDigitized", "EXIF:OffsetTime"],  #Utc-offset (sub-value of date)
                     "description_only": ["XMP:DescriptionOnly"],
                     "persons": ["XMP-iptcExt:PersonInImage", "XMP-MP:RegionPersonDisplayName", "XMP:Subject",
                                 "EXIF:XPKeywords", "IPTC:Keywords"],
@@ -233,8 +248,9 @@ def patchDefaultValues():
             "arw": {"rotation": ["EXIF:Orientation#"],
                     "rating": ["XMP:Rating", "XMP-microsoft:RatingPercent"],
                     "title": ["XMP:Title", "EXIF:XPTitle", "IPTC:ObjectName"],
-                    "date": ["XMP:Date", "EXIF:DateTimeOriginal", "EXIF:CreateDate", "EXIF:ModifyDate",
-                             "IPTC:DateCreated", "File:FileCreateDate"],
+                    "date": ["XMP:Date", "IPTC:DateCreated", "File:FileCreateDate"],                                #Local date/time and utc-offset
+                    "date.local_date_time": ["EXIF:DateTimeOriginal","EXIF:CreateDate","EXIF:ModifyDate"],          #Local date/time without (sub-value of date)
+                    "date.utc_offset": ["EXIF:OffsetTimeOriginal", "EXIF:OffsetTimeDigitized", "EXIF:OffsetTime"],  #Utc-offset (sub-value of date)
                     "description_only": ["XMP:DescriptionOnly"],
                     "persons": ["XMP-iptcExt:PersonInImage", "XMP-MP:RegionPersonDisplayName", "XMP:Subject",
                                 "EXIF:XPKeywords", "IPTC:Keywords"],
@@ -248,8 +264,9 @@ def patchDefaultValues():
             "heic": {"rotation": ["QuickTime:Rotation#"],
                      "rating": ["XMP:Rating", "XMP-microsoft:RatingPercent"],
                      "title": ["XMP:Title", "EXIF:XPTitle"],
-                     "date": ["XMP:Date", "EXIF:DateTimeOriginal", "EXIF:CreateDate", "EXIF:ModifyDate",
-                              "File:FileCreateDate"],
+                     "date": ["XMP:Date", "IPTC:DateCreated", "File:FileCreateDate"],                              # Local date/time and utc-offset
+                     "date.local_date_time": ["EXIF:DateTimeOriginal", "EXIF:CreateDate", "EXIF:ModifyDate"],      # Local date/time without utc-offset(sub-value of date)
+                     "date.utc_offset": ["EXIF:OffsetTimeOriginal", "EXIF:OffsetTimeDigitized", "EXIF:OffsetTime"],# Utc-offset (sub-value of date)
                      "description_only": ["XMP:DescriptionOnly"],
                      "persons": ["XMP-iptcExt:PersonInImage", "XMP-MP:RegionPersonDisplayName", "XMP:Subject",
                                  "EXIF:XPKeywords"],
@@ -262,8 +279,9 @@ def patchDefaultValues():
             "tif": {"rotation": ["EXIF:Orientation#"],
                     "rating": ["XMP:Rating", "XMP-microsoft:RatingPercent"],
                     "title": ["XMP:Title", "EXIF:XPTitle", "IPTC:ObjectName"],
-                    "date": ["XMP:Date", "EXIF:DateTimeOriginal", "EXIF:CreateDate", "EXIF:ModifyDate",
-                             "IPTC:DateCreated", "File:FileCreateDate"],
+                    "date": ["XMP:Date", "IPTC:DateCreated", "File:FileCreateDate"],                                #Local date/time and utc-offset
+                    "date.local_date_time": ["EXIF:DateTimeOriginal","EXIF:CreateDate","EXIF:ModifyDate"],          #Local date/time without (sub-value of date)
+                    "date.utc_offset": ["EXIF:OffsetTimeOriginal", "EXIF:OffsetTimeDigitized", "EXIF:OffsetTime"],  #Utc-offset (sub-value of date)
                     "description_only": ["XMP:DescriptionOnly"],
                     "persons": ["XMP-iptcExt:PersonInImage", "XMP-MP:RegionPersonDisplayName", "XMP:Subject",
                                 "EXIF:XPKeywords", "IPTC:Keywords"],
@@ -277,8 +295,9 @@ def patchDefaultValues():
             "tiff": {"rotation": ["EXIF:Orientation#"],
                     "rating": ["XMP:Rating", "XMP-microsoft:RatingPercent"],
                     "title": ["XMP:Title", "EXIF:XPTitle", "IPTC:ObjectName"],
-                    "date": ["XMP:Date", "EXIF:DateTimeOriginal", "EXIF:CreateDate", "EXIF:ModifyDate",
-                             "IPTC:DateCreated", "File:FileCreateDate"],
+                    "date": ["XMP:Date", "IPTC:DateCreated", "File:FileCreateDate"],                                #Local date/time and utc-offset
+                    "date.local_date_time": ["EXIF:DateTimeOriginal","EXIF:CreateDate","EXIF:ModifyDate"],          #Local date/time without (sub-value of date)
+                    "date.utc_offset": ["EXIF:OffsetTimeOriginal", "EXIF:OffsetTimeDigitized", "EXIF:OffsetTime"],  #Utc-offset (sub-value of date)
                     "description_only": ["XMP:DescriptionOnly"],
                     "persons": ["XMP-iptcExt:PersonInImage", "XMP-MP:RegionPersonDisplayName", "XMP:Subject",
                                 "EXIF:XPKeywords", "IPTC:Keywords"],
@@ -293,7 +312,9 @@ def patchDefaultValues():
             "gif": {"rotation": ["EXIF:Orientation#"],
                     "rating": ["XMP:Rating", "XMP-microsoft:RatingPercent"],
                     "title": ["XMP:Title", "EXIF:XPTitle"],
-                    "date": ["XMP:Date", "EXIF:DateTimeOriginal", "EXIF:CreateDate", "EXIF:ModifyDate"],
+                    "date": ["XMP:Date", "IPTC:DateCreated", "File:FileCreateDate"],                                #Local date/time and utc-offset
+                    "date.local_date_time": ["EXIF:DateTimeOriginal","EXIF:CreateDate","EXIF:ModifyDate"],          #Local date/time without (sub-value of date)
+                    "date.utc_offset": ["EXIF:OffsetTimeOriginal", "EXIF:OffsetTimeDigitized", "EXIF:OffsetTime"],  #Utc-offset (sub-value of date)
                     "description_only": ["XMP:DescriptionOnly", "File:FileCreateDate"],
                     "persons": ["XMP-iptcExt:PersonInImage", "XMP-MP:RegionPersonDisplayName", "XMP:Subject",
                                 "EXIF:XPKeywords"],
@@ -305,9 +326,10 @@ def patchDefaultValues():
                     },
             "mp4": {"rating": ["XMP:Rating", "XMP-microsoft:RatingPercent"],
                     "title": ["XMP:Title", "QuickTime:Title"],
-                    "date": ["XMP:Date", "QuickTime:MediaCreateDate", "QuickTime:CreateDate", "QuickTime:ModifyDate",
-                             "QuickTime:MediaModifyDate", "QuickTime:TrackCreateDate",
-                             "QuickTime:TrackModifyDate", "File:FileCreateDate"],
+                    "date.local_date_time": ["EXIF:DateTimeOriginal", "EXIF:CreateDate", "EXIF:ModifyDate"],          #Local date/time without (sub-value of date)
+                    "date.utc_offset": ["EXIF:OffsetTimeOriginal", "EXIF:OffsetTimeDigitized", "EXIF:OffsetTime"],    #Utc-offset (sub-value of date)
+                    "date": ["QuickTime:CreationDate", "XMP:Date", "File:FileCreateDate"],                            #Local date/time and utc-offset
+                    "date.utc_date_time": ["QuickTime:MediaCreateDate", "QuickTime:CreateDate", "QuickTime:TrackCreateDate"], #Utc date/time
                     "description_only": ["XMP:DescriptionOnly"],
                     "persons": ["XMP:Subject", "QuickTime:Category"],
                     "photographer": ["XMP:Creator", "QuickTime:Artist"],
@@ -316,11 +338,17 @@ def patchDefaultValues():
                     "original_filename": ["XMP:PreservedFileName"],
                     "description": ["XMP:Description", "QuickTime:Comment"]
                     },
-            "m4v": {"rating": ["XMP:Rating", "XMP-microsoft:RatingPercent"],
+            "m4v": {"rating": ["QuickTime:CreationDate", "XMP:Rating", "XMP-microsoft:RatingPercent"],
                     "title": ["XMP:Title", "QuickTime:Title"],
-                    "date": ["XMP:Date", "QuickTime:MediaCreateDate", "QuickTime:CreateDate", "QuickTime:ModifyDate",
-                             "QuickTime:MediaModifyDate", "QuickTime:TrackCreateDate",
-                             "QuickTime:TrackModifyDate", "File:FileCreateDate"],
+                    "date": [["EXIF:DateTimeOriginal", "EXIF:OffsetTimeOriginal"],
+                             ["EXIF:CreateDate", "EXIF:OffsetTimeDigitized"],
+                             ["EXIF:ModifyDate", "EXIF:OffsetTime"],
+
+                             "XMP:Date",
+                             "File:FileCreateDate",
+                             "QuickTime:MediaCreateDate",
+                             "QuickTime:CreateDate",
+                             "QuickTime:TrackCreateDate"],
                     "description_only": ["XMP:DescriptionOnly"],
                     "persons": ["XMP:Subject", "QuickTime:Category"],
                     "photographer": ["XMP:Creator", "QuickTime:Artist"],
@@ -331,9 +359,15 @@ def patchDefaultValues():
                     },
             "mov": {"rating": ["XMP:Rating", "XMP-microsoft:RatingPercent"],
                     "title": ["XMP:Title", "QuickTime:Title"],
-                    "date": ["XMP:Date", "QuickTime:MediaCreateDate", "QuickTime:CreateDate", "QuickTime:ModifyDate",
-                             "QuickTime:MediaModifyDate", "QuickTime:TrackCreateDate",
-                             "QuickTime:TrackModifyDate", "File:FileCreateDate"],
+                    "date": [["EXIF:DateTimeOriginal", "EXIF:OffsetTimeOriginal"],
+                             ["EXIF:CreateDate", "EXIF:OffsetTimeDigitized"],
+                             ["EXIF:ModifyDate", "EXIF:OffsetTime"],
+                             "QuickTime:CreationDate",
+                             "XMP:Date",
+                             "File:FileCreateDate",
+                             "QuickTime:MediaCreateDate",
+                             "QuickTime:CreateDate",
+                             "QuickTime:TrackCreateDate"],
                     "description_only": ["XMP:DescriptionOnly"],
                     "persons": ["XMP:Subject", "QuickTime:Category"],
                     "photographer": ["XMP:Creator", "QuickTime:Artist"],
@@ -356,8 +390,17 @@ def patchDefaultValues():
                                      {"DA": "Titel",
                                       "EN": "Title"},
                                  "tag_label_date":
-                                     {"DA": "Dato",
-                                      "EN": "Date"},
+                                     {"DA": "Dato/tid",
+                                      "EN": "Date/time"},
+                                 "tag_label_date.local_date_time":
+                                     {"DA": "Lokal dato/tid",
+                                      "EN": "Local date/time"},
+                                 "tag_label_date.utc_offset":
+                                     {"DA": "Dato/tid utc-offset",
+                                      "EN": "Date/time utc-offset"},
+                                 "tag_label_date.latest_change":
+                                     {"DA": "Lokal dato/tid ændring",
+                                      "EN": "Local date/time change"},
                                  "tag_label_description_only":
                                      {"DA": "Beskrivelse",
                                       "EN": "Description"},
@@ -536,7 +579,6 @@ def migrateVersion():
                                     "IPTC:Caption-Abstract"]
                 }
 
-
     def rule04():  # By defaule, date and geolocation should not be selected for pasting
         if old_ver_num <= 10399 and new_ver_num >= 10400:  # Date and geolocation not pasted by default
             date_logical_tag = settings["logical_tags"].get("date")
@@ -622,6 +664,56 @@ def migrateVersion():
                     new_file_type_tags[file_type][new_logical_tag] = settings["file_type_tags"][file_type][logical_tag]
             settings['file_type_tags'] = new_file_type_tags
 
+    def rule08():   # Replace EXIF:Orientation#: with EXIF:Orientation# (without : in end
+        global settings
+        if old_ver_num <= 10702 and new_ver_num >= 10800:
+            # Correct incorrect key-name for orientation
+            exif_orientation_settings = settings["tags"].pop("EXIF:Orientation#:", None)
+            if exif_orientation_settings is not None:
+                settings["tags"]["EXIF:Orientation#"] = exif_orientation_settings
+
+            # Add UTC-offset support
+            settings["tags"]["EXIF:OffsetTimeOriginal"] = {"access": "Read/Write}"}
+            settings["tags"]["EXIF:OffsetTimeDigitized"] = {"access": "Read/Write}"}
+            settings["tags"]["EXIF:OffsetTime"] = {"access": "Read/Write}"}
+            settings["tags"]["QuickTime:CreationDate"] = {"access": "Read/Write"}
+            settings["tags"]["QuickTime:CreateDate"] = {"access": "Write"}
+            for file_type in settings['file_type_tags']:
+                if settings['file_type_tags'][file_type].get('date') is not None:
+                    if file_type in ["jpg", "jpeg", "png", "cr3", "cr2", "dng", "arw", "nef", "heic", "tif", "tiff", "gif"]:
+                        settings['file_type_tags'][file_type]['date'] = [["EXIF:DateTimeOriginal", "EXIF:OffsetTimeOriginal"],
+                                                                         ["EXIF:CreateDate", "EXIF:OffsetTimeDigitized"],
+                                                                         ["EXIF:ModifyDate", "EXIF:OffsetTime"],
+                                                                         "XMP:Date",
+                                                                         "IPTC:DateCreated",
+                                                                         "File:FileCreateDate"]
+                    elif file_type in ["mp4", "m4v", "mov"]:
+                        settings['file_type_tags'][file_type]['date'] = ["QuickTime:CreationDate",
+                                                                         "XMP:Date",
+                                                                         ["EXIF:DateTimeOriginal", "EXIF:OffsetTimeOriginal"],
+                                                                         ["EXIF:CreateDate", "EXIF:OffsetTimeDigitized"],
+                                                                         ["EXIF:ModifyDate", "EXIF:OffsetTime"],
+                                                                         "File:FileCreateDate",
+                                                                         "QuickTime:MediaCreateDate",
+                                                                         "QuickTime:CreateDate",
+                                                                         "QuickTime:TrackCreateDate"]
+
+            if not "m4v" in settings["file_types"]:
+                settings["file_types"].append("m4v")
+                settings["file_type_tags"]["m4v"] = {"rating": ["XMP:Rating", "XMP-microsoft:RatingPercent"],
+                    "title": ["XMP:Title", "QuickTime:Title"],
+                    "date": ["XMP:Date", "QuickTime:CreateDate", "QuickTime:ModifyDate",
+                             "QuickTime:MediaModifyDate", "QuickTime:TrackCreateDate",
+                             "QuickTime:TrackModifyDate", "File:FileCreateDate"],
+                    "description_only": ["XMP:DescriptionOnly"],
+                    "persons": ["XMP:Subject", "QuickTime:Category"],
+                    "photographer": ["XMP:Creator", "QuickTime:Artist"],
+                    "geo_location": ["Composite:GPSPosition#"],
+                    "source": ["XMP:Source"],
+                    "original_filename": ["XMP:PreservedFileName"],
+                    "description": ["XMP:Description", "QuickTime:Comment"]
+                    }
+
 
     old_ver_num = versionNumber(settings.get("version"))
     new_ver_num = versionNumber(version)
@@ -638,6 +730,7 @@ def migrateVersion():
         rule05()  # Add support for m2t- and m2ts-files
         rule06()  # Add support for m4v-files
         rule07()  # Change Quicktime to QuickTime, and add tag QuickTime:MediaCreateDate
+        rule08()  # Enable UTC-offset support and correct Orientation-bug
 
 def writeSettingsFile():
     global settings, settings_path
@@ -646,7 +739,7 @@ def writeSettingsFile():
         outfile.write(settings_json_object)
 
 
-version = "1.7.2"   # Bug causing fresh installation to fail
+version = "1.8.0"   # UTC Time Offset Handling
 # Make location for Application, if missing
 app_data_location = os.path.join(os.environ.get("ProgramData"),"Memory Mate")
 if not os.path.isdir(app_data_location):
