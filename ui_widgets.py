@@ -159,6 +159,7 @@ class DateTime(QWidget):
         self.date_time_edit.setDisplayFormat("dd/MM/yyyy HH:mm:ss")
         self.date_time_edit.setFixedWidth(150)
         self.date_time_edit.setAlignment(Qt.AlignmentFlag.AlignLeft)
+        self.second_fraction = ''
 
         self.offset_edit = self.TimeOffsetLineEdit()
         self.offset_edit.setFixedWidth(60)
@@ -196,7 +197,7 @@ class DateTime(QWidget):
     def readFromImage(self):
         file_metadata = FileMetadata.getInstance(self.file_name)
         if file_metadata:
-            local_date_time = file_metadata.getLogicalTagValues().get(self.logical_tag)
+            local_date_time = file_metadata.getLogicalTagValues().get(self.logical_tag) # 2022-12-24T13:50:00+02:00
             if local_date_time == None:
                 return
             self.date_time_edit.clear()
@@ -204,31 +205,46 @@ class DateTime(QWidget):
             self.date_time_edit.setStyleSheet("color: #D3D3D3;")
             self.offset_edit.setStyleSheet("color: #D3D3D3;")
             if local_date_time != "" and local_date_time != None:  # Data was found
+                year = local_date_time[0:4]
+                month = local_date_time[5:7]
+                day = local_date_time[8:10]
+                hour = local_date_time[11:13]
+                minute = local_date_time[14:16]
+                second = local_date_time[17:19]
                 utc_offset = ''
-                if '+' in local_date_time:
-                    utc_offset = '+' + local_date_time.split('+')[1]     # 2022/12/24 13:50:00+02:00 --> +02:00
-                    date_time = local_date_time.split('+')[0]            # 2022/12/24 13:50:00+02:00 --> 2022/12/24 13:50:00
-                elif '-' in local_date_time:
-                    utc_offset = '-' + local_date_time.split('-')[1]     # 2022/12/24 13:50:00+02:00 --> +02:00
-                    date_time = local_date_time.split('-')[0]            # 2022/12/24 13:50:00+02:00 --> 2022/12/24 13:50:00
-                else:
-                    date_time = local_date_time
-                date_time = date_time.replace(" ", ":")       # 2022/12/24 13:50:00 --> 2022/12/24:13:50:00
-                date_time = date_time.replace("/", ":")       # 2022/12/24:13:50:00 --> 2022:12:24:13:50:00
-                date_time_parts = date_time.split(":")        # 2022:12:24:13:50:00 --> ["2022", "12", "24", "13", "50", "00"]
-                while len(date_time_parts) < 6:
-                    date_time_parts.append("")
-                self.date_time_edit.setDateTime(QDateTime(int(date_time_parts[0]), int(date_time_parts[1]), int(date_time_parts[2]),
-                                           int(date_time_parts[3]), int(date_time_parts[4]), int(date_time_parts[5])))
+                utc_offset_index = local_date_time.find('+',19)
+                if utc_offset_index == -1:
+                    utc_offset_index = local_date_time.find('-',19)
+                if utc_offset_index == -1:
+                    utc_offset_index = local_date_time.find('Z',19)
+                if utc_offset_index != -1:
+                    utc_offset = local_date_time[utc_offset_index:]
+                    if utc_offset == 'Z':
+                        utc_offset = 'UTC'
+                second_fraction_index = local_date_time.find('.')
+                self.second_fraction = ''    # Widget never modifies fraction. It just remembers and reinsert after correction
+                if second_fraction_index != -1:
+                    if utc_offset_index != -1:
+                        self.second_fraction = local_date_time[second_fraction_index:utc_offset_index]
+                    else:
+                        self.second_fraction = local_date_time[second_fraction_index:]
+
+                self.date_time_edit.setDateTime(QDateTime(int(year), int(month), int(day), int(hour), int(minute), int(second)))
                 self.offset_edit.setText(utc_offset)
                 self.date_time_edit.setStyleSheet("color: black")
                 self.offset_edit.setStyleSheet("color: black")
 
                 if self.auto_complete_list != None:
-                    self.auto_complete_list.collectItem(date_time)    # Collect new entry in auto_complete_list
+                    self.auto_complete_list.collectItem(local_date_time)    # Collect new entry in auto_complete_list
 
     def logical_tag_value(self):
-        logical_tag_value = self.date_time_edit.dateTime().toString("yyyy:MM:dd hh:mm:ss")+self.offset_edit.text()
+        logical_tag_value = self.date_time_edit.dateTime().toString("yyyy-MM-ddThh:mm:ss")
+        if self.second_fraction != '':
+            logical_tag_value = logical_tag_value + self.second_fraction
+        if self.offset_edit.text()=='UTC':
+            logical_tag_value = logical_tag_value + 'Z'
+        else:
+            logical_tag_value = logical_tag_value + self.offset_edit.text()
         if self.auto_complete_list != None and logical_tag_value != '':  # Collect value in autocomplete-list
             self.auto_complete_list.collectItem(logical_tag_value)
         return logical_tag_value
@@ -255,12 +271,14 @@ class DateTime(QWidget):
                 return
 
             if len(self.text()) == 0:
-                if input_char in ['+', '-']:
+                if input_char in ['Z', 'U', 'z', 'u']:    #UTC Time-zone
+                    self.setText('UTC')
+                elif input_char in ['+', '-']:
                     self.setText(input_char)
                 elif input_char in ['0', '1', '2']:
                     self.setText('+' + input_char)
                     self.first_hour_digit = input_char
-            elif len(self.text()) == 1:  # Expecting first digit in hours (HH)
+            elif len(self.text()) == 1 and self.text() != 'Z':  # Expecting first digit in hours (HH)
                 if input_char in ['0', '1', '2']:
                     text += input_char
                     self.setText(text)
@@ -278,9 +296,7 @@ class DateTime(QWidget):
                     self.first_minute_digit = input_char
             elif len(self.text()) == 5:  # Expecting second digit in minutes (MM)
                 if input_char.isdigit():
-                    if self.first_minute_digit in ['0', '3'] and input_char in ['0'] or self.first_minute_digit in ['1',
-                                                                                                                    '4'] and input_char in [
-                        '5']:
+                    if self.first_minute_digit in ['0', '3'] and input_char in ['0'] or self.first_minute_digit in ['1','4'] and input_char in [ '5']:
                         text += input_char
                         self.setText(text)
 

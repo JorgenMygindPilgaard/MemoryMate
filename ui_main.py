@@ -213,28 +213,28 @@ class FilePanel(QScrollArea):
             else:
                 label_widget = None
 
-            if tag_widget_type == "text_line":
+            if tag_widget_type == "TextLine":
                 tag_widget = TextLine(FilePanel.file_name,logical_tag)
                 FilePanel.tags[logical_tag] = [label_widget, tag_widget, tag_widget_type, new_line]
-            elif tag_widget_type == "text":
+            elif tag_widget_type == "Text":
                 tag_widget = Text(FilePanel.file_name,logical_tag)
                 FilePanel.tags[logical_tag] = [label_widget, tag_widget, tag_widget_type, new_line]
-            elif tag_widget_type == "date_time":
+            elif tag_widget_type == "DateTime":
                 tag_widget = DateTime(FilePanel.file_name,logical_tag)
                 FilePanel.tags[logical_tag] = [label_widget, tag_widget, tag_widget_type, new_line]
-            elif tag_widget_type == "date":
+            elif tag_widget_type == "Date":
                 tag_widget = Date(FilePanel.file_name,logical_tag)
                 FilePanel.tags[logical_tag] = [label_widget, tag_widget, tag_widget_type, new_line]
-            elif tag_widget_type == "text_set":
+            elif tag_widget_type == "TextSet":
                 tag_widget = TextSet(FilePanel.file_name,logical_tag)
                 FilePanel.tags[logical_tag] = [label_widget, tag_widget, tag_widget_type, new_line]
-            elif tag_widget_type == "geo_location":
+            elif tag_widget_type == "GeoLocation":
                 tag_widget = GeoLocation(FilePanel.file_name,logical_tag)
                 FilePanel.tags[logical_tag] = [label_widget, tag_widget, tag_widget_type, new_line]
-            elif tag_widget_type == "rotation":
+            elif tag_widget_type == "Rotation":
                 tag_widget = Rotation(FilePanel.file_name, logical_tag)
                 FilePanel.tags[logical_tag] = [label_widget, tag_widget, tag_widget_type, new_line]
-            elif tag_widget_type == "rating":
+            elif tag_widget_type == "Rating":
                 tag_widget = Rating(FilePanel.file_name, logical_tag)
                 FilePanel.tags[logical_tag] = [label_widget, tag_widget, tag_widget_type, new_line]
             else:
@@ -1018,12 +1018,11 @@ def onFileRenamed(old_file_name, new_file_name, update_original_filename_tag=Fal
                     file_metadata_pasted_emitter = FileMetadataPastedEmitter.getInstance()
                     file_metadata_pasted_emitter.emit(new_file_name)
 
-
 def onCurrentFileChanged(new_file_name):
-    FilePanel.saveMetadata()                      # Saves metadata for file currently in filepanel (if any)
-    dummy = FilePanel.getInstance(new_file_name)  # Puts new file in file-panel
-    FileReadQueue.appendQueue(new_file_name)
-
+    if new_file_name != FilePanel.file_name:
+        FilePanel.saveMetadata()                      # Saves metadata for file currently in filepanel (if any)
+        dummy = FilePanel.getInstance(new_file_name)  # Puts new file in file-panel
+        FileReadQueue.appendQueue(new_file_name)
 
 def onImageRotated(file_name):
     if file_name == FilePanel.file_name:

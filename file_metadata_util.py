@@ -14,7 +14,9 @@ from PIL import Image
 from moviepy.video.io.VideoFileClip import VideoFileClip
 import re
 import util
-from datetime import datetime, timedelta
+from value_classes import *
+import cv2
+
 
 class FileMetadataChangedEmitter(QObject):
     instance = None
@@ -28,7 +30,7 @@ class FileMetadataChangedEmitter(QObject):
         if FileMetadataChangedEmitter.instance == None:
             FileMetadataChangedEmitter.instance = FileMetadataChangedEmitter()
         return FileMetadataChangedEmitter.instance
-    def emit(self, file_name, old_logical_tag_values, new_logical_tag_values):
+    def send(self, file_name, old_logical_tag_values, new_logical_tag_values):
         self.change_signal.emit(file_name, old_logical_tag_values, new_logical_tag_values)
 
 class FileMetadata(QObject):
@@ -148,7 +150,19 @@ class FileMetadata(QObject):
     def getLogicalTagValues(self):
         if self.metadata_status != '':
             raise Exception('Metadata not yet read. status is ' + self.metadata_status)
-        return self.logical_tag_values
+        logical_tag_values = {}
+        for logical_tag in self.logical_tag_instances:
+            logical_tag_values[logical_tag] = self.logical_tag_instances.get(logical_tag).getValue()
+        return logical_tag_values
+
+    def getSavedLogicalTagValues(self):
+        if self.metadata_status != '':
+            raise Exception('Metadata not yet read. status is ' + self.metadata_status)
+        logical_tag_values = {}
+        for logical_tag in self.saved_logical_tag_instances:
+            logical_tag_values[logical_tag] = self.saved_logical_tag_instances.get(logical_tag).getValue()
+        return logical_tag_values
+
     def __readFileType(self):
         file_type = self.split_file_name[2].rstrip('_backup')   # Remove _backup from filetype
         tags = ['File:FileTypeExtension']
@@ -167,8 +181,8 @@ class FileMetadata(QObject):
         #Get names of tags in tags for the filetype from settings
         logical_tags_tags = settings.file_type_tags.get(self.type.lower())  #Logical_tags for filetype with corresponding tags
         if logical_tags_tags is None:    # Filename blank or unknown filetype
-            self.logical_tag_values = {}
-            self.saved_logical_tag_values = copy.deepcopy(self.logical_tag_values)
+            self.logical_tag_instances = {}
+            self.saved_logical_tag_instances = copy.deepcopy(self.logical_tag_instances)
             self.logical_tags_missing_value = []
             self.metadata_status = ''
             return 'DATA READ'
@@ -176,73 +190,59 @@ class FileMetadata(QObject):
 
         for logical_tag in logical_tags_tags:
             logical_tag_tags = logical_tags_tags[logical_tag]
-            for tag_set in logical_tag_tags:
-                if not isinstance(tag_set, list):
-                    tag_set = [tag_set]
-                tags.extend(tag_set)
+            for tag in logical_tag_tags:
+                tags.append(tag)
 
         # Now get values for these tags using exif-tool
         with ExifTool(executable=self.exif_executable,configuration=self.exif_configuration) as ex:
             exif_data = ex.getTags(self.file_name, tags,process_id='READ')
         self.tag_values = {}
         for tag in tags:
-            tag_alone = tag.rstrip('#')               #Remove #-character, as it is not a part of tag-name, it is a controll-character telling exiftool to deliver/recieve tag in nummeric format
+            tag_alone = tag.rstrip('#')               #Remove #-character, as it is not a part of tag-name, it is a control-character telling exiftool to deliver/recieve tag in nummeric format
             tag_value = exif_data[0].get(tag_alone)
             if tag_value != None and tag_value != "" and tag_value != []:
                 if isinstance(tag_value,list):
                     tag_value = list(map(str, tag_value))
-                self.tag_values[tag] = tag_value
+                self.tag_values[tag] = tag_value    # These are the physical tag name-value pairs (tag-name includes # where relevant)
 
-        # Finally map tag_values to logical_tag_values
-        self.logical_tag_values = {}
+        # Finally map tag_values to logical_tag_instances
+        self.logical_tag_instances = {}
         self.logical_tags_missing_value = []
         for logical_tag in logical_tags_tags:
-            logical_tag_data_type = settings.logical_tags.get(logical_tag).get("data_type")
-            logical_tag_tags = logical_tags_tags.get(logical_tag)
-            if logical_tag_data_type == 'list':
-                tag_value = []
-            elif logical_tag_data_type == 'string':
-                tag_value = ''
-            else:
-                tag_value = None
-
-            self.logical_tag_values[logical_tag] = tag_value  # Set to empty value to begin with"
-
             logical_tag_value_found = False
-            for tag_set in logical_tag_tags:
 
-                # Physical tags can be a set of two tags together forming the value for logical tag.
-                # Exampel: ["EXIF:DateTimeOriginal", "EXIF:OffsetTimeOriginal"].
-                # Here DateTimeOriginal is local date/time and OffsetTimeOriginal is the UTC-offset.
-                if not isinstance(tag_set, list):
-                    tag_set = [tag_set]
-                tag_values = {}
-                for tag in tag_set:
-                    tag_access = settings.tags.get(tag).get('access')
-                    # Some tags can't be used when reading value into logical tag.tag not meant for reading, when setting value in logical_tag.
-                    # An example: Quicktime:CreateDate. It holds only the UTC date/time but no UTC-offset, so logical
-                    # tag date (date-time with offset) can't be set from this tag. However Quicktime:CreateDate can be set (written)
-                    # from logical tag date, as date holds both local time and offset, so utc date-time can be derrived from logical tag.
-                    if tag_access is not None:
-                        if 'Read' not in tag_access:
-                            continue
-                    tag_value = self.tag_values.get(tag)
-                    if tag_value is not None:
-                        tag_values[tag] = tag_value
-                logical_tag_value = TagConverter.logicalTagRead(logical_tag, tag_values)
-                if logical_tag_value:
-                    logical_tag_value_found = True
-                if logical_tag_data_type != 'list' and isinstance(logical_tag_value, list):     # If e.g. Author contains multiple entries. Concatenate to a string then
-                    logical_tag_value = ', '.join(str(logical_tag_value))
-                if logical_tag_data_type == 'list' and isinstance(logical_tag_value, str):      # If e.g. persons contains only one entrie, exiftool returns it as a string, not a list
-                    logical_tag_value = [logical_tag_value]
-                if logical_tag_value != None and logical_tag_value != '':
-                    self.logical_tag_values[logical_tag] = logical_tag_value
-                    break
+            # Get instance of value-class for the logical tag
+            logical_tag_class_name = settings.logical_tags.get(logical_tag).get("value_class")
+            logical_tag_class = globals().get(logical_tag_class_name) if logical_tag_class_name is not None else None
+            logical_tag_instance = logical_tag_class() if logical_tag_class is not None else None
+
+            if logical_tag_instance is None:
+                print('Logical tag Class not found: ' + logical_tag)
+                continue
+
+            # Get physical tags for the logical tag
+            logical_tag_tags = logical_tags_tags.get(logical_tag)
+
+            # Set value of logical tag inside instance of logical tag value-instance
+            for tag in logical_tag_tags:
+                tag_attrib = settings.tags.get(tag)
+                if tag_attrib is None:
+                    print('Physical tag attributes not found: ' + tag)
+                    continue
+                tag_access = settings.tags.get(tag).get('access')   # Some tags are only written, not read
+                if tag_access is not None:
+                    if 'Read' not in tag_access:
+                        continue
+                logical_tag_instance.setValueFromExif(value=self.tag_values.get(tag),exif_tag=tag)
+            if logical_tag_instance.getValue() is not None:
+                logical_tag_value_found = True
+
+            self.logical_tag_instances[logical_tag] = logical_tag_instance  # Save logical tag value-instance in dictionary
+
             if not logical_tag_value_found:
                 self.logical_tags_missing_value.append(logical_tag)
 
-        self.saved_logical_tag_values = copy.deepcopy(self.logical_tag_values)
+        self.saved_logical_tag_instances = copy.deepcopy(self.logical_tag_instances)
         self.__updateLogicalTagValuesFromQueue()
         self.__updateLogicalTagValuesFromFallbackTags()
         self.__updateReferenceTags()
@@ -257,39 +257,22 @@ class FileMetadata(QObject):
             for logical_tag in self.logical_tags_missing_value:
                 fallback_tag = settings.logical_tags.get(logical_tag).get('fallback_tag')
                 if fallback_tag:
-                    fallback_tag_value = self.logical_tag_values.get(fallback_tag)
+                    fallback_tag_instance = self.logical_tag_instances.get(fallback_tag)
+                    fallback_tag_value = fallback_tag_instance.getValue() if fallback_tag_instance is not None else None
                     if fallback_tag_value:
-                        self.logical_tag_values[logical_tag] = fallback_tag_value
+                        self.logical_tag_instances[logical_tag].setValue(fallback_tag_value)
 
 
     def __updateLogicalTagValues(self,logical_tag_values, overwrite=True):
-        if logical_tag_values != None and logical_tag_values != {}:
-            old_logical_tag_values = copy.deepcopy(self.logical_tag_values)
+        if logical_tag_values is not None and logical_tag_values != {}:
             for logical_tag in logical_tag_values:
-                if not logical_tag in old_logical_tag_values:  # If the file-type does not support the logical tag, then skip it
+                if not logical_tag in self.logical_tag_instances:  # If the file-type does not support the logical tag, then skip it
                     continue
-                old_logical_tag_value = self.logical_tag_values.get(logical_tag)
-                if old_logical_tag_value != logical_tag_values[logical_tag]:
-                    if not overwrite and old_logical_tag_value != '' and old_logical_tag_value != []:  # Don't overwrite, existing values
+                if self.logical_tag_instances.get(logical_tag).getValue() != logical_tag_values.get(logical_tag):
+                    if not overwrite and self.logical_tag_instances.get(logical_tag).getValue() is not None:  # Don't overwrite, existing values
                         pass
                     else:
-                        self.logical_tag_values[logical_tag] = logical_tag_values[logical_tag]
-                        if old_logical_tag_value != '' and old_logical_tag_value != []:
-                            if settings.logical_tags[logical_tag].get("widget") == "date_time":
-                                date_time_format = "%Y:%m:%d %H:%M:%S"
-                                old_dt_string = old_logical_tag_value[:19]
-                                old_dt = datetime.strptime(old_dt_string, date_time_format)
-                                dt_string = logical_tag_values[logical_tag][:19]
-                                dt = datetime.strptime(dt_string, date_time_format)
-                                self.date_time_change = dt - old_dt
-
-# Calculate change in date-tag:
-#  1. Look in settings if type is date/time. If it is, then store delta in a dictionary: { logical_tag: tag-value delta }
-
-
-            for logical_tag in logical_tag_values:
-                while logical_tag in self.logical_tags_missing_value:
-                    self.logical_tags_missing_value.remove(logical_tag)
+                        self.logical_tag_instances.get(logical_tag).setValue(logical_tag_values[logical_tag])
 
     def __updateLogicalTagValuesFromQueue(self):
         json_queue = file_util.JsonQueue.getInstance(settings.queue_file_path)
@@ -321,7 +304,8 @@ class FileMetadata(QObject):
                     if ref_logical_tag:
                         label_key = settings.logical_tags.get(ref_logical_tag).get("label_text_key")
                         label = settings.text_keys.get(label_key).get(settings.language)
-                        ref_logical_tag_value = self.logical_tag_values.get(ref_logical_tag)
+                        ref_logical_tag_instance = self.logical_tag_instances.get(ref_logical_tag)
+                        ref_logical_tag_value = ref_logical_tag_instance.getValue() if ref_logical_tag_instance is not None else None
                         if type(ref_logical_tag_value) == str:
                             if ref_logical_tag_value != "":
                                 if not first:
@@ -337,28 +321,31 @@ class FileMetadata(QObject):
                                 if tag_content.get('tag_label'):
                                     logical_tag_value += label + ': '
                                 logical_tag_value += ', '.join(ref_logical_tag_value)
-            self.logical_tag_values[logical_tag]=logical_tag_value
+                                first = False
+            logical_tag_instance  = self.logical_tag_instances.get(logical_tag)
+            if logical_tag_instance is not None:
+                logical_tag_instance.setValue(logical_tag_value)
 
 
     def setLogicalTagValues(self,logical_tag_values,overwrite=True,force_rewrite = False):
-        dueue_for_queuing=False
+        due_for_queuing=False
 
         # Update tag-values in instance from queue
         if self.metadata_status == '':     # Metadata has already been read from file
-            old_logical_tag_values = copy.deepcopy(self.logical_tag_values)
+            old_logical_tag_values = self.getLogicalTagValues()
             self.__updateLogicalTagValues(logical_tag_values,overwrite)
             self.__updateReferenceTags()
-            if self.logical_tag_values != old_logical_tag_values:
-                dueue_for_queuing=True
-                self.change_signal.emit(self.file_name, old_logical_tag_values, self.logical_tag_values)
+            if self.getLogicalTagValues() != old_logical_tag_values:
+                due_for_queuing=True
+                self.change_signal.send(self.file_name, old_logical_tag_values, self.getLogicalTagValues())
 
         if self.metadata_status != '':    # Put everything in queue, if file has not yet been read
-            dueue_for_queuing = True
+            due_for_queuing = True
         if force_rewrite:
-            dueue_for_queuing = True
+            due_for_queuing = True
 
         # Write tags to queue
-        if dueue_for_queuing:
+        if due_for_queuing:
             self.file_status = 'QUEUING'
             json_queue_file = file_util.JsonQueue.getInstance(settings.queue_file_path)
             json_queue_file.enqueue({'file': self.file_name, 'overwrite': overwrite,'logical_tag_values': logical_tag_values, 'force_rewrite': force_rewrite})
@@ -379,35 +366,27 @@ class FileMetadata(QObject):
 
 
     def save(self):
-        if self.is_virgin or self.force_rewrite or self.logical_tag_values != self.saved_logical_tag_values:
+        logical_tag_values = self.getLogicalTagValues()
+        saved_logical_tag_values = self.getSavedLogicalTagValues()
+        if self.is_virgin or self.force_rewrite or self.getLogicalTagValues() != self.getSavedLogicalTagValues():
             self.file_status = 'WRITING'
             logical_tags_tags = settings.file_type_tags.get(self.type.lower())
             tag_values = {}
-            for logical_tag in self.logical_tag_values:
-
-                #               logical_tag_type = settings.logical_tags.get(logical_tag)
-                if self.logical_tag_values[logical_tag] != self.saved_logical_tag_values.get(
-                        logical_tag) or self.force_rewrite or self.is_virgin:  # New value to be saved
+            for logical_tag in self.logical_tag_instances:
+                saved_logical_tag_instance = self.saved_logical_tag_instances.get(logical_tag)
+                saved_logical_tag_value = saved_logical_tag_instance.getValue() if saved_logical_tag_instance is not None else None
+                if self.logical_tag_instances[logical_tag].getValue() != saved_logical_tag_value or self.force_rewrite or self.is_virgin:  # New value to be saved
                     logical_tag_tags = logical_tags_tags.get(logical_tag)  # All physical tags for logical tag"
-                    tag_set = []
-                    for tag_set_draft in logical_tag_tags:
-                        if not isinstance(tag_set_draft, list):
-                            tag_set_draft = [tag_set_draft]
-                        tag_set = []
-                        for tag in tag_set_draft:
-                            tag_access = settings.tags.get(tag).get('access')
-                            if 'Write' in tag_access:
-                                tag_set.append(tag)
-                        if not tag_set == []:
-                            tag_set_values = TagConverter.tagWrite(logical_tag, tag_set, self.logical_tag_values[logical_tag])
-                            for tag in tag_set_values:
-                                tag_values[tag] = tag_set_values.get(tag)
+                    for tag in logical_tag_tags:
+                        tag_access = settings.tags.get(tag).get('access')
+                        if 'Write' in tag_access:
+                            tag_values[tag] = self.logical_tag_instances[logical_tag].getExifValue(tag)
 
             if tag_values != {} and tag_values != None:
                 with ExifTool(executable=self.exif_executable, configuration=self.exif_configuration) as ex:
                     ex.setTags(self.file_name, tag_values,'WRITE')
 
-            self.saved_logical_tag_values = copy.deepcopy(self.logical_tag_values)
+            self.saved_logical_tag_instances = copy.deepcopy(self.logical_tag_instances)
             self.file_status = ''
             self.is_virgin=False
             self.force_rewrite=False
@@ -806,9 +785,13 @@ class FilePreview(QObject):
         if self.image == None:
             return None
         else:
-            rotation = FileMetadata.getInstance(self.file_name).logical_tag_values.get("rotation")
-            if rotation == None:
+            rotation_instance = FileMetadata.getInstance(self.file_name).logical_tag_instances.get("rotation")
+            if rotation_instance == None:
                 rotation = 0.
+            else:
+                rotation = rotation_instance.getValue()
+                if rotation is None:
+                    rotation = 0
             if self.current_rotation is None:
                 if self.original_image_rotated:
                     self.current_rotation = rotation
@@ -863,7 +846,19 @@ class FilePreview(QObject):
     def __movie_to_qimage(self,file_name):
         if self.image == None:
             video_clip = VideoFileClip(file_name)
-            thumbnail = video_clip.get_frame(0)  # Get the first frame as the thumbnail
+
+            # Get frame 3% into the video. The first seconds are often black or blurry/shaked
+            fps = video_clip.fps
+            duration = video_clip.duration
+            frame = int(duration*3/100*fps)  # Frame
+            thumbnail = video_clip.get_frame(frame)  # Get the first frame as the thumbnail
+
+            # If recorded in portrait-mode, swap height and width
+            if hasattr(video_clip, 'rotation'):
+                rotation = video_clip.rotation
+                if rotation in [90, 270]:
+                    original_width, original_height = video_clip.size
+                    thumbnail = cv2.resize(thumbnail, (original_height, original_width))  # Swap hight and width
             video_clip.close()
 
             height, width, channel = thumbnail.shape
