@@ -199,6 +199,9 @@ class FilePanel(QScrollArea):
         FilePanel.tags = {}
         for logical_tag in settings.logical_tags:
             tag_label = None
+            new_line = settings.logical_tags.get(logical_tag).get("new_line")
+            if new_line == None:
+                new_line = True
             tag_label_key = settings.logical_tags.get(logical_tag).get("label_text_key")
             if tag_label_key:
                 tag_label = settings.text_keys.get(tag_label_key).get(settings.language)
@@ -210,30 +213,30 @@ class FilePanel(QScrollArea):
             else:
                 label_widget = None
 
-            if tag_widget_type == "text_line":
+            if tag_widget_type == "TextLine":
                 tag_widget = TextLine(FilePanel.file_name,logical_tag)
-                FilePanel.tags[logical_tag] = [label_widget, tag_widget, tag_widget_type]
-            elif tag_widget_type == "text":
+                FilePanel.tags[logical_tag] = [label_widget, tag_widget, tag_widget_type, new_line]
+            elif tag_widget_type == "Text":
                 tag_widget = Text(FilePanel.file_name,logical_tag)
-                FilePanel.tags[logical_tag] = [label_widget, tag_widget, tag_widget_type]
-            elif tag_widget_type == "date_time":
+                FilePanel.tags[logical_tag] = [label_widget, tag_widget, tag_widget_type, new_line]
+            elif tag_widget_type == "DateTime":
                 tag_widget = DateTime(FilePanel.file_name,logical_tag)
-                FilePanel.tags[logical_tag] = [label_widget, tag_widget, tag_widget_type]
-            elif tag_widget_type == "date":
+                FilePanel.tags[logical_tag] = [label_widget, tag_widget, tag_widget_type, new_line]
+            elif tag_widget_type == "Date":
                 tag_widget = Date(FilePanel.file_name,logical_tag)
-                FilePanel.tags[logical_tag] = [label_widget, tag_widget, tag_widget_type]
-            elif tag_widget_type == "text_set":
+                FilePanel.tags[logical_tag] = [label_widget, tag_widget, tag_widget_type, new_line]
+            elif tag_widget_type == "TextSet":
                 tag_widget = TextSet(FilePanel.file_name,logical_tag)
-                FilePanel.tags[logical_tag] = [label_widget, tag_widget, tag_widget_type]
-            elif tag_widget_type == "geo_location":
+                FilePanel.tags[logical_tag] = [label_widget, tag_widget, tag_widget_type, new_line]
+            elif tag_widget_type == "GeoLocation":
                 tag_widget = GeoLocation(FilePanel.file_name,logical_tag)
-                FilePanel.tags[logical_tag] = [label_widget, tag_widget, tag_widget_type]
-            elif tag_widget_type == "rotation":
+                FilePanel.tags[logical_tag] = [label_widget, tag_widget, tag_widget_type, new_line]
+            elif tag_widget_type == "Rotation":
                 tag_widget = Rotation(FilePanel.file_name, logical_tag)
-                FilePanel.tags[logical_tag] = [label_widget, tag_widget, tag_widget_type]
-            elif tag_widget_type == "rating":
+                FilePanel.tags[logical_tag] = [label_widget, tag_widget, tag_widget_type, new_line]
+            elif tag_widget_type == "Rating":
                 tag_widget = Rating(FilePanel.file_name, logical_tag)
-                FilePanel.tags[logical_tag] = [label_widget, tag_widget, tag_widget_type]
+                FilePanel.tags[logical_tag] = [label_widget, tag_widget, tag_widget_type, new_line]
             else:
                 pass
 
@@ -333,6 +336,16 @@ class FileList(QTreeView):
                 self.logical_tag_actions[logical_tag] = tag_action
                 self.menu.addAction(tag_action)
                 tag_action.triggered.connect(self.toggleAction)
+                if settings.logical_tags.get(logical_tag).get("widget") == "date_time":
+                    tag_label = tag_label + " delta"
+                    tag_action = QAction(tag_label, self, checkable=True)
+                    if settings.logical_tags.get(logical_tag).get("default_paste_select") == False:
+                        tag_action.setChecked(False)
+                    else:
+                        tag_action.setChecked(True)
+                    self.logical_tag_actions[logical_tag+"#delta"] = tag_action
+                    self.menu.addAction(tag_action)
+                    tag_action.triggered.connect(self.toggleAction)
 
     def openMenu(self, position):
         if not hasattr(self, 'menu'):
@@ -1005,12 +1018,11 @@ def onFileRenamed(old_file_name, new_file_name, update_original_filename_tag=Fal
                     file_metadata_pasted_emitter = FileMetadataPastedEmitter.getInstance()
                     file_metadata_pasted_emitter.emit(new_file_name)
 
-
 def onCurrentFileChanged(new_file_name):
-    FilePanel.saveMetadata()                      # Saves metadata for file currently in filepanel (if any)
-    dummy = FilePanel.getInstance(new_file_name)  # Puts new file in file-panel
-    FileReadQueue.appendQueue(new_file_name)
-
+    if new_file_name != FilePanel.file_name:
+        FilePanel.saveMetadata()                      # Saves metadata for file currently in filepanel (if any)
+        dummy = FilePanel.getInstance(new_file_name)  # Puts new file in file-panel
+        FileReadQueue.appendQueue(new_file_name)
 
 def onImageRotated(file_name):
     if file_name == FilePanel.file_name:

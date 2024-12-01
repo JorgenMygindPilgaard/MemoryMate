@@ -1,6 +1,6 @@
-from PyQt6.QtWidgets import QWidget, QHBoxLayout, QVBoxLayout, QLabel, QLineEdit, QPlainTextEdit, QDateTimeEdit, QDateEdit, QPushButton, QListWidget, QAbstractItemView
-from PyQt6.QtCore import Qt, QDateTime, QDate, QTimer, QObject, pyqtSignal, QSize
-from PyQt6.QtGui import QFontMetrics,QPixmap,QIcon
+from PyQt6.QtWidgets import QWidget, QHBoxLayout, QVBoxLayout, QLabel, QLineEdit, QPlainTextEdit, QDateTimeEdit, QDateEdit, QPushButton, QListWidget, QAbstractItemView,QSpacerItem,QSizePolicy
+from PyQt6.QtCore import Qt, QDateTime, QDate, QTimer, QObject, pyqtSignal, QSize,QRegularExpression
+from PyQt6.QtGui import QFontMetrics,QPixmap,QIcon,QKeyEvent, QFocusEvent
 import settings
 from file_metadata_util import FileMetadata
 from ui_util import AutoCompleteList
@@ -147,19 +147,39 @@ class Text(QPlainTextEdit):
 
         return text_height
 
-class DateTime(QDateTimeEdit):
+class DateTime(QWidget):
     def __init__(self, file_name, logical_tag):
         super().__init__()
         self.file_name = file_name
         self.logical_tag = logical_tag                                    #Widget should remember who it serves
-        self.setCalendarPopup(True)
-        self.setFixedWidth(250)
         self.auto_complete_list = None
 
-        display_format = self.displayFormat()
-        if not 'mm.ss' in display_format.lower():
-            self.setDisplayFormat(display_format+'.ss')
-        display_format = self.displayFormat()
+        self.date_time_edit = QDateTimeEdit()
+        self.date_time_edit.setCalendarPopup(True)
+        self.date_time_edit.setDisplayFormat("dd/MM/yyyy HH:mm:ss")
+        self.date_time_edit.setFixedWidth(150)
+        self.date_time_edit.setAlignment(Qt.AlignmentFlag.AlignLeft)
+        self.second_fraction = ''
+
+        self.offset_edit = self.TimeOffsetLineEdit()
+        self.offset_edit.setFixedWidth(60)
+        self.offset_edit.setPlaceholderText("±00:00")
+
+        self.space = QSpacerItem(0,0,QSizePolicy.Policy.Expanding,QSizePolicy.Policy.Minimum)
+
+        # Layout to hold both date-time edit and offset edit
+        self.layout = QHBoxLayout()
+        self.layout.setContentsMargins(0, 0, 0, 0)
+        self.layout.addWidget(self.date_time_edit,alignment=Qt.AlignmentFlag.AlignLeft)
+        self.layout.addWidget(self.offset_edit,alignment=Qt.AlignmentFlag.AlignLeft)
+        self.layout.addSpacerItem(self.space)
+
+        self.setLayout(self.layout)
+
+        # display_format = self.displayFormat()
+        # if not 'mm.ss' in display_format.lower():
+        #     self.setDisplayFormat(display_format+'.ss')
+        # display_format = self.displayFormat()
 
         #Get attributes of tag
         tag_attributes = settings.logical_tags.get(self.logical_tag)
@@ -177,29 +197,108 @@ class DateTime(QDateTimeEdit):
     def readFromImage(self):
         file_metadata = FileMetadata.getInstance(self.file_name)
         if file_metadata:
-            date_time = file_metadata.getLogicalTagValues().get(self.logical_tag)
-            if date_time == None:
+            local_date_time = file_metadata.getLogicalTagValues().get(self.logical_tag) # 2022-12-24T13:50:00+02:00
+            if local_date_time == None:
                 return
-            self.clear()
-            self.setStyleSheet("color: #D3D3D3;")
-            if date_time != "" and date_time != None:  # Data was found
-                date_time = ''.join(date_time.split('+')[:1]) # 2022/12/24 13:50:00+02:00 --> 2022/12/24 13:50:00
-                date_time = date_time.replace(" ", ":")       # 2022/12/24 13:50:00 --> 2022/12/24:13:50:00
-                date_time = date_time.replace("/", ":")       # 2022/12/24:13:50:00 --> 2022:12:24:13:50:00
-                date_time_parts = date_time.split(":")        # 2022:12:24:13:50:00 --> ["2022", "12", "24", "13", "50", "00"]
-                while len(date_time_parts) < 6:
-                    date_time_parts.append("")
-                self.setDateTime(QDateTime(int(date_time_parts[0]), int(date_time_parts[1]), int(date_time_parts[2]),
-                                           int(date_time_parts[3]), int(date_time_parts[4]), int(date_time_parts[5])))
-                self.setStyleSheet("color: black")
+            self.date_time_edit.clear()
+            self.offset_edit.clear()
+            self.date_time_edit.setStyleSheet("color: #D3D3D3;")
+            self.offset_edit.setStyleSheet("color: #D3D3D3;")
+            if local_date_time != "" and local_date_time != None:  # Data was found
+                year = local_date_time[0:4]
+                month = local_date_time[5:7]
+                day = local_date_time[8:10]
+                hour = local_date_time[11:13]
+                minute = local_date_time[14:16]
+                second = local_date_time[17:19]
+                utc_offset = ''
+                utc_offset_index = local_date_time.find('+',19)
+                if utc_offset_index == -1:
+                    utc_offset_index = local_date_time.find('-',19)
+                if utc_offset_index == -1:
+                    utc_offset_index = local_date_time.find('Z',19)
+                if utc_offset_index != -1:
+                    utc_offset = local_date_time[utc_offset_index:]
+                    if utc_offset == 'Z':
+                        utc_offset = 'UTC'
+                second_fraction_index = local_date_time.find('.')
+                self.second_fraction = ''    # Widget never modifies fraction. It just remembers and reinsert after correction
+                if second_fraction_index != -1:
+                    if utc_offset_index != -1:
+                        self.second_fraction = local_date_time[second_fraction_index:utc_offset_index]
+                    else:
+                        self.second_fraction = local_date_time[second_fraction_index:]
+
+                self.date_time_edit.setDateTime(QDateTime(int(year), int(month), int(day), int(hour), int(minute), int(second)))
+                self.offset_edit.setText(utc_offset)
+                self.date_time_edit.setStyleSheet("color: black")
+                self.offset_edit.setStyleSheet("color: black")
+
                 if self.auto_complete_list != None:
-                    self.auto_complete_list.collectItem(date_time)    # Collect new entry in auto_complete_list
+                    self.auto_complete_list.collectItem(local_date_time)    # Collect new entry in auto_complete_list
 
     def logical_tag_value(self):
-        logical_tag_value = self.dateTime().toString("yyyy:MM:dd hh:mm:ss")
+        logical_tag_value = self.date_time_edit.dateTime().toString("yyyy-MM-ddThh:mm:ss")
+        if self.second_fraction != '':
+            logical_tag_value = logical_tag_value + self.second_fraction
+        if self.offset_edit.text()=='UTC':
+            logical_tag_value = logical_tag_value + 'Z'
+        else:
+            logical_tag_value = logical_tag_value + self.offset_edit.text()
         if self.auto_complete_list != None and logical_tag_value != '':  # Collect value in autocomplete-list
             self.auto_complete_list.collectItem(logical_tag_value)
         return logical_tag_value
+
+    class TimeOffsetLineEdit(QLineEdit):
+        def __init__(self, parent=None):
+            super().__init__(parent)
+            self.setMaxLength(6)  # To ensure the format "+HH:MM"
+
+        def focusInEvent(self, event: QFocusEvent):
+            super().focusInEvent(event)
+            self.selectAll()
+
+        def keyPressEvent(self, event: QKeyEvent):
+            if self.text() == self.selectedText():
+                self.clear()
+            text = self.text()
+            key = event.key()
+            input_char = event.text()
+
+            # Allow navigation keys
+            if key in (Qt.Key.Key_Backspace, Qt.Key.Key_Delete, Qt.Key.Key_Left, Qt.Key.Key_Right):
+                super().keyPressEvent(event)
+                return
+
+            if len(self.text()) == 0:
+                if input_char in ['Z', 'U', 'z', 'u']:    #UTC Time-zone
+                    self.setText('UTC')
+                elif input_char in ['+', '-']:
+                    self.setText(input_char)
+                elif input_char in ['0', '1', '2']:
+                    self.setText('+' + input_char)
+                    self.first_hour_digit = input_char
+            elif len(self.text()) == 1 and self.text() != 'Z':  # Expecting first digit in hours (HH)
+                if input_char in ['0', '1', '2']:
+                    text += input_char
+                    self.setText(text)
+                    self.first_hour_digit = input_char
+            elif len(self.text()) == 2:  # Expecting second digit in hours (HH)
+                if input_char.isdigit():
+                    if self.first_hour_digit in ['0', '1'] or input_char in ['0', '1', '2',
+                                                                             '3']:  # 00-09, 10-19 or 20-23"
+                        text += input_char + ':'
+                        self.setText(text)
+            elif len(self.text()) == 4:  # Expecting first digit in minutes (MM)
+                if input_char in ['0', '1', '3', '4']:  # 00, 15, 30 and 45 allowed
+                    text += input_char
+                    self.setText(text)
+                    self.first_minute_digit = input_char
+            elif len(self.text()) == 5:  # Expecting second digit in minutes (MM)
+                if input_char.isdigit():
+                    if self.first_minute_digit in ['0', '3'] and input_char in ['0'] or self.first_minute_digit in ['1','4'] and input_char in [ '5']:
+                        text += input_char
+                        self.setText(text)
 
 class Date(QDateEdit):
     def __init__(self, file_name, logical_tag):
@@ -439,90 +538,6 @@ class GeoLocation(MapView):
         if self.auto_complete_list != None and logical_tag_value != '':    # Collect value in autocomplete-list
             self.auto_complete_list.collectItem(logical_tag_value)
         return logical_tag_value
-
-# class Orientation(QWidget):
-#     def __init__(self, file_name, logical_tag):
-#         super().__init__()
-#         self.file_name = file_name
-#         self.logical_tag = logical_tag
-#         self.orientation = None
-#         self.initUI()
-#
-#     def initUI(self):
-#         self.layout = QHBoxLayout()
-#
-#
-#         # Create a QLabel for "rotate_left" image
-#         self.left_image_label = QLabel()
-#         self.left_image_label.setPixmap(QPixmap('rotate_left.png'))  # Replace with your image file
-#         self.left_image_label.mousePressEvent = self.onRotateLeft
-#         self.left_image_label.enterEvent = self.onEnterLeft
-#         self.left_image_label.leaveEvent = self.onLeaveLeft
-#
-#         # Create a QLabel for "rotate_right" image
-#         self.right_image_label = QLabel()
-#         self.right_image_label.setPixmap(QPixmap('rotate_right.png'))  # Replace with your image file
-#         self.right_image_label.mousePressEvent = self.onRotateRight
-#         self.right_image_label.enterEvent = self.onEnterRight
-#         self.right_image_label.leaveEvent = self.onLeaveRight
-#
-#
-#         self.layout.addStretch(1)
-#         self.layout.addWidget(self.left_image_label)
-#         self.layout.addWidget(self.right_image_label)
-#         self.layout.addStretch(1)
-#
-#         self.setLayout(self.layout)
-#
-#     def readFromImage(self):
-#         file_metadata = FileMetadata.getInstance(self.file_name)
-#         if file_metadata:
-#             orientation = file_metadata.getLogicalTagValues().get(self.logical_tag)
-#             if orientation == None:
-#                 return
-#             self.orientation = orientation
-#
-#     def logical_tag_value(self):
-#         return self.orientation
-#
-#     def onRotateLeft(self, event):
-#         if self.orientation == 1 or self.orientation == None:     # 1: Not Rotated
-#             self.orientation = 8                                  # 8: Rotated 270 CW
-#         elif self.orientation == 8:                               # 8: Rotated 270 CW
-#             self.orientation = 3                                  # 3: Rotated 180
-#         elif self.orientation == 3:                               # 3: Rotated 180
-#             self.orientation = 6                                  # 6: Rotated 90 CW
-#         elif self.orientation == 6:                               # 6: Rotated 90 CW
-#             self.orientation = 1                                  # 1: Not Rotated
-#         else:
-#             self.orientation = 1
-#         image_rotated_emitter = ImageRotatedEmitter.getInstance()
-#         image_rotated_emitter.emit(self.file_name)
-#
-#     def onRotateRight(self, event):
-#         if self.orientation == 1 or self.orientation == None:     # 1: Not Rotated
-#             self.orientation = 6                                  # 6: Rotated 90 CW
-#         elif self.orientation == 6:                               # 6: Rotated 90 CW
-#             self.orientation = 3                                  # 3: Rotated 180
-#         elif self.orientation == 3:                               # 3: Rotated 180
-#             self.orientation = 8                                  # 8: Rotated 270 CW
-#         elif self.orientation == 8:                               # 8: Rotated 270 CW
-#             self.orientation = 1                                  # 1: Not Rotated
-#         else:
-#             self.orientation = 1
-#         image_rotated_emitter = ImageRotatedEmitter.getInstance()
-#         image_rotated_emitter.emit(self.file_name)
-#
-#     def onEnterLeft(self,event):
-#         self.left_image_label.setCursor(Qt.CursorShape.PointingHandCursor)  # Change cursor to pointing hand when mouse enters
-#
-#     def onLeaveLeft(self,event):
-#         self.left_image_label.setCursor(Qt.CursorShape.ArrowCursor)  # Change cursor back tor arrow
-#     def onEnterRight(self,event):
-#         self.right_image_label.setCursor(Qt.CursorShape.PointingHandCursor)  # Change cursor to pointing hand when mouse enters
-#
-#     def onLeaveRight(self,event):
-#         self.right_image_label.setCursor(Qt.CursorShape.ArrowCursor)  # Change cursor back tor arrow
 
 class Rotation(QWidget):
     def __init__(self, file_name, logical_tag):
