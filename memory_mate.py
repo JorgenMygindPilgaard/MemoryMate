@@ -6,6 +6,7 @@ from file_metadata_util import QueueHost, QueueStatusMonitor, FileReadQueue
 from ui_status import UiStatusManager
 from ui_main import FilePanel, FileList, SettingsWheeel
 from PyQt6.QtGui import QIcon
+from PyQt6.QtCore import Qt, QEvent
 from file_metadata_util import FileMetadata, FilePreview
 import settings
 
@@ -94,6 +95,16 @@ class MainWindow(QMainWindow):
         # if self.ui_status.getStatusParameter('geometry'):
         #     self.setGeometry(self.ui_status.getStatusParameter('geometry').toVariang())
 
+        self.file_panel.installEventFilter(self)
+
+    def eventFilter(self, source, event):
+        if source == self.file_panel and event.type() == QEvent.Type.KeyPress:
+            if event.key() in (Qt.Key.Key_Up, Qt.Key.Key_Down, Qt.Key.Key_Left, Qt.Key.Key_Right, Qt.Key.Key_PageDown, Qt.Key.Key_PageUp):
+                # Forward the event to FileList
+                QApplication.sendEvent(self.file_list, event)
+                return True
+        return super().eventFilter(source, event)
+
     def closeEvent(self, event):
         self.file_panel.saveMetadata()      # Saves metadata if changed
         self.ui_status.setUiStatusParameters({'current_file':   self.file_panel.file_name,
@@ -106,6 +117,7 @@ class MainWindow(QMainWindow):
         QueueHost.get_instance().stop_queue_worker()
         ExifTool.closeProcess()              # Close exiftool processes
         super().closeEvent(event)
+
 
 app = QApplication(sys.argv)
 window = MainWindow()

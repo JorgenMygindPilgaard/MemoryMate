@@ -1,4 +1,6 @@
-from PyQt6.QtWidgets import QWidget, QHBoxLayout, QVBoxLayout, QLabel, QLineEdit, QPlainTextEdit, QDateTimeEdit, QDateEdit, QPushButton, QListWidget, QAbstractItemView,QSpacerItem,QSizePolicy
+import time
+
+from PyQt6.QtWidgets import QWidget, QHBoxLayout, QVBoxLayout, QLabel, QLineEdit, QPlainTextEdit, QDateTimeEdit, QDateEdit, QPushButton, QListWidget, QAbstractItemView,QSpacerItem,QSizePolicy,QAbstractSpinBox
 from PyQt6.QtCore import Qt, QDateTime, QDate, QTimer, QObject, pyqtSignal, QSize,QRegularExpression
 from PyQt6.QtGui import QFontMetrics,QPixmap,QIcon,QKeyEvent, QFocusEvent
 import settings
@@ -38,6 +40,10 @@ class TextLine(QLineEdit):
             autocompleter_file = os.path.join(settings.app_data_location, "autocomplete_" + self.logical_tag +'.txt')
             self.auto_complete_list.setFileName(autocompleter_file)
         self.readFromImage()
+
+    def setDisabled(self, a0):
+        super().setFrame(False)
+        super().setDisabled(a0)
 
     def readFromImage(self):
         file_metadata = FileMetadata.getInstance(self.file_name)
@@ -90,6 +96,9 @@ class Text(QPlainTextEdit):
         file_metadata = FileMetadata.getInstance(self.file_name)
         if file_metadata:
             text = file_metadata.getLogicalTagValues().get(self.logical_tag)
+            if isinstance(text,str):
+                if text.isspace():
+                    text = ''
             if text == None:
                 return
             self.setPlainText(text)
@@ -153,18 +162,45 @@ class DateTime(QWidget):
         self.file_name = file_name
         self.logical_tag = logical_tag                                    #Widget should remember who it serves
         self.auto_complete_list = None
+        self.locked = True
 
-        self.date_time_edit = QDateTimeEdit()
+        # Field for editing date/time
+        self.date_time = None
+        self.date_time_edit = self.DateTimeEdit(parent=self)
         self.date_time_edit.setCalendarPopup(True)
         self.date_time_edit.setDisplayFormat("dd/MM/yyyy HH:mm:ss")
         self.date_time_edit.setFixedWidth(150)
         self.date_time_edit.setAlignment(Qt.AlignmentFlag.AlignLeft)
-        self.second_fraction = ''
 
+        # Field for showing old date/time from before latest edit
+        self.old_date_time = None
+        self.old_date_time_edit = self.DateTimeEdit()
+        self.old_date_time_edit.setDisplayFormat("dd/MM/yyyy HH:mm:ss")
+        self.old_date_time_edit.setFixedWidth(150)
+        self.old_date_time_edit.setFrame(False)  # Disable frame
+        self.old_date_time_edit.setReadOnly(True)  # Make it non-editable
+        self.old_date_time_edit.setDisabled(True)
+        self.old_date_time_edit.setHidden(True)
+        self.old_date_time_edit.setAlignment(Qt.AlignmentFlag.AlignLeft)
+        self.old_date_time_edit.setButtonSymbols(QAbstractSpinBox.ButtonSymbols.NoButtons)
+        font = self.old_date_time_edit.font()
+        font.setStrikeOut(True)  # Enable strikethrough
+        self.old_date_time_edit.setFont(font)
+
+        # Field for editing UTC-offset
         self.offset_edit = self.TimeOffsetLineEdit()
         self.offset_edit.setFixedWidth(60)
         self.offset_edit.setPlaceholderText("±00:00")
 
+        # Fraction of seconds (kept unchanged)
+        self.second_fraction = ''
+
+        # Icon for locking/unlocking date/time edit
+        self.padlock = self.Padlock('closed')
+        self.setEditMode('closed')
+        self.padlock.toggled.connect(self.setEditMode)
+
+        # Space between fields
         self.space = QSpacerItem(0,0,QSizePolicy.Policy.Expanding,QSizePolicy.Policy.Minimum)
 
         # Layout to hold both date-time edit and offset edit
@@ -172,14 +208,11 @@ class DateTime(QWidget):
         self.layout.setContentsMargins(0, 0, 0, 0)
         self.layout.addWidget(self.date_time_edit,alignment=Qt.AlignmentFlag.AlignLeft)
         self.layout.addWidget(self.offset_edit,alignment=Qt.AlignmentFlag.AlignLeft)
+        self.layout.addWidget(self.padlock,alignment=Qt.AlignmentFlag.AlignLeft)
+        self.layout.addWidget(self.old_date_time_edit,alignment=Qt.AlignmentFlag.AlignLeft)
         self.layout.addSpacerItem(self.space)
 
         self.setLayout(self.layout)
-
-        # display_format = self.displayFormat()
-        # if not 'mm.ss' in display_format.lower():
-        #     self.setDisplayFormat(display_format+'.ss')
-        # display_format = self.displayFormat()
 
         #Get attributes of tag
         tag_attributes = settings.logical_tags.get(self.logical_tag)
@@ -190,57 +223,131 @@ class DateTime(QWidget):
             self.auto_complete_list.setFileName(autocompleter_file)
         self.readFromImage()
 
+    class DateTimeEdit(QDateTimeEdit):
+        def __init__(self, parent=None):
+            super().__init__(parent)
+            self.blank_date_time = QDateTime(1753, 1, 1, 0, 0, 0, 1)
+            self.parent_widget = parent  # Store a reference to the parent widget
+            self.setSpecialValueText(' ')
+            self.setMinimumDateTime(self.blank_date_time)
+            self.setDateTime(self.blank_date_time)
+
+        def focusOutEvent(self, event: QFocusEvent):
+            # Call the parent's focus-out handler if it exists
+            if self.parent_widget:
+                self.parent_widget.atFocusOutEvent()
+            super().focusOutEvent(event)  # Ensure default behavior is preserved
+
+    def setEditMode(self,state):
+        if state == 'open':
+            self.date_time_edit.setDisabled(False)
+            self.offset_edit.setDisabled(False)
+            if self.date_time_edit.dateTime()==self.date_time_edit.blank_date_time:
+                self.date_time_edit.setDateTime(QDateTime(2000,1,1,0,0,0))
+        else:
+            self.date_time_edit.setDisabled(True)
+            self.offset_edit.setDisabled(True)
+
     def wheelEvent(self, event):
         # Ignore the wheel event
         event.ignore()
 
+    def __fillDateTimeEdit(self,date_time_edit,date_time):
+        if len(date_time)>6:  # Data was found
+            year = int(date_time[0:4])
+            month = int(date_time[5:7])
+            day = int(date_time[8:10])
+            hour = int(date_time[11:13])
+            minute = int(date_time[14:16])
+            second = int(date_time[17:19])
+            date_time_edit.setDateTime(QDateTime(year, month, day, hour, minute, second))
+        else:
+            date_time_edit.setDateTime(self.date_time_edit.blank_date_time)
+        return date_time_edit
+
+    def __fillOffsetEdit(self,offset_edit,date_time):
+        offset_edit.clear()
+        if date_time != "" and date_time != None:  # Data was found
+            utc_offset = ''
+            if len(date_time)>6:    # Containd date/time
+                start_pos = 19
+            else:
+                start_pos = 0
+            utc_offset_index = date_time.find('+', start_pos)
+            if utc_offset_index == -1:
+                utc_offset_index = date_time.find('-', start_pos)
+            if utc_offset_index == -1:
+                utc_offset_index = date_time.find('Z', start_pos)
+            if utc_offset_index != -1:
+                utc_offset = date_time[utc_offset_index:]
+                if utc_offset == 'Z':
+                    utc_offset = 'UTC'
+            offset_edit.setText(utc_offset)
+        return offset_edit
+
+    def __fillSecondFraction(self,date_time):
+        second_fraction_index = date_time.find('.')
+        second_fraction = ''  # Widget never modifies fraction. It just remembers and reinsert after correction
+        if second_fraction_index != -1:
+            utc_offset_index = date_time.find('+', 19)
+            if utc_offset_index == -1:
+                utc_offset_index = date_time.find('-', 19)
+            if utc_offset_index == -1:
+                utc_offset_index = date_time.find('Z', 19)
+            if utc_offset_index != -1:
+                second_fraction = date_time[second_fraction_index:utc_offset_index]
+            else:
+                second_fraction = date_time[second_fraction_index:]
+        return second_fraction
+
     def readFromImage(self):
         file_metadata = FileMetadata.getInstance(self.file_name)
         if file_metadata:
-            local_date_time = file_metadata.getLogicalTagValues().get(self.logical_tag) # 2022-12-24T13:50:00+02:00
-            if local_date_time == None:
+            tags = file_metadata.getLogicalTagValues()
+            self.date_time = file_metadata.getLogicalTagValues().get(self.logical_tag) # 2022-12-24T13:50:00+02:00
+
+            if self.date_time== None:
                 return
-            self.date_time_edit.clear()
-            self.offset_edit.clear()
-            self.date_time_edit.setStyleSheet("color: #D3D3D3;")
-            self.offset_edit.setStyleSheet("color: #D3D3D3;")
-            if local_date_time != "" and local_date_time != None:  # Data was found
-                year = local_date_time[0:4]
-                month = local_date_time[5:7]
-                day = local_date_time[8:10]
-                hour = local_date_time[11:13]
-                minute = local_date_time[14:16]
-                second = local_date_time[17:19]
-                utc_offset = ''
-                utc_offset_index = local_date_time.find('+',19)
-                if utc_offset_index == -1:
-                    utc_offset_index = local_date_time.find('-',19)
-                if utc_offset_index == -1:
-                    utc_offset_index = local_date_time.find('Z',19)
-                if utc_offset_index != -1:
-                    utc_offset = local_date_time[utc_offset_index:]
-                    if utc_offset == 'Z':
-                        utc_offset = 'UTC'
-                second_fraction_index = local_date_time.find('.')
-                self.second_fraction = ''    # Widget never modifies fraction. It just remembers and reinsert after correction
-                if second_fraction_index != -1:
-                    if utc_offset_index != -1:
-                        self.second_fraction = local_date_time[second_fraction_index:utc_offset_index]
-                    else:
-                        self.second_fraction = local_date_time[second_fraction_index:]
 
-                self.date_time_edit.setDateTime(QDateTime(int(year), int(month), int(day), int(hour), int(minute), int(second)))
-                self.offset_edit.setText(utc_offset)
-                self.date_time_edit.setStyleSheet("color: black")
-                self.offset_edit.setStyleSheet("color: black")
+            # Fill date/time edit
+            # if self.date_time!= "" and self.date_time!= None:  # Data was found
+            #     self.date_time_edit.setStyleSheet("color: black")
+            # else:
+            #     self.date_time_edit.setStyleSheet("color: #D3D3D3;")
+            self.date_time_edit = self.__fillDateTimeEdit(self.date_time_edit,self.date_time)
 
+            # Fill offset edit
+            # if self.date_time!= "" and self.date_time!= None:  # Data was found
+            #     self.offset_edit.setStyleSheet("color: black")
+            # else:
+            #     self.offset_edit.setStyleSheet("color: #D3D3D3;")
+            self.offset_edit = self.__fillOffsetEdit(self.offset_edit,self.date_time)
+
+            # Fill fraction of second
+            self.second_fraction = self.__fillSecondFraction(self.date_time)
+
+            # Fill old date/time edit (to display time before change with strike through)
+
+            self.old_date_time = file_metadata.getLogicalTagValues().get(self.logical_tag+'.old_value')  # 2022-12-24T13:50:00+02:00
+            if self.old_date_time!= "" and self.old_date_time is not None:     # If old time differs (exist)
+                self.old_date_time_edit = self.__fillDateTimeEdit(self.old_date_time_edit,self.old_date_time)
+                self.old_date_time_edit.setHidden(False)
+            else:
+                self.old_date_time_edit == self.__fillDateTimeEdit(self.old_date_time_edit,self.date_time)
+                self.old_date_time_edit.setHidden(True)
+
+            # Fill autocompleter
+            if self.date_time!= "" and self.date_time!= None:  # Data was found
                 if self.auto_complete_list != None:
-                    self.auto_complete_list.collectItem(local_date_time)    # Collect new entry in auto_complete_list
+                    self.auto_complete_list.collectItem(self.date_time)    # Collect new entry in auto_complete_list
 
     def logical_tag_value(self):
-        logical_tag_value = self.date_time_edit.dateTime().toString("yyyy-MM-ddThh:mm:ss")
-        if self.second_fraction != '':
-            logical_tag_value = logical_tag_value + self.second_fraction
+        if self.date_time_edit.dateTime()==self.date_time_edit.blank_date_time:
+            logical_tag_value = ''
+        else:
+            logical_tag_value = self.date_time_edit.dateTime().toString("yyyy-MM-ddThh:mm:ss")
+            if self.second_fraction != '':
+                logical_tag_value = logical_tag_value + self.second_fraction
         if self.offset_edit.text()=='UTC':
             logical_tag_value = logical_tag_value + 'Z'
         else:
@@ -248,6 +355,39 @@ class DateTime(QWidget):
         if self.auto_complete_list != None and logical_tag_value != '':  # Collect value in autocomplete-list
             self.auto_complete_list.collectItem(logical_tag_value)
         return logical_tag_value
+
+    def atFocusOutEvent(self):
+        next_old_date_time = self.date_time
+        self.date_time = self.logical_tag_value()
+
+        if next_old_date_time is None or next_old_date_time == "":   # Adding date for the first time
+            self.old_date_time = next_old_date_time
+            self.old_date_time_edit.clear()
+            self.old_date_time_edit.setHidden(True)
+        else:
+            if self.date_time is None or self.date_time == "":    # Clearing a date
+                self.old_date_time = next_old_date_time
+                self.old_date_time_edit = self.__fillDateTimeEdit(self.old_date_time_edit, self.old_date_time)
+                self.old_date_time_edit.setHidden(False)
+            elif self.date_time[:19] != next_old_date_time[:19]:   # Changing a date
+                self.old_date_time = next_old_date_time
+                self.old_date_time_edit = self.__fillDateTimeEdit(self.old_date_time_edit, self.old_date_time)
+                self.old_date_time_edit.setHidden(False)
+            else:                                                 # Date/time not changed
+                pass
+
+
+
+        if self.date_time is None or self.date_time == "" or next_old_date_time is None or next_old_date_time == "":
+            self.old_date_time_edit.setHidden(True)
+        elif self.date_time[:19] != next_old_date_time[:19]:
+            self.old_date_time = next_old_date_time
+            self.old_date_time_edit.setHidden(False)
+            self.old_date_time_edit = self.__fillDateTimeEdit(self.old_date_time_edit, self.old_date_time)
+        else:
+            self.old_date_time_edit.setHidden(True)
+
+
 
     class TimeOffsetLineEdit(QLineEdit):
         def __init__(self, parent=None):
@@ -299,6 +439,42 @@ class DateTime(QWidget):
                     if self.first_minute_digit in ['0', '3'] and input_char in ['0'] or self.first_minute_digit in ['1','4'] and input_char in [ '5']:
                         text += input_char
                         self.setText(text)
+
+    class Padlock(QLabel):
+        toggled = pyqtSignal(str)
+        def __init__(self,state):
+            super().__init__()
+
+            # Set up the layout and size
+            self.setAlignment(Qt.AlignmentFlag.AlignCenter)
+            self.setFixedSize(24, 24)
+
+            # Load images
+            self.closed_padlock = QPixmap("closed_padlock.png").scaled(20, 20, Qt.AspectRatioMode.KeepAspectRatio,Qt.TransformationMode.SmoothTransformation)
+            self.open_padlock = QPixmap("open_padlock.png").scaled(20, 20, Qt.AspectRatioMode.KeepAspectRatio,Qt.TransformationMode.SmoothTransformation)
+
+            # Set initial image to closed padlock
+            self.current_state = state
+            if state == 'open':
+                self.setPixmap(self.open_padlock)
+                self.current_state = 'open'
+            else:
+                self.setPixmap(self.closed_padlock)
+                self.current_state = 'closed'
+
+
+            # Enable click event
+            self.mousePressEvent = self.togglePadlock
+
+        def togglePadlock(self, event):
+            # Toggle the image on click
+            if self.current_state == "closed":
+                self.setPixmap(self.open_padlock)
+                self.current_state = "open"
+            else:
+                self.setPixmap(self.closed_padlock)
+                self.current_state = "closed"
+            self.toggled.emit(self.current_state)
 
 class Date(QDateEdit):
     def __init__(self, file_name, logical_tag):
@@ -534,8 +710,8 @@ class GeoLocation(MapView):
         if self.marker_location:
             logical_tag_value = str(self.marker_location[0])+','+str(self.marker_location[1])
         else:
-            logical_tag_value = ''
-        if self.auto_complete_list != None and logical_tag_value != '':    # Collect value in autocomplete-list
+            logical_tag_value = None
+        if self.auto_complete_list != None and logical_tag_value != '' and logical_tag_value is not None:    # Collect value in autocomplete-list
             self.auto_complete_list.collectItem(logical_tag_value)
         return logical_tag_value
 

@@ -65,13 +65,13 @@ class FileMetadata(QObject):
         self.split_file_name = file_util.splitFileName(file_name)       # ["c:\pictures\", "copy_of_my_picture-Enhanced-NR-SAI", "jpg"]
         self.path = self.split_file_name[0]                             # "c:\pictures\"
         self.name = self.split_file_name[1]                             # "copy_of_my_picture-Enhanced-NR-SAI"
+        self.extension = self.split_file_name[2].rstrip('_backup')      # .jpg
         self.name_alone = self.split_file_name[1]                       # <---Remove this line whendepad method is ready
         self.split_name = self.depad(self.split_file_name[1])           # ["copy_of_","my_picture", "-Enhanced-NR-SAI]]
         self.name_prefix = self.split_name[0]                           # "copy_of_"
         self.name_alone = self.split_name[1]                            # "my_picture"
         self.name_postfix = self.split_name[2]                          # "-Enhanced-NR-SAI"
         self.is_virgin=False                                       # "Virgin means memory_mate never wrote metadata to file before. Assume not virgin tll metadata has been read
-        self.force_rewrite=False                                   # If new tags are added in config, a consolidation can be triggered by user. The force_rewrite indicates that consolidation has been requested
         self.date_time_change = None
 
     @staticmethod
@@ -153,6 +153,10 @@ class FileMetadata(QObject):
         logical_tag_values = {}
         for logical_tag in self.logical_tag_instances:
             logical_tag_values[logical_tag] = self.logical_tag_instances.get(logical_tag).getValue()
+            if settings.logical_tags.get(logical_tag).get("value_parts") is not None:
+                for logical_tag_part in settings.logical_tags.get(logical_tag).get("value_parts"):
+                    logical_tag_values[logical_tag + '.' + logical_tag_part] = self.logical_tag_instances.get(
+                    logical_tag).getValue(logical_tag_part)
         return logical_tag_values
 
     def getSavedLogicalTagValues(self):
@@ -161,6 +165,9 @@ class FileMetadata(QObject):
         logical_tag_values = {}
         for logical_tag in self.saved_logical_tag_instances:
             logical_tag_values[logical_tag] = self.saved_logical_tag_instances.get(logical_tag).getValue()
+            if settings.logical_tags.get(logical_tag).get("value_parts") is not None:
+                for logical_tag_part in settings.logical_tags.get(logical_tag).get("value_parts"):
+                    logical_tag_values[logical_tag+'.'+logical_tag_part] = self.saved_logical_tag_instances.get(logical_tag).getValue(logical_tag_part)
         return logical_tag_values
 
     def __readFileType(self):
@@ -186,24 +193,66 @@ class FileMetadata(QObject):
             self.logical_tags_missing_value = []
             self.metadata_status = ''
             return 'DATA READ'
-        tags = []                                           #These are the physical tags
+
+        file_names_tags = {}                                 #A dictionary with imate-file-name and it's tags plus sidecar file-name(s) and it's/their tags
+
 
         for logical_tag in logical_tags_tags:
             logical_tag_tags = logical_tags_tags[logical_tag]
+            sidecar_file_names = {}
             for tag in logical_tag_tags:
-                tags.append(tag)
+                sidecar_file_name = None
+                tag_attributes = settings.tags.get(tag)
+                if tag_attributes is not None:
+                    sidecar_tag_group = tag_attributes.get('sidecar_tag_group')
+                    if sidecar_tag_group is not None:
+                        sidecar_file_name_pattern = settings.sidecar_tag_groups.get(sidecar_tag_group).get('file_name_pattern')
+                        sidecar_file_name_pri_1 = self.path + sidecar_file_name_pattern.replace('<file_name>',self.name).replace('<ext>',self.extension)   # c:\pictures\image-Enhanced-NR-SAI.jpg.json
+                        sidecar_file_name_pri_2  = self.path + sidecar_file_name_pattern.replace('<file_name>',self.name_alone).replace('<ext>',self.extension)   # c:\pictures\image-Enhanced-NR-SAI.jpg.json
+                        if sidecar_file_names.get(sidecar_file_name_pri_1) is None:
+                            if os.path.isfile(sidecar_file_name_pri_1):
+                                sidecar_file_names[sidecar_file_name_pri_1] = 'EXISTING'
+                            else:
+                                sidecar_file_names[sidecar_file_name_pri_1] = 'NON_EXISTING'
+                        if sidecar_file_names.get(sidecar_file_name_pri_2) is None:
+                            if os.path.isfile(sidecar_file_name_pri_2):
+                                sidecar_file_names[sidecar_file_name_pri_2] = 'EXISTING'
+                            else:
+                                sidecar_file_names[sidecar_file_name_pri_2] = 'NON_EXISTING'
+
+                        if sidecar_file_names.get(sidecar_file_name_pri_1) == 'EXISTING':
+                            sidecar_file_name = sidecar_file_name_pri_1
+                        elif sidecar_file_names.get(sidecar_file_name_pri_2) == 'EXISTING':
+                            sidecar_file_name = sidecar_file_name_pri_2
+                        else:
+                            sidecar_file_name = None
+
+                        if sidecar_file_name is not None:       # Sidecar file exist
+                            file_name_tags = file_names_tags.get(sidecar_file_name)
+                            if file_name_tags is None:
+                                file_names_tags[sidecar_file_name] = [tag]
+                            else:
+                                file_name_tags.append(tag)
+                    else:
+                        file_name_tags = file_names_tags.get(self.file_name)
+                        if file_name_tags is None:
+                            file_names_tags[self.file_name] = [tag]
+                        else:
+                            file_name_tags.append(tag)
 
         # Now get values for these tags using exif-tool
-        with ExifTool(executable=self.exif_executable,configuration=self.exif_configuration) as ex:
-            exif_data = ex.getTags(self.file_name, tags,process_id='READ')
         self.tag_values = {}
-        for tag in tags:
-            tag_alone = tag.rstrip('#')               #Remove #-character, as it is not a part of tag-name, it is a control-character telling exiftool to deliver/recieve tag in nummeric format
-            tag_value = exif_data[0].get(tag_alone)
-            if tag_value != None and tag_value != "" and tag_value != []:
-                if isinstance(tag_value,list):
-                    tag_value = list(map(str, tag_value))
-                self.tag_values[tag] = tag_value    # These are the physical tag name-value pairs (tag-name includes # where relevant)
+        for file_name in file_names_tags:
+            tags = file_names_tags.get(file_name)
+            with ExifTool(executable=self.exif_executable,configuration=self.exif_configuration) as ex:
+                exif_data = ex.getTags(file_name, tags,process_id='READ')
+            for tag in tags:
+                tag_alone = tag.rstrip('#')               #Remove #-character, as it is not a part of tag-name, it is a control-character telling exiftool to deliver/recieve tag in nummeric format
+                tag_value = exif_data[0].get(tag_alone)
+                if tag_value != None and tag_value != "" and tag_value != []:
+                    if isinstance(tag_value,list):
+                        tag_value = list(map(str, tag_value))
+                    self.tag_values[tag] = tag_value    # These are the physical tag name-value pairs (tag-name includes # where relevant)
 
         # Finally map tag_values to logical_tag_instances
         self.logical_tag_instances = {}
@@ -263,16 +312,23 @@ class FileMetadata(QObject):
                         self.logical_tag_instances[logical_tag].setValue(fallback_tag_value)
 
 
+
+    def __splitTag(self,full_logical_tag):
+        if "." in full_logical_tag:
+            logical_tag, part = full_logical_tag.split(".", 1)  # Split at the first dot
+        else:
+            logical_tag = full_logical_tag
+            part = None
+        return logical_tag, part
+
     def __updateLogicalTagValues(self,logical_tag_values, overwrite=True):
         if logical_tag_values is not None and logical_tag_values != {}:
-            for logical_tag in logical_tag_values:
+            for full_logical_tag in logical_tag_values:
+                # Here split of logical tag at .  E.g  date.utc_offset --> logical_tag=date, part=utc_offset
+                logical_tag, part = self.__splitTag(full_logical_tag)
                 if not logical_tag in self.logical_tag_instances:  # If the file-type does not support the logical tag, then skip it
                     continue
-                if self.logical_tag_instances.get(logical_tag).getValue() != logical_tag_values.get(logical_tag):
-                    if not overwrite and self.logical_tag_instances.get(logical_tag).getValue() is not None:  # Don't overwrite, existing values
-                        pass
-                    else:
-                        self.logical_tag_instances.get(logical_tag).setValue(logical_tag_values[logical_tag])
+                self.logical_tag_instances.get(logical_tag).setValue(logical_tag_values[full_logical_tag],part=part,overwrite=overwrite)
 
     def __updateLogicalTagValuesFromQueue(self):
         json_queue = file_util.JsonQueue.getInstance(settings.queue_file_path)
@@ -282,7 +338,7 @@ class FileMetadata(QObject):
                 self.__updateLogicalTagValues(queue_logical_tag_values,queue_entry.get('overwrite'))
 
     def __updateReferenceTags(self):
-        first = True
+        new_line = False
         logical_tags_tags = settings.file_type_tags.get(self.type.lower())  #Logical_tags for filetype with corresponding tags
         if logical_tags_tags is None:
             pass
@@ -291,37 +347,52 @@ class FileMetadata(QObject):
                 continue
 
             logical_tag_value = ''
-            for tag_content in settings.logical_tags[logical_tag].get("reference_tag_content"):
+            tag_separator = settings.logical_tags[logical_tag].get("reference_tag_separator")
+            if tag_separator is None:
+                tag_separator = ""
+            for i, tag_content in enumerate(settings.logical_tags[logical_tag].get("reference_tag_content")):
+                tag_separator_this = tag_separator
+                if i == 0:
+                    tag_separator_this = ""      #first loop pass
+                prefix = tag_content.get('prefix')
+                if prefix is None:
+                    prefix = ""
+                postfix = tag_content.get('postfix')
+                if postfix is None:
+                    postfix = ""
                 if tag_content.get('type') =='text_line':
                     tag_content_text = tag_content.get('text')
                     if tag_content_text != None:
-                        if not first:
+                        if new_line:
                             logical_tag_value += '\n'
-                        logical_tag_value += tag_content_text
-                        first = False
+                        logical_tag_value += tag_separator_this + prefix + tag_content_text + postfix
+                        new_line = tag_content.get('new_line')
                 elif tag_content.get('type') == 'tag':
                     ref_logical_tag = tag_content.get('tag_name')
                     if ref_logical_tag:
-                        label_key = settings.logical_tags.get(ref_logical_tag).get("label_text_key")
-                        label = settings.text_keys.get(label_key).get(settings.language)
+                        if tag_content.get('tag_label') == True:
+                            label_key = settings.logical_tags.get(ref_logical_tag).get("label_text_key")
+                            if label_key is not None:
+                                label = settings.text_keys.get(label_key).get(settings.language) + ': '
+                            else:
+                                label = ""
+                        else:
+                            label = ""
                         ref_logical_tag_instance = self.logical_tag_instances.get(ref_logical_tag)
                         ref_logical_tag_value = ref_logical_tag_instance.getValue() if ref_logical_tag_instance is not None else None
                         if type(ref_logical_tag_value) == str:
                             if ref_logical_tag_value != "":
-                                if not first:
+                                if new_line:
                                     logical_tag_value += '\n'
-                                if tag_content.get('tag_label'):
-                                    logical_tag_value += label + ': '
-                                logical_tag_value += ref_logical_tag_value
-                                first = False
+                                logical_tag_value += tag_separator_this + label + prefix + ref_logical_tag_value + postfix
+                                new_line = tag_content.get('new_line')
                         elif type(ref_logical_tag_value) == list:
                             if ref_logical_tag_value != []:
-                                if not first:
+                                if new_line:
                                     logical_tag_value += '\n'
-                                if tag_content.get('tag_label'):
-                                    logical_tag_value += label + ': '
-                                logical_tag_value += ', '.join(ref_logical_tag_value)
-                                first = False
+                                ref_logical_tag_value_str = ', '.join(ref_logical_tag_value)
+                                logical_tag_value += tag_separator_this + label + prefix + ref_logical_tag_value_str + postfix
+                                new_line = tag_content.get('new_line')
             logical_tag_instance  = self.logical_tag_instances.get(logical_tag)
             if logical_tag_instance is not None:
                 logical_tag_instance.setValue(logical_tag_value)
@@ -335,9 +406,10 @@ class FileMetadata(QObject):
             old_logical_tag_values = self.getLogicalTagValues()
             self.__updateLogicalTagValues(logical_tag_values,overwrite)
             self.__updateReferenceTags()
-            if self.getLogicalTagValues() != old_logical_tag_values:
+            new_logical_tag_values = self.getLogicalTagValues()
+            if new_logical_tag_values != old_logical_tag_values:
                 due_for_queuing=True
-                self.change_signal.send(self.file_name, old_logical_tag_values, self.getLogicalTagValues())
+                self.change_signal.send(self.file_name, old_logical_tag_values, new_logical_tag_values )
 
         if self.metadata_status != '':    # Put everything in queue, if file has not yet been read
             due_for_queuing = True
@@ -365,17 +437,17 @@ class FileMetadata(QObject):
         del FileMetadata.instance_index[old_file_name]
 
 
-    def save(self):
+    def save(self,force_rewrite=False):
         logical_tag_values = self.getLogicalTagValues()
         saved_logical_tag_values = self.getSavedLogicalTagValues()
-        if self.is_virgin or self.force_rewrite or self.getLogicalTagValues() != self.getSavedLogicalTagValues():
+        if self.is_virgin or force_rewrite or self.getLogicalTagValues() != self.getSavedLogicalTagValues():
             self.file_status = 'WRITING'
             logical_tags_tags = settings.file_type_tags.get(self.type.lower())
             tag_values = {}
             for logical_tag in self.logical_tag_instances:
                 saved_logical_tag_instance = self.saved_logical_tag_instances.get(logical_tag)
                 saved_logical_tag_value = saved_logical_tag_instance.getValue() if saved_logical_tag_instance is not None else None
-                if self.logical_tag_instances[logical_tag].getValue() != saved_logical_tag_value or self.force_rewrite or self.is_virgin:  # New value to be saved
+                if self.logical_tag_instances[logical_tag].getValue() != saved_logical_tag_value or force_rewrite or self.is_virgin:  # New value to be saved
                     logical_tag_tags = logical_tags_tags.get(logical_tag)  # All physical tags for logical tag"
                     for tag in logical_tag_tags:
                         tag_access = settings.tags.get(tag).get('access')
@@ -389,7 +461,6 @@ class FileMetadata(QObject):
             self.saved_logical_tag_instances = copy.deepcopy(self.logical_tag_instances)
             self.file_status = ''
             self.is_virgin=False
-            self.force_rewrite=False
 
 #----------------------------------------------------------------------------------------#
 # Write Queue handling
@@ -430,7 +501,7 @@ class QueueWorker(QThread):
                         while file_metadata.getStatus() != '':    # If instance being processed, wait for it to finalize
                             time.sleep(self.delay)
                             status = file_metadata.getStatus()     # Line added to be able to see status during debugging
-                        file_metadata.save()
+                        file_metadata.save(force_rewrite)
                     except FileNotFoundError:
                         pass
                     json_queue_file.dequeue_commit()
@@ -854,11 +925,11 @@ class FilePreview(QObject):
             thumbnail = video_clip.get_frame(frame)  # Get the first frame as the thumbnail
 
             # If recorded in portrait-mode, swap height and width
-            if hasattr(video_clip, 'rotation'):
-                rotation = video_clip.rotation
-                if rotation in [90, 270]:
-                    original_width, original_height = video_clip.size
-                    thumbnail = cv2.resize(thumbnail, (original_height, original_width))  # Swap hight and width
+#            if hasattr(video_clip, 'rotation'):
+#                rotation = video_clip.rotation
+#                if rotation in [90, 270]:
+#                    original_width, original_height = video_clip.size
+#                    thumbnail = cv2.resize(thumbnail, (original_height, original_width))  # Swap hight and width
             video_clip.close()
 
             height, width, channel = thumbnail.shape
