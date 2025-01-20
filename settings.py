@@ -1,7 +1,6 @@
 import json
 import os
 import copy
-from util import insertDictionary
 
 
 def readSettingsFile():
@@ -720,7 +719,7 @@ def writeSettingsFile():
     with open(settings_path, "w") as outfile:
         outfile.write(settings_json_object)
 
-version = "1.8.0"   # Value classes, UTC Time Offset Handling, settings simplified
+version = "2.0.0"   # Value classes, UTC Time Offset Handling, settings simplified
 
 # Make location for Application, if missing
 app_data_location = os.path.join(os.environ.get("ProgramData"),"Memory Mate")
