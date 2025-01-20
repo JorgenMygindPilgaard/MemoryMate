@@ -18,8 +18,8 @@ a = Analysis(
            ('reset_icon.png', '.'),
            ('pause.png', '.'),
            ('play.png', '.'),
-           ('lock_icon.png', '.'),
-           ('lock_open_icon.png', '.'),
+           ('open_padlock.png', '.'),
+           ('closed_padlock.png', '.'),
            ('exiftool_memory_mate.exe', '.'),
            ('exiftool_memory_mate.cfg', '.'),
            ('Memory Mate Sample Photo.jpg', '.')
