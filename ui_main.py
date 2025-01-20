@@ -130,7 +130,10 @@ class FilePanel(QScrollArea):
             # Prepare metadata widgets and place them all in metadata_layout.
             FilePanel.metadata_layout.setSizeConstraint(QVBoxLayout.SizeConstraint.SetNoConstraint)  # No constraints
             tags = {}
+            logical_tags_values = FilePanel.file_metadata.getLogicalTagValues()
             for logical_tag in FilePanel.file_metadata.getLogicalTagValues():
+                if settings.logical_tags.get(logical_tag) == None: # Is the case for parts, e.g date.utc_offset
+                    continue
                 if settings.logical_tags.get(logical_tag).get("widget") == None:
                     continue
                 tags[logical_tag] = FilePanel.tags.get(logical_tag)
@@ -243,6 +246,7 @@ class FilePanel(QScrollArea):
             if settings.logical_tags.get(logical_tag).get("reference_tag"):
                 tag_widget.setDisabled(True)
 
+
     @staticmethod
     def onPixmapChanged(file_name):
         if file_name == FilePanel.file_name:
@@ -273,7 +277,7 @@ class FileList(QTreeView):
         # Set root-path
         self.setRootPath(dir_path)
 
-        # Prepare context menu
+        # Prepare ontext menu
         self.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
         self.customContextMenuRequested.connect(self.openMenu)
 
@@ -322,7 +326,9 @@ class FileList(QTreeView):
             if settings.logical_tags.get(logical_tag).get(
                     "reference_tag"):  # Can't copy-paste a reference tag. It is derrived from the other tags
                 continue
-            if settings.logical_tags.get(logical_tag).get("widget") == None:  # Cant copy-paste tags not shown in widget
+            if settings.logical_tags.get(logical_tag).get('disable_in_context_menu') == True:   # Disable in context-menu
+                continue
+            if settings.logical_tags.get(logical_tag).get("widget") == None:  # Can't copy-paste tags not shown in widget
                 continue
 
             tag_label_text_key = settings.logical_tags.get(logical_tag).get("label_text_key")
@@ -336,16 +342,22 @@ class FileList(QTreeView):
                 self.logical_tag_actions[logical_tag] = tag_action
                 self.menu.addAction(tag_action)
                 tag_action.triggered.connect(self.toggleAction)
-                if settings.logical_tags.get(logical_tag).get("widget") == "date_time":
-                    tag_label = tag_label + " delta"
-                    tag_action = QAction(tag_label, self, checkable=True)
-                    if settings.logical_tags.get(logical_tag).get("default_paste_select") == False:
-                        tag_action.setChecked(False)
-                    else:
-                        tag_action.setChecked(True)
-                    self.logical_tag_actions[logical_tag+"#delta"] = tag_action
-                    self.menu.addAction(tag_action)
-                    tag_action.triggered.connect(self.toggleAction)
+
+                if settings.logical_tags.get(logical_tag).get("value_parts") is not None:
+                    for value_part in settings.logical_tags.get(logical_tag).get("value_parts"):
+                        if settings.logical_tags.get(logical_tag).get("value_parts").get(value_part).get('disable_in_context_menu') is True:
+                            continue
+                        tag_label_text_key = settings.logical_tags.get(logical_tag).get("value_parts").get(value_part).get("label_text_key")
+                        if tag_label_text_key:
+                            tag_label = settings.text_keys.get(tag_label_text_key).get(settings.language)
+                            tag_action = QAction(tag_label, self, checkable=True)
+                            if settings.logical_tags.get(logical_tag).get("value_parts").get(value_part).get("default_paste_select") == False:
+                                tag_action.setChecked(False)
+                            else:
+                                tag_action.setChecked(True)
+                            self.logical_tag_actions[logical_tag+'.'+value_part] = tag_action
+                            self.menu.addAction(tag_action)
+                            tag_action.triggered.connect(self.toggleAction)
 
     def openMenu(self, position):
         if not hasattr(self, 'menu'):
@@ -541,7 +553,7 @@ class FileList(QTreeView):
     def showFilteredFiles(self):
         self.model.setNameFilterDisables(True)  # Filtered files are shown as dimmed, and are not selectable
 
-    def currentChanged(self, current, previous):  # Redefinet method called at event "current file changed"
+    def currentChanged(self, current, previous):  # Redefined method called at event "current file changed"
         chosen_path = self.model.filePath(current)
         previous_path = self.model.filePath((previous))
         if chosen_path != previous_path:
@@ -579,6 +591,7 @@ class FileList(QTreeView):
                 if folder_index.isValid():  # Check if the folder exists in the model
                     # Expand the folder
                     self.setExpanded(folder_index, True)
+
     def getSelectedItems(self):
         selected_items = []
         selected_indexes = self.selectedIndexes()
@@ -865,7 +878,8 @@ class CopyLogicalTags(QObject):
             target_tag_values = {}
             for logical_tag in self.logical_tags:
                 source_tag_value = None
-                source_tag_value = source_file_metadata.getLogicalTagValues().get(logical_tag)
+                source_tag_values = source_file_metadata.getLogicalTagValues()
+                source_tag_value = source_tag_values.get(logical_tag)
                 if source_tag_value != None:
                     target_tag_values[logical_tag] = source_tag_value
             target_file_metadata.setLogicalTagValues(logical_tag_values=target_tag_values, overwrite=self.overwrite)
