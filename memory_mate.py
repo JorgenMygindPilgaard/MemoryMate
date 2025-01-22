@@ -9,6 +9,7 @@ from PyQt6.QtGui import QIcon
 from PyQt6.QtCore import Qt, QEvent
 from file_metadata_util import FileMetadata, FilePreview
 import settings
+import qdarkstyle
 
 
 class MainWindow(QMainWindow):
@@ -120,6 +121,9 @@ class MainWindow(QMainWindow):
 
 
 app = QApplication(sys.argv)
+
+app.setStyle("Fusion")
+#app.setStyleSheet(qdarkstyle.load_stylesheet())
 window = MainWindow()
 window.show()
 QueueHost.get_instance().start_queue_worker()    #Start Queue-processing

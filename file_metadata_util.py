@@ -15,7 +15,6 @@ from moviepy.video.io.VideoFileClip import VideoFileClip
 import re
 import util
 from value_classes import *
-import cv2
 
 
 class FileMetadataChangedEmitter(QObject):
@@ -33,11 +32,16 @@ class FileMetadataChangedEmitter(QObject):
     def send(self, file_name, old_logical_tag_values, new_logical_tag_values):
         self.change_signal.emit(file_name, old_logical_tag_values, new_logical_tag_values)
 
+
 class FileMetadata(QObject):
-    app_path = sys.argv[0]
-    app_dir = os.path.dirname(os.path.abspath(app_path))
-    exif_executable = os.path.join(app_dir, 'exiftool_memory_mate.exe')
-    exif_configuration = os.path.join(app_dir, 'exiftool_memory_mate.cfg')
+#   app_path = sys.argv[0]
+#   app_dir = os.path.dirname(os.path.abspath(app_path))
+#   exif_executable = os.path.join(app_dir, 'exiftool_memory_mate.exe')
+#   exif_configuration = os.path.join(app_dir, 'exiftool_memory_mate.cfg')
+
+    exif_executable = 'exiftool_memory_mate.exe'
+    exif_configuration = 'exiftool_memory_mate.cfg'
+
     if not os.path.isfile(exif_configuration):
         exif_configuration=''
     getInstance_active = False  # To be able to give error when instantiated directly, outside getInstance
