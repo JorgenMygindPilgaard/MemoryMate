@@ -1,5 +1,6 @@
 import json
 import os
+import sys
 import copy
 
 
@@ -13,6 +14,13 @@ def readSettingsFile():
 
 def patchDefaultValues():
     global settings
+
+    if settings.get("resource_path") is None:
+        if hasattr(sys, '_MEIPASS'):
+            settings['resource_path'] = sys._MEIPASS
+        else:
+            settings['resource_path'] = ''
+
     if settings.get("file_types") is None:
         settings["file_types"] = ["jpg", "jpeg", "png", "bmp", "cr3", "cr2", "dng", "arw", "nef", "heic", "tif", "tiff", "gif","mp4", "m4v", "mov", "avi", "m2t", "m2ts","mts"]
     if settings.get("sidecar_tag_groups") is None:
@@ -767,7 +775,8 @@ file_context_menu_actions = settings.get("file_context_menu_actions")
 folder_context_menu_actions = settings.get("folder_context_menu_actions")
 settings_labels = settings.get("settings_labels")
 file_name_padding = settings.get("file_name_padding")
-
+resource_path = settings.get('resource_path')
+print('path: '+ resource_path )
 
 
 

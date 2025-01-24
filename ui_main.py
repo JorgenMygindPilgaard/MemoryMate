@@ -51,7 +51,7 @@ class FilePanel(QScrollArea):
         new_file_name = file_name
         if new_file_name == None:
             # Show sample photo in stead of an empty wndow
-            new_file_name = "Memory Mate Sample Photo.jpg"
+            new_file_name = os.path.join(settings.resource_path,"Memory Mate Sample Photo.jpg")
         if new_file_name != '' and new_file_name != FilePanel.old_file_name:
             if not os.path.exists(new_file_name):
                 new_file_name = ''
@@ -636,7 +636,7 @@ class FileList(QTreeView):
 class SettingsWheeel(QLabel):
     def __init__(self):
         super().__init__()
-        pixmap = QPixmap('settings.png').scaled(20,20)
+        pixmap = QPixmap(os.path.join(settings.resource_path,'settings.png')).scaled(20,20)
         self.setPixmap(pixmap)
         self.mousePressEvent = self.onMousePress
         self.enterEvent = self.onEnter

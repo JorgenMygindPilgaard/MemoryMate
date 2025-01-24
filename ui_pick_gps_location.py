@@ -40,6 +40,7 @@ html = '''
                     height: 100.0%;
                     left: 0.0%;
                     top: 0.0%;
+                    background-color: #19232d;
                 }
                 .leaflet-container { font-size: 1rem; }
             </style>
