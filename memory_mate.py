@@ -1,4 +1,5 @@
 import sys
+import os
 from ui_widgets import *
 from PyQt6.QtWidgets import QWidget,QMainWindow,QApplication
 from exiftool_wrapper import ExifTool
@@ -20,7 +21,7 @@ class MainWindow(QMainWindow):
         self.ui_status = UiStatusManager.getInstance(os.path.join(settings.app_data_location, "ui_status.json"))
 
         self.setWindowTitle("Memory Mate "+settings.version)
-        self.setWindowIcon(QIcon('memory_mate.ico'))
+        self.setWindowIcon(QIcon(os.path.join(settings.resource_path,'memory_mate.ico')))
 
         current_file = self.ui_status.getStatusParameter('current_file')
         show_sample_photo = False
@@ -36,7 +37,7 @@ class MainWindow(QMainWindow):
             show_sample_photo = True
 
         if show_sample_photo:
-            current_file = "Memory Mate Sample Photo.jpg"       # Show sample-photo at first launch
+            current_file = os.path.join(settings.resource_path, "Memory Mate Sample Photo.jpg")       # Show sample-photo at first launch
             FileMetadata.getInstance(current_file).readLogicalTagValues()
             FilePreview.getInstance(current_file).readImage()
         else:

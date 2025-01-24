@@ -39,8 +39,8 @@ class FileMetadata(QObject):
 #   exif_executable = os.path.join(app_dir, 'exiftool_memory_mate.exe')
 #   exif_configuration = os.path.join(app_dir, 'exiftool_memory_mate.cfg')
 
-    exif_executable = 'exiftool_memory_mate.exe'
-    exif_configuration = 'exiftool_memory_mate.cfg'
+    exif_executable = os.path.join(settings.resource_path,'exiftool_memory_mate.exe')
+    exif_configuration = os.path.join(settings.resource_path,'exiftool_memory_mate.cfg')
 
     if not os.path.isfile(exif_configuration):
         exif_configuration=''
@@ -590,8 +590,8 @@ class QueueStatusMonitor(QHBoxLayout):
     def init_ui(self):
         # Create a label for pause/play
         self.play_pause_label = QLabel()
-        self.play_pixmap = QPixmap("play.png").scaled(12,12)
-        self.pause_pixmap = QPixmap("pause.png").scaled(12,12)
+        self.play_pixmap = QPixmap(os.path.join(settings.resource_path,"play.png")).scaled(12,12)
+        self.pause_pixmap = QPixmap(os.path.join(settings.resource_path,"pause.png")).scaled(12,12)
         self.play_pause_label.setSizePolicy(QSizePolicy.Policy.Minimum, QSizePolicy.Policy.Minimum)
         if self.queue_host.queue_worker_paused:
             self.play_pause_label.setPixmap(self.play_pixmap)
@@ -606,7 +606,7 @@ class QueueStatusMonitor(QHBoxLayout):
         self.queue_size_label.setSizePolicy(QSizePolicy.Policy.Minimum, QSizePolicy.Policy.Minimum)
 
         # Load the processing.gif and display it using a QMovie
-        self.movie = QMovie("processing.gif")
+        self.movie = QMovie(os.path.join(settings.resource_path,"processing.gif"))
         self.movie.setScaledSize(QSize(25,18))
 
 
