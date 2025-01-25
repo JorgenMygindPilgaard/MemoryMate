@@ -22,7 +22,8 @@ a = Analysis(
            ('closed_padlock.png', '.'),
            ('exiftool_memory_mate.exe', '.'),
            ('exiftool_memory_mate.cfg', '.'),
-           ('Memory Mate Sample Photo.jpg', '.')
+           ('Memory Mate Sample Photo.jpg', '.'),
+           ('no_preview.png', '.')
           ],
     hiddenimports=[],
     hookspath=[],
