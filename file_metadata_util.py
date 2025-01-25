@@ -918,34 +918,45 @@ class FilePreview(QObject):
             image = self.image
 
         return image
+
     def __movie_to_qimage(self,file_name):
         if self.image == None:
-            video_clip = VideoFileClip(file_name)
+            try:
+                # Attempt to create a VideoFileClip object
+                video_clip = VideoFileClip(file_name)
+                fps = video_clip.fps
+                duration = video_clip.duration
+                # Get frame 3% into the video. The first seconds are often black or blurry/shaked
+                frame = int(duration * 3 / 100 * fps)  # Frame
+                thumbnail = video_clip.get_frame(frame)  # Get the first frame as the thumbnail
 
-            # Get frame 3% into the video. The first seconds are often black or blurry/shaked
-            fps = video_clip.fps
-            duration = video_clip.duration
-            frame = int(duration*3/100*fps)  # Frame
-            thumbnail = video_clip.get_frame(frame)  # Get the first frame as the thumbnail
+                # If recorded in portrait-mode, swap height and width
+                #            if hasattr(video_clip, 'rotation'):
+                #                rotation = video_clip.rotation
+                #                if rotation in [90, 270]:
+                #                    original_width, original_height = video_clip.size
+                #                    thumbnail = cv2.resize(thumbnail, (original_height, original_width))  # Swap hight and width
+                video_clip.close()
 
-            # If recorded in portrait-mode, swap height and width
-#            if hasattr(video_clip, 'rotation'):
-#                rotation = video_clip.rotation
-#                if rotation in [90, 270]:
-#                    original_width, original_height = video_clip.size
-#                    thumbnail = cv2.resize(thumbnail, (original_height, original_width))  # Swap hight and width
-            video_clip.close()
+                height, width, channel = thumbnail.shape
+                bytes_per_line = 3 * width
 
-            height, width, channel = thumbnail.shape
-            bytes_per_line = 3 * width
-
-            image = QImage(
-                thumbnail.data,
-                width,
-                height,
-                bytes_per_line,
-                QImage.Format.Format_RGB888,
-            )
+                image = QImage(
+                    thumbnail.data,
+                    width,
+                    height,
+                    bytes_per_line,
+                    QImage.Format.Format_RGB888,
+                )
+                video_clip.close()
+            except OSError as e:
+                image = self.__default_to_qimage(os.path.join(settings.resource_path, "no_preview.png"))
+                # Handle specific OSError from ffmpeg
+                print(f"Error loading video file {file_name}: {e}")
+            except Exception as e:
+                image = self.__default_to_qimage(os.path.join(settings.resource_path, "no_preview.png"))
+                # Catch all other exceptions
+                print(f"An unexpected error occurred with file {file_name}: {e}")
         else:
             image = self.image
         return image
