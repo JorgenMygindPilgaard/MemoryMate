@@ -248,6 +248,7 @@ class JsonQueue(QObject):
     def change_queue(self, find={}, change={}):
         if change == {}:
             return
+        queue_changed = False
 
         while self.queue_being_changed:   # Wait till queue is ready for change
             pass
@@ -256,32 +257,48 @@ class JsonQueue(QObject):
         for index, queue_entry in enumerate(self.queue):
             passed_find_filter = True
             for find_key, find_value in find.items():
+                dummy = queue_entry.get(find_key)
+                print(dummy)
+                print(find_value)
                 if not queue_entry.get(find_key) == find_value:
                     passed_find_filter = False
                     break
             if passed_find_filter:
                 for change_key, change_value in change.items():
-                    if self.queue[index].get(change_key):
+                    old_value = self.queue[index].get(change_key)
+                    if old_value is not None and old_value != change_value:
                         self.queue[index][change_key] = change_value
+                        queue_changed = True
+        if queue_changed:
+            self.queue_being_changed = False
+            self.update_queue_file()  # Update file with changed queue immediately
+
+
         self.queue_being_changed = False
+
     def dequeue_commit(self):
         self.committed_index = self.index - 1
 
+
     def dequeue_from_file(self, delay=5):
+        if self.queue_being_changed:
+            return
+        self.queue_being_changed = True
         if time.time() - self.last_file_write_time < delay:
+            self.queue_being_changed = False
             return                       # Prevent storming file with updates
+
         if len(self.queue) == 0:   # Queue is already emptied. That means that file is also already empty
+            self.queue_being_changed = False
             return
         if self.committed_index < 0:    # Nothing to remove from file
-            return
-        if self.queue_being_changed:
+            self.queue_being_changed = False
             return
 
         lock_acquired = self.lock.acquire(blocking=True, timeout=0)
         if not lock_acquired:
             return
 
-        self.queue_being_changed = True
         lines = [json.dumps(d).replace('\n','<newline>') + '\n' for d in self.queue[self.committed_index+1:]]
         with open(self.file_path, 'w') as file:
             file.writelines(lines)
@@ -294,4 +311,26 @@ class JsonQueue(QObject):
         self.queue_size = len(self.queue)
         self.queue_size_changed.emit({self.file_path: self.queue_size})
 
+    def update_queue_file(self):
+        if self.queue_being_changed:
+            return
+        self.queue_being_changed = True
+        if len(self.queue) == 0:   # Queue is already emptied. That means that file is also already empty
+            self.queue_being_changed = False
+            return
 
+        lock_acquired = self.lock.acquire(blocking=True, timeout=0)
+        if not lock_acquired:
+            return
+        old_queue_size = len(self.queue)
+        lines = [json.dumps(d).replace('\n','<newline>') + '\n' for d in self.queue[self.committed_index+1:]]    # Removes also committed changes
+        with open(self.file_path, 'w') as file:
+            file.writelines(lines)
+            self.queue = self.queue[self.committed_index+1:]
+            self.index = 0
+            self.committed_index = -1
+        self.queue_being_changed = False
+        self.lock.release()
+        self.queue_size = len(self.queue)
+        if self.queue_size != old_queue_size:
+            self.queue_size_changed.emit({self.file_path: self.queue_size})

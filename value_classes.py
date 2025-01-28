@@ -94,7 +94,11 @@ class RotationValue():
                 self.value = 270
             else:
                 self.value = 0
-        else:                                  #Rotation in degree. Being used in QuickTime:Rotation (heic-images)
+        elif exif_tag == 'Composite:Rotation':      # Composite:Rotation direction is clockwise, logical tag Rotation is counter clockwise
+            self.value = 360 - value
+            if self.value >=  360:
+                self.value -= 360
+        else:
             self.value = value
 
     def setValue(self,value,part=None,overwrite=True):
@@ -114,6 +118,11 @@ class RotationValue():
                 return 6
             else:
                 return 1
+        elif exif_tag == 'Composite:Rotation':      # Composite:Rotation direction is clockwise, logical tag Rotation is counter clockwise
+            value = 360 - self.value
+            if value >=  360:
+                value -= 360
+            return value
         else:                                  #Rotation in degree being read. Being used in QuickTime:Rotation (heic-images)
             return self.value
 

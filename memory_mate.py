@@ -43,7 +43,7 @@ class MainWindow(QMainWindow):
         else:
             FileMetadata.getInstance(current_file).readLogicalTagValues()
             FilePreview.getInstance(current_file).readImage()
-            FileMetadata.getInstance(current_file).readLogicalTagValues()
+#            FileMetadata.getInstance(current_file).readLogicalTagValues()
             FileReadQueue.appendQueue(current_file)    # Triggers other files in folder to be read
 
         #-------------------------------------------------------------------------------------------------------------
