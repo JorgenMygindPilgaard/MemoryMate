@@ -1001,6 +1001,10 @@ def onMetadataPasted(file_name):
         dummy = FilePanel.getInstance(file_name)   #Triggers update of Filepanel
 
 def onFileRenamed(old_file_name, new_file_name, update_original_filename_tag=False):     # reacts on change filename signal from
+    # Update fileename in queue
+    json_queue_file = file_util.JsonQueue.getInstance(settings.queue_file_path)
+    json_queue_file.change_queue(find={'file': old_file_name}, change={'file': new_file_name})
+
     # Update filename in file-panel
     if FilePanel.file_name == old_file_name:
         FilePanel.updateFilename(new_file_name)
@@ -1014,11 +1018,6 @@ def onFileRenamed(old_file_name, new_file_name, update_original_filename_tag=Fal
     file_metadata = FileMetadata.instance_index.get(old_file_name)
     if file_metadata:
         file_metadata.updateFilename(new_file_name)
-
-    # Update fileename in queue
-    json_queue_file = file_util.JsonQueue.getInstance(settings.queue_file_path)
-    json_queue_file.change_queue(find={'file': old_file_name}, change={'file': new_file_name})
-
 
 # Set original filename tag in all files
     if update_original_filename_tag==True:

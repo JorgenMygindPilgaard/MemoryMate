@@ -149,6 +149,7 @@ def patchDefaultValues():
                             "Composite:GPSPosition#": {"access": "Read/Write"},
                             "EXIF:Orientation#": {"access": "Read/Write"},
                             "QuickTime:Rotation#": {"access": "Read/Write"},
+                            "Composite:Rotation": {"access": "Read/Write"},
                             "XMP:Rating": {"access": "Read/Write"},
                             "XMP-microsoft:RatingPercent": {"access": "Read/Write"},
                             "EXIF:Make": {"access": "Read"},
@@ -512,7 +513,8 @@ def patchDefaultValues():
                     "description": ["XMP:Description", "EXIF:XPComment", "EXIF:UserComment",
                                     "EXIF:ImageDescription", "JSON:description"]
                     },
-            "mp4": {"camera_settings": [],
+            "mp4": {"rotation": ["Composite:Rotation"],
+                    "camera_settings": [],
                     "make": ["EXIF:Make", "QuickTime:Make"],
                     "model": ["EXIF:Model", "QuickTime:Model"],
                     "lens_model": ["EXIF:LensModel", "MakerNotes:LensModel"],
@@ -538,7 +540,8 @@ def patchDefaultValues():
                     "original_filename": ["XMP:PreservedFileName"],
                     "description": ["XMP:Description", "QuickTime:Comment", "JSON:description"]
                     },
-            "m4v": {"camera_settings": [],
+            "m4v": {"rotation": ["Composite:Rotation"],
+                    "camera_settings": [],
                     "make": ["EXIF:Make", "QuickTime:Make"],
                     "model": ["EXIF:Model", "QuickTime:Model"],
                     "lens_model": ["EXIF:LensModel", "MakerNotes:LensModel"],
@@ -564,7 +567,8 @@ def patchDefaultValues():
                     "original_filename": ["XMP:PreservedFileName"],
                     "description": ["XMP:Description", "QuickTime:Comment", "JSON:description"]
                     },
-            "mov": {"camera_settings": [],
+            "mov": {"rotation": ["Composite:Rotation"],
+                    "camera_settings": [],
                     "make": ["EXIF:Make", "QuickTime:Make"],
                     "model": ["EXIF:Model", "QuickTime:Model"],
                     "lens_model": ["EXIF:LensModel", "MakerNotes:LensModel"],
@@ -727,7 +731,7 @@ def writeSettingsFile():
     with open(settings_path, "w") as outfile:
         outfile.write(settings_json_object)
 
-version = "2.0.1"   # Value classes, UTC Time Offset Handling, settings simplified
+version = "2.1.0"   # Rotation of videos
 
 # Make location for Application, if missing
 app_data_location = os.path.join(os.environ.get("ProgramData"),"Memory Mate")

@@ -1,4 +1,3 @@
-import copy
 import os
 from exiftool_wrapper import ExifTool
 from PyQt6.QtCore import QThread, QCoreApplication,QObject,pyqtSignal,QSize, Qt
@@ -7,15 +6,13 @@ from PyQt6.QtWidgets import QLabel, QHBoxLayout, QSizePolicy
 import settings
 import time
 import file_util
-import sys
 import pillow_heif
 import rawpy
 from PIL import Image
-from moviepy.video.io.VideoFileClip import VideoFileClip
 import re
 import util
 from value_classes import *
-
+import cv2
 
 class FileMetadataChangedEmitter(QObject):
     instance = None
@@ -850,7 +847,7 @@ class FilePreview(QObject):
         file_type = FileMetadata.getInstance(self.file_name).type
 
         # Set right rotation/orientation
-        if file_type == 'mov' or file_type == 'mp4' or file_type == 'm2t' or file_type == 'm2ts' or file_type == 'mts':
+        if file_type ==  'm2t' or file_type == 'm2ts' or file_type == 'mts':
             image = self.image
         else:
             image = self.__rotatedImage()
@@ -861,15 +858,23 @@ class FilePreview(QObject):
             return None
         else:
             rotation_instance = FileMetadata.getInstance(self.file_name).logical_tag_instances.get("rotation")
+            saved_rotation_instance = FileMetadata.getInstance(self.file_name).saved_logical_tag_instances.get("rotation")
             if rotation_instance == None:
-                rotation = 0.
+                rotation = 0
             else:
                 rotation = rotation_instance.getValue()
                 if rotation is None:
                     rotation = 0
+            if saved_rotation_instance == None:
+                saved_rotation = 0
+            else:
+                saved_rotation = saved_rotation_instance.getValue()
+                if saved_rotation is None:
+                    saved_rotation = 0
+
             if self.current_rotation is None:
                 if self.original_image_rotated:
-                    self.current_rotation = rotation
+                    self.current_rotation = saved_rotation
                 else:
                     self.current_rotation = 0
 
@@ -921,42 +926,78 @@ class FilePreview(QObject):
 
     def __movie_to_qimage(self,file_name):
         if self.image == None:
-            try:
-                # Attempt to create a VideoFileClip object
-                video_clip = VideoFileClip(file_name)
-                fps = video_clip.fps
-                duration = video_clip.duration
-                # Get frame 3% into the video. The first seconds are often black or blurry/shaked
-                frame = int(duration * 3 / 100 * fps)  # Frame
-                thumbnail = video_clip.get_frame(frame)  # Get the first frame as the thumbnail
+            video = cv2.VideoCapture(file_name)
 
-                # If recorded in portrait-mode, swap height and width
-                #            if hasattr(video_clip, 'rotation'):
-                #                rotation = video_clip.rotation
-                #                if rotation in [90, 270]:
-                #                    original_width, original_height = video_clip.size
-                #                    thumbnail = cv2.resize(thumbnail, (original_height, original_width))  # Swap hight and width
-                video_clip.close()
-
-                height, width, channel = thumbnail.shape
-                bytes_per_line = 3 * width
-
-                image = QImage(
-                    thumbnail.data,
-                    width,
-                    height,
-                    bytes_per_line,
-                    QImage.Format.Format_RGB888,
-                )
-                video_clip.close()
-            except OSError as e:
+            if not video.isOpened():
                 image = self.__default_to_qimage(os.path.join(settings.resource_path, "no_preview.png"))
-                # Handle specific OSError from ffmpeg
-                print(f"Error loading video file {file_name}: {e}")
-            except Exception as e:
-                image = self.__default_to_qimage(os.path.join(settings.resource_path, "no_preview.png"))
-                # Catch all other exceptions
-                print(f"An unexpected error occurred with file {file_name}: {e}")
+            else:
+
+                # Get total frame count and FPS
+                total_frames = int(video.get(cv2.CAP_PROP_FRAME_COUNT))
+                fps = video.get(cv2.CAP_PROP_FPS)
+                duration = total_frames / fps  # Total duration in seconds
+
+                # Calculate the time (in seconds) at the given percentage
+                frame_time = duration * (3.0 / 100.0)
+
+                # Set the video position to that time
+                video.set(cv2.CAP_PROP_POS_MSEC, frame_time * 1000)
+
+                # Read the frame
+                success, frame = video.read()
+                if not success:
+                    image = self.__default_to_qimage(os.path.join(settings.resource_path, "no_preview.png"))
+                    video.release()
+                else:
+                    # Convert the frame (BGR to RGB for QImage)
+                    rgb_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+
+                    # Get frame dimensions
+                    height, width, channel = rgb_frame.shape
+
+                    # Create QImage
+                    image = QImage(rgb_frame.data, width, height, 3 * width, QImage.Format.Format_RGB888)
+                    video.release()
+
+
+            # try:
+            #     # Attempt to create a VideoFileClip object
+            #     video_clip = VideoFileClip(file_name)
+            #     fps = video_clip.fps
+            #     duration = video_clip.duration
+            #     # Get frame 3% into the video. The first seconds are often black or blurry/shaked
+            #     frame = int(duration * 3 / 100 * fps)  # Frame
+            #     thumbnail = video_clip.get_frame(frame)  # Get the first frame as the thumbnail
+            #
+            #     # If recorded in portrait-mode, swap height and width
+            #     #            if hasattr(video_clip, 'rotation'):
+            #     #                rotation = video_clip.rotation
+            #     #                if rotation in [90, 270]:
+            #     #                    original_width, original_height = video_clip.size
+            #     #                    thumbnail = cv2.resize(thumbnail, (original_height, original_width))  # Swap hight and width
+            #     video_clip.close()
+            #
+            #     height, width, channel = thumbnail.shape
+            #     bytes_per_line = 3 * width
+            #
+            #     image = QImage(
+            #         thumbnail.data,
+            #         width,
+            #         height,
+            #         bytes_per_line,
+            #         QImage.Format.Format_RGB888,
+            #     )
+            #     video_clip.close()
+            # except OSError as e:
+            #     image = self.__default_to_qimage(os.path.join(settings.resource_path, "no_preview.png"))
+            #     # Handle specific OSError from ffmpeg
+            #     print(f"Error loading video file {file_name}: {e}")
+            # except Exception as e:
+            #     image = self.__default_to_qimage(os.path.join(settings.resource_path, "no_preview.png"))
+            #     # Catch all other exceptions
+            #     print(f"An unexpected error occurred with file {file_name}: {e}")
+
+
         else:
             image = self.image
         return image
