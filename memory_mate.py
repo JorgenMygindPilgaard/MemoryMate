@@ -1,17 +1,49 @@
 import sys
 import os
 from ui_widgets import *
-from PyQt6.QtWidgets import QWidget,QMainWindow,QApplication
+from PyQt6.QtWidgets import QWidget, QMainWindow, QApplication, QDialog, QComboBox
 from exiftool_wrapper import ExifTool
 from file_metadata_util import QueueHost, QueueStatusMonitor, FileReadQueue
 from ui_status import UiStatusManager
-from ui_main import FilePanel, FileList, SettingsWheeel
+from ui_main import FilePanel, FileList, SettingsWheeel,SettingsWindow
 from PyQt6.QtGui import QIcon
 from PyQt6.QtCore import Qt, QEvent
 from file_metadata_util import FileMetadata, FilePreview
 import settings
 import qdarkstyle
 
+
+class WelcomeWindow(QDialog):
+    def __init__(self):
+        super().__init__()
+
+        # Prepare window
+        self.setWindowTitle('Welcome - Velkommen')
+        self.setGeometry(400, 300, 300, 150)
+        settings_layout = QVBoxLayout()
+        self.setLayout(settings_layout)
+        self.headline = QLabel('Please select Language - Vælg Sprog')
+        settings_layout.addWidget(self.headline)
+        self.language_combobox = QComboBox()
+        for index, (key, value) in enumerate(settings.languages.items()):
+            self.language_combobox.addItem(key+" - "+value)
+            if key == 'EN':
+                self.language_combobox.setCurrentIndex(index)
+        language_label = QLabel('Language - Sprog')
+        language_layout = QHBoxLayout()
+        language_layout.addWidget(language_label)
+        language_layout.addWidget(self.language_combobox)
+        settings_layout.addLayout(language_layout)
+        settings_layout.addSpacing(20)
+        self.ok_button = QPushButton("OK")
+        settings_layout.addWidget(self.ok_button)
+        self.ok_button.clicked.connect(self.saveLanguage)
+
+    def saveLanguage(self, index):
+        settings.settings["language"] = self.language_combobox.currentText()[:2]
+        settings.language = self.language_combobox.currentText()[:2]
+        settings.writeSettingsFile()
+        self.accept()
 
 class MainWindow(QMainWindow):
     def __init__(self):
@@ -47,7 +79,7 @@ class MainWindow(QMainWindow):
             FileReadQueue.appendQueue(current_file)    # Triggers other files in folder to be read
 
         #-------------------------------------------------------------------------------------------------------------
-        # Prepare widgets for MainWindow
+        # Chose settings at first launch
         #-------------------------------------------------------------------------------------------------------------
         # File (Right part of MainWindow)
         self.file_panel = FilePanel.getInstance(current_file)
@@ -120,10 +152,16 @@ class MainWindow(QMainWindow):
         ExifTool.closeProcess()              # Close exiftool processes
         super().closeEvent(event)
 
-
 app = QApplication(sys.argv)
 
 app.setStyle("Fusion")
+
+# Check if language is set, if not, show the selection dialog
+if settings.language is None:
+    dialog = WelcomeWindow()
+    if dialog.exec() == QDialog.DialogCode.Rejected:  # If user closes the dialog, exit app
+        sys.exit()
+
 #app.setStyleSheet(qdarkstyle.load_stylesheet())
 window = MainWindow()
 window.show()

@@ -3,6 +3,7 @@ import os
 import sys
 import copy
 
+from PyQt6.QtWidgets import QWidget, QVBoxLayout, QComboBox, QLabel, QHBoxLayout
 
 def readSettingsFile():
     global settings_path, settings
@@ -12,9 +13,13 @@ def readSettingsFile():
     else:
         settings = {}
 
+
 def patchDefaultValues():
     global settings
 
+    if settings.get("languages") is None:
+        settings["languages"] = {"DA": "Danish",
+                                 "EN": "English"}
     if settings.get("resource_path") is None:
         if hasattr(sys, '_MEIPASS'):
             settings['resource_path'] = sys._MEIPASS
@@ -25,9 +30,6 @@ def patchDefaultValues():
         settings["file_types"] = ["jpg", "jpeg", "png", "bmp", "cr3", "cr2", "dng", "arw", "nef", "heic", "tif", "tiff", "gif","mp4", "m4v", "mov", "avi", "m2t", "m2ts","mts"]
     if settings.get("sidecar_tag_groups") is None:
         settings["sidecar_tag_groups"] = {"JSON": {"file_name_pattern": "<file_name>.<ext>.json"} }
-    if settings.get("languages") is None:
-        settings["languages"] = {"DA": "Danish",
-                                 "EN": "English"}
     if settings.get("logical_tags") is None:
         settings["logical_tags"] = {
             "make": {"value_class": "StringValue"},
@@ -731,7 +733,7 @@ def writeSettingsFile():
     with open(settings_path, "w") as outfile:
         outfile.write(settings_json_object)
 
-version = "2.1.0"   # Rotation of videos
+version = "2.2.0"   # Rotation of videos
 
 # Make location for Application, if missing
 app_data_location = os.path.join(os.environ.get("ProgramData"),"Memory Mate")
@@ -756,8 +758,6 @@ old_settings['version']=settings.get('version')
 old_settings['language']=settings.get('language')
 settings = copy.deepcopy(old_settings)   # Now settings only holds old version and language
 settings['version']=version   # Settings now holds new version (from line 526)
-if settings.get('language') is None:
-    settings['language']='EN'
 
 # Write settings to file if new or upgraded
 if old_settings != settings:          # Write to file and update settings variables in case of change
