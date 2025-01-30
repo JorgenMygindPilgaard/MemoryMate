@@ -1,4 +1,8 @@
-from PyQt6.QtWidgets import QTreeView, QMenu, QScrollArea, QWidget, QHBoxLayout, QVBoxLayout, QLabel, QLineEdit,QPushButton, QAbstractItemView, QDialog, QComboBox
+import subprocess
+import sys
+
+from PyQt6.QtWidgets import QTreeView, QMenu, QScrollArea, QWidget, QHBoxLayout, QVBoxLayout, QLabel, QLineEdit, \
+    QPushButton, QAbstractItemView, QDialog, QComboBox, QApplication
 from PyQt6.QtCore import QModelIndex, Qt, QDir, QModelIndex,QItemSelectionModel, QObject, pyqtSignal
 from PyQt6.QtGui import QFileSystemModel,QAction
 import settings
@@ -651,7 +655,7 @@ class SettingsWheeel(QLabel):
         self.settings_window = SettingsWindow()
         self.settings_window.show()
 
-class SettingsWindow(QWidget):
+class SettingsWindow(QDialog):
     def __init__(self):
         super().__init__()
 
@@ -673,13 +677,19 @@ class SettingsWindow(QWidget):
         language_layout.addWidget(language_label)
         language_layout.addWidget(self.language_combobox)
         settings_layout.addLayout(language_layout)
+        settings_layout.addSpacing(20)
+        self.ok_button = QPushButton("OK")
+        settings_layout.addWidget(self.ok_button)
+        self.ok_button.clicked.connect(self.saveSettings)
 
-        # Connect the ComboBox's item selection to a slot
-        self.language_combobox.currentIndexChanged.connect(self.onLanguageSelected)
-
-    def onLanguageSelected(self, index):
+    def saveSettings(self):
         settings.settings["language"] = self.language_combobox.currentText()[:2]
         settings.writeSettingsFile()
+        python = sys.executable  # Get Python executable path
+        script = sys.argv[0]  # Get the current script file
+        subprocess.Popen([python, script])  # Start a new instance
+        QApplication.quit()  # Close current instance
+        self.accept()
 
 class StandardizeFilenames(QObject):
     # The purpose of this class is to rename files systematically. The naming pattern in the files will be
