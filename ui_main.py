@@ -677,6 +677,22 @@ class SettingsWindow(QDialog):
         language_layout.addWidget(language_label)
         language_layout.addWidget(self.language_combobox)
         settings_layout.addLayout(language_layout)
+
+        # Add ui_mode-selection
+        self.ui_mode_combobox = QComboBox(self)
+        for index, ui_mode in enumerate(settings.ui_modes):
+            self.ui_mode_combobox.addItem(settings.text_keys.get("settings_ui_mode."+ui_mode).get(settings.language))
+            if ui_mode == settings.ui_mode:
+                self.ui_mode_combobox.setCurrentIndex(index)
+        if self.ui_mode_combobox.currentIndex() is None:
+            self.ui_mode_combobox.setCurrentIndex(0)
+        ui_mode_label = QLabel(settings.text_keys.get("settings_labels_ui_mode").get(settings.language), self)
+        ui_mode_layout = QHBoxLayout()
+        ui_mode_layout.addWidget(ui_mode_label)
+        ui_mode_layout.addWidget(self.ui_mode_combobox)
+        settings_layout.addLayout(ui_mode_layout)
+
+
         settings_layout.addSpacing(20)
         self.ok_button = QPushButton("OK")
         settings_layout.addWidget(self.ok_button)
@@ -684,6 +700,8 @@ class SettingsWindow(QDialog):
 
     def saveSettings(self):
         settings.settings["language"] = self.language_combobox.currentText()[:2]
+        ui_mode = settings.ui_modes[self.ui_mode_combobox.currentIndex()]
+        settings.settings["ui_mode"] = ui_mode
         settings.writeSettingsFile()
         python = sys.executable  # Get Python executable path
         script = sys.argv[0]  # Get the current script file

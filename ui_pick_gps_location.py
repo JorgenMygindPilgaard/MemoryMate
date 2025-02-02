@@ -40,7 +40,7 @@ html = '''
                     height: 100.0%;
                     left: 0.0%;
                     top: 0.0%;
-                    background-color: #ffffff;
+                    background-color: #909ba5;
                 }
                 .leaflet-container { font-size: 1rem; }
             </style>
@@ -262,6 +262,7 @@ class MapView(QWebEngineView):
         self.zoom_enabled = zoom_enabled
         self.setLocationZoom(self.location, self.zoom)
         self.setMarkerLocation(self.marker_location)
+
 
     @pyqtSlot(str)
     def jsonSetMarkerLocation(self, location_json):

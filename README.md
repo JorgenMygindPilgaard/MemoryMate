@@ -8,9 +8,15 @@ Greetings from passed times. I want to put greetings on "the back" of our digita
 
 ![The UI is kept simple...](MemoryMateUI.jpg)
 ## Installation
-### Installation package
-The easiest way to get the application running on your computer is to use the installation-package.
-Go to https://github.com/JorgenMygindPilgaard/MemoryMate/releases/latest and follow the instructions
+There are two ways to install the application:
+### 1. Installation package
+Running Install.exe will do all for you
+### 2. Distributable folder
+Extract files in Distributable.zip to a folder you created for the Memory Mate App.
+After that you can start the App by running the "Memory Mate.exe" in the App-folder you created.
+The benifit of the distributable folder is that it can be held on a USB and moved from computer to computer.
+
+Go to https://github.com/JorgenMygindPilgaard/MemoryMate/releases/latest and follow the instructions.
 
 ### Get Source-code
 You can use the souce-code from repsitory freely, suggest changes etc. The application is created using Python 3.11 and PyQt6. 
@@ -50,78 +56,9 @@ If you have a folder with multible files and folders below, and you want to rena
 Enter the prefix if needed, the numberpattern (a string of x n's) and if needed a postfix. 
 The example above will name the first file "2023-F035-001.jpg", the next "2023-F035-002.jpg" etc. (jpg-files as example). Files with same name (ignoring filetype) will get the same name after renaming also. That way you make sure that original/editet filepairs having same name before standardizing filenames, will also have same name after renaming has taken place.
 
-
-## How to configure the application
-First time you launch the program, the language is set to english. You can change that to danish (only additional language prepared so far) by clicking the settings-wheel in the top right corner. After changing the language, relaunch the program.
-Also at first launch the program generates a settings.json file in "\ProgramData\Memeory Mate"-folder on your computer. At future launches, the program will use the existing settings.json file. You can add or remove logical tags in the settings.json, if you would like the program to work with other logical tags that the defaults. Make sure to take a backup of the originl settings.json.
-If you want to revert to defaults after editing settings.json, then simply delete the file from "\ProgramData\Memeory Mate"-folder. At next program-launch, the default settings.json will be generated again.
-In settings.json, logical tags are mapped to one or more physical image-tags per image/video file type. Here is a snipit from the settings.json showing in which physical tags the program stores the Title in jpg-files.:
-```json
-    "file_type_tags": {
-        "jpg": {
-            "title": [
-                "XMP:Title",
-                "EXIF:XPTitle",
-                "IPTC:ObjectName"
-            ],
-            "date": [
-                "XMP:Date"
-               
-```
-#### Reference tags
-The *Full description* logical tag is a special type of tag called a reference-tag in the application. The reference tag is *always* a read-only tag on the screen, but it is still mapped to one or more physical tags, just like the normal logical tags.
-The content of a reference tag is defined in the settings.json file. You can configure the reference tag to one or more of the following components:
-* A logical tag with label
-* A logical tag without label
-* A fixed text (can be an empty string, if you need a blank line)
-
-Here you see the default-configuration of content for the *Full description* reference tag:
-```json
-    "reference_tag_content": {
-        "description": [
-            {
-                "type": "tag",
-                "tag_name": "title",
-                "tag_label": false
-            },
-            {
-                "type": "tag",
-                "tag_name": "description_only",
-                "tag_label": false
-            },
-            {
-                "type": "text_line",
-                "text": ""
-            },
-            {
-                "type": "tag",
-                "tag_name": "persons",
-                "tag_label": true
-            },
-            {
-                "type": "tag",
-                "tag_name": "source",
-                "tag_label": true
-            },
-            {
-                "type": "tag",
-                "tag_name": "photographer",
-                "tag_label": true
-            },
-            {
-                "type": "tag",
-                "tag_name": "original_filename",
-                "tag_label": true
-            }
-        ]
-    },
-```
-
 #### Automatic backup running in background
 Memory Mate updates image-files when you change logical tag values. Some backup-solutions lock files when doing automatic backup. If an image is locked, Memory Mate will not be able to update the metadata. It is therefore recommended that you pause your backup-program while using Memory Mate to update metadata.
 
 #### Donate
 Memory Mate is totally free for you to use. If you like the tool, you can donate an amount via paypal. It absolutly not needed:
 https://www.paypal.com/paypalme/JorgenMygindPilgaard
-
-
