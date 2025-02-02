@@ -24,6 +24,8 @@ class WelcomeWindow(QDialog):
         self.setLayout(settings_layout)
         self.headline = QLabel('Please select Language - Vælg Sprog')
         settings_layout.addWidget(self.headline)
+
+        # Add language selection box
         self.language_combobox = QComboBox()
         for index, (key, value) in enumerate(settings.languages.items()):
             self.language_combobox.addItem(key+" - "+value)
@@ -34,6 +36,25 @@ class WelcomeWindow(QDialog):
         language_layout.addWidget(language_label)
         language_layout.addWidget(self.language_combobox)
         settings_layout.addLayout(language_layout)
+
+        # Add ui_mode-selection
+        self.ui_mode_combobox = QComboBox(self)
+        for index, ui_mode in enumerate(settings.ui_modes):
+            language = settings.language
+            if language is None:
+                language = 'EN'
+            self.ui_mode_combobox.addItem(settings.text_keys.get("settings_ui_mode."+ui_mode).get(language))
+            if ui_mode == settings.ui_mode:
+                self.ui_mode_combobox.setCurrentIndex(index)
+        if self.ui_mode_combobox.currentIndex() is None:
+            self.ui_mode_combobox.setCurrentIndex(0)
+        ui_mode_label = QLabel(settings.text_keys.get("settings_labels_ui_mode").get(settings.language), self)
+        ui_mode_layout = QHBoxLayout()
+        ui_mode_layout.addWidget(ui_mode_label)
+        ui_mode_layout.addWidget(self.ui_mode_combobox)
+        settings_layout.addLayout(ui_mode_layout)
+
+
         settings_layout.addSpacing(20)
         self.ok_button = QPushButton("OK")
         settings_layout.addWidget(self.ok_button)
@@ -42,6 +63,11 @@ class WelcomeWindow(QDialog):
     def saveLanguage(self, index):
         settings.settings["language"] = self.language_combobox.currentText()[:2]
         settings.language = self.language_combobox.currentText()[:2]
+
+        ui_mode = settings.ui_modes[self.ui_mode_combobox.currentIndex()]
+        settings.settings["ui_mode"] = ui_mode
+        settings.ui_mode = ui_mode
+
         settings.writeSettingsFile()
         self.accept()
 
@@ -153,7 +179,6 @@ class MainWindow(QMainWindow):
         super().closeEvent(event)
 
 app = QApplication(sys.argv)
-
 app.setStyle("Fusion")
 
 # Check if language is set, if not, show the selection dialog
@@ -162,7 +187,14 @@ if settings.language is None:
     if dialog.exec() == QDialog.DialogCode.Rejected:  # If user closes the dialog, exit app
         sys.exit()
 
-#app.setStyleSheet(qdarkstyle.load_stylesheet())
+# Set UI-mode
+if settings.ui_mode == 'LIGHT':
+    app.setStyle("Fusion")
+elif settings.ui_mode == 'DARK':
+    app.setStyleSheet(qdarkstyle.load_stylesheet())
+else:
+    app.setStyle("Fusion")
+
 window = MainWindow()
 window.show()
 QueueHost.get_instance().start_queue_worker()    #Start Queue-processing

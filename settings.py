@@ -13,19 +13,21 @@ def readSettingsFile():
     else:
         settings = {}
 
-
 def patchDefaultValues():
     global settings
-
     if settings.get("languages") is None:
         settings["languages"] = {"DA": "Danish",
                                  "EN": "English"}
+    if settings.get("ui_modes") is None:
+        settings["ui_modes"] = ["LIGHT",
+                               "DARK"]
+    if settings.get("ui_mode") is None:
+        settings["ui_mode"] = "LIGHT"
     if settings.get("resource_path") is None:
         if hasattr(sys, '_MEIPASS'):
             settings['resource_path'] = sys._MEIPASS
         else:
             settings['resource_path'] = ''
-
     if settings.get("file_types") is None:
         settings["file_types"] = ["jpg", "jpeg", "png", "bmp", "cr3", "cr2", "dng", "arw", "nef", "heic", "tif", "tiff", "gif","mp4", "m4v", "mov", "avi", "m2t", "m2ts","mts"]
     if settings.get("sidecar_tag_groups") is None:
@@ -675,6 +677,15 @@ def patchDefaultValues():
                                  "settings_labels_application_language":
                                      {"DA": "Sprog",
                                       "EN": "Language"},
+                                 "settings_labels_ui_mode":
+                                     {"DA": "Applikations-udseende",
+                                      "EN": "Application-mode"},
+                                 "settings_ui_mode.LIGHT":
+                                     {"DA": "Lyst tema",
+                                      "EN": "Light Theme"},
+                                 "settings_ui_mode.DARK":
+                                     {"DA": "Mørkt tema",
+                                      "EN": "Dark Theme"},
                                  "preview_menu_open_in_default_program":
                                      {"DA": "Åben",
                                       "EN": "Open"},
@@ -706,6 +717,12 @@ def patchDefaultValues():
                                                    }
     if settings.get("settings_labels") is None:
         settings["settings_labels"] = {"application_language":
+                                           {"text_key": "settings_labels_application_language"},
+                                       "ui_mode":
+                                           {"text_key": "settings_labels_ui_mode"}
+                                       }
+    if settings.get("settings_labels") is None:
+        settings["settings_labels"] = {"application_language":
                                            {"text_key": "settings_labels_application_language"}
                                        }
     # A file padded with one of the paddings are still considered coming from same source-file during standardization of filenames.
@@ -729,41 +746,37 @@ def writeSettingsFile():
     file_settings = {}
     file_settings['version']=settings.get('version')
     file_settings['language']=settings.get('language')
+    file_settings['ui_mode']=settings.get('ui_mode')
     settings_json_object = json.dumps(file_settings, indent=4)
     with open(settings_path, "w") as outfile:
         outfile.write(settings_json_object)
 
-version = "2.2.0"   # Rotation of videos
+version = "2.5.0"   # Windows portable edition
 
 # Make location for Application, if missing
-app_data_location = os.path.join(os.environ.get("ProgramData"),"Memory Mate")
+exe_folder = os.path.dirname(os.path.abspath(sys.argv[0]))
+if os.path.exists(os.path.join(exe_folder,"_distributable.txt")):   # existence of distributable.txt indicates that the program is in a distributable folder (with subfolder for data)
+    app_data_location = os.path.join(exe_folder, "Data")
+    is_distributable = True
+else:
+    app_data_location = os.path.join(os.environ.get("ProgramData"),"Memory Mate")
+    is_distributable = False
 if not os.path.isdir(app_data_location):
     os.mkdir(app_data_location)
+
+settings_path = os.path.join(app_data_location, "settings.json")   # Path to settings-file
+queue_file_path = os.path.join(app_data_location, "queue.json")
 
 # Define global variable for settings
 settings = {}
 old_settings = {}
 
-# Set path to settings
-settings_path = os.path.join(app_data_location,"settings.json")
-
-# Set path to queue-file
-queue_file_path = os.path.join(app_data_location,"queue.json")
-
 # Read settings-file, patch it and upgrade
-readSettingsFile()                       # Holds version and Language only, so settings now holds these two
-
-# Read settings-file with language and version-number
-old_settings['version']=settings.get('version')
-old_settings['language']=settings.get('language')
-settings = copy.deepcopy(old_settings)   # Now settings only holds old version and language
+readSettingsFile()            # Holds version, ui_mode and Language only, so settings now holds three
 settings['version']=version   # Settings now holds new version (from line 526)
+patchDefaultValues()          # Settings now holds all (Tags, translations etc. are added)
+writeSettingsFile()           #Update Settingsfile with newest values
 
-# Write settings to file if new or upgraded
-if old_settings != settings:          # Write to file and update settings variables in case of change
-    writeSettingsFile()
-
-patchDefaultValues()                  # Settings now holds all (Tags, translations etc. are added)
 
 # Set all variables from data in settings-file and defaultdata
 version = settings.get("version")            # Actually this is the version already assigned in top of settings
@@ -780,6 +793,8 @@ folder_context_menu_actions = settings.get("folder_context_menu_actions")
 settings_labels = settings.get("settings_labels")
 file_name_padding = settings.get("file_name_padding")
 resource_path = settings.get('resource_path')
+ui_modes = settings.get('ui_modes')
+ui_mode = settings.get("ui_mode")
 print('path: '+ resource_path )
 
 

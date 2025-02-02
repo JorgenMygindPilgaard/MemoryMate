@@ -728,12 +728,14 @@ class Rotation(QWidget):
 
         # Create a QLabel for "rotate_left" image
         self.left_image_label = QLabel()
-        self.left_image_label.setPixmap(QPixmap(os.path.join(settings.resource_path,'rotate_left.png')))  # Replace with your image file
+        rotate_left_pixmap = QPixmap(os.path.join(settings.resource_path,'rotate_left.png')).scaled(25, 25, Qt.AspectRatioMode.IgnoreAspectRatio, Qt.TransformationMode.SmoothTransformation)
+        self.left_image_label.setPixmap(rotate_left_pixmap)  # Replace with your image file
         self.left_image_label.mousePressEvent = self.onRotateLeft
 
         # Create a QLabel for "rotate_right" image
         self.right_image_label = QLabel()
-        self.right_image_label.setPixmap(QPixmap(os.path.join(settings.resource_path,'rotate_right.png')))  # Replace with your image file
+        rotate_right_pixmap = QPixmap(os.path.join(settings.resource_path,'rotate_right.png')).scaled(25, 25, Qt.AspectRatioMode.IgnoreAspectRatio, Qt.TransformationMode.SmoothTransformation)
+        self.right_image_label.setPixmap(rotate_right_pixmap)  # Replace with your image file
         self.right_image_label.mousePressEvent = self.onRotateRight
         self.left_image_label.enterEvent = self.onEnterLeft
         self.left_image_label.leaveEvent = self.onLeaveLeft
