@@ -751,7 +751,7 @@ def writeSettingsFile():
     with open(settings_path, "w") as outfile:
         outfile.write(settings_json_object)
 
-version = "2.5.0"   # Windows portable edition
+version = "2.5.1"   # Progress monitor visible in dark modegit
 
 # Make location for Application, if missing
 exe_folder = os.path.dirname(os.path.abspath(sys.argv[0]))
