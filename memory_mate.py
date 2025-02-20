@@ -11,7 +11,8 @@ from PyQt6.QtCore import Qt, QEvent
 from file_metadata_util import FileMetadata, FilePreview
 import settings
 import qdarkstyle
-
+from language import getText
+from lightroom_integration import processLightroomQueue
 
 class WelcomeWindow(QDialog):
     def __init__(self):
@@ -43,12 +44,12 @@ class WelcomeWindow(QDialog):
             language = settings.language
             if language is None:
                 language = 'EN'
-            self.ui_mode_combobox.addItem(settings.text_keys.get("settings_ui_mode."+ui_mode).get(language))
+            self.ui_mode_combobox.addItem(getText("settings_ui_mode."+ui_mode))
             if ui_mode == settings.ui_mode:
                 self.ui_mode_combobox.setCurrentIndex(index)
         if self.ui_mode_combobox.currentIndex() is None:
             self.ui_mode_combobox.setCurrentIndex(0)
-        ui_mode_label = QLabel(settings.text_keys.get("settings_labels_ui_mode").get(settings.language), self)
+        ui_mode_label = QLabel(getText("settings_labels_ui_mode"), self)
         ui_mode_layout = QHBoxLayout()
         ui_mode_layout.addWidget(ui_mode_label)
         ui_mode_layout.addWidget(self.ui_mode_combobox)
@@ -186,6 +187,11 @@ if settings.language is None:
     dialog = WelcomeWindow()
     if dialog.exec() == QDialog.DialogCode.Rejected:  # If user closes the dialog, exit app
         sys.exit()
+
+# Rename files in Lightroom if anything in queue
+if settings.lr_integration_active:
+    processLightroomQueue(settings.lr_db_path,settings.lr_queue_file_path,True)
+
 
 # Set UI-mode
 if settings.ui_mode == 'LIGHT':

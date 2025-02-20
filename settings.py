@@ -1,9 +1,6 @@
 import json
 import os
 import sys
-import copy
-
-from PyQt6.QtWidgets import QWidget, QVBoxLayout, QComboBox, QLabel, QHBoxLayout
 
 def readSettingsFile():
     global settings_path, settings
@@ -28,6 +25,10 @@ def patchDefaultValues():
             settings['resource_path'] = sys._MEIPASS
         else:
             settings['resource_path'] = ''
+    if settings.get("lr_integration_active") is None:
+        settings["lr_integration_active"] = False
+    if settings.get("lr_db_path") is None:
+        settings["lr_db_path"] = ''
     if settings.get("file_types") is None:
         settings["file_types"] = ["jpg", "jpeg", "png", "bmp", "cr3", "cr2", "dng", "arw", "nef", "heic", "tif", "tiff", "gif","mp4", "m4v", "mov", "avi", "m2t", "m2ts","mts"]
     if settings.get("sidecar_tag_groups") is None:
@@ -604,95 +605,7 @@ def patchDefaultValues():
             "m2ts": {},
             "mts": {},
         }
-    if settings.get("text_keys") is None:
-        settings["text_keys"] = {"tag_label_rating":
-                                     {"DA": "Bedømmelse",
-                                      "EN": "Rating"},
-                                 "tag_label_title":
-                                     {"DA": "Titel",
-                                      "EN": "Title"},
-                                 "tag_label_date":
-                                     {"DA": "Dato/tid",
-                                      "EN": "Date/time"},
-                                 "tag_label_date.local_date_time":
-                                     {"DA": "Lokal dato/tid",
-                                      "EN": "Local date/time"},
-                                 "tag_label_date.utc_offset":
-                                     {"DA": "Dato/tid utc-offset",
-                                      "EN": "Date/time utc-offset"},
-                                 "tag_label_date.latest_change":
-                                     {"DA": "Seneste dato/tid ændring",
-                                      "EN": "Latest date/time change"},
-                                 "tag_label_description_only":
-                                     {"DA": "Beskrivelse",
-                                      "EN": "Description"},
-                                 "tag_label_persons":
-                                     {"DA": "Personer",
-                                      "EN": "People"},
-                                 "tag_label_photographer":
-                                     {"DA": "Fotograf",
-                                      "EN": "Photographer"},
-                                 "tag_label_source":
-                                     {"DA": "Oprindelse",
-                                      "EN": "Source"},
-                                 "tag_label_original_filename":
-                                     {"DA": "Oprindeligt filnavn",
-                                      "EN": "Original Filename"},
-                                 "tag_label_geo_location":
-                                     {"DA": "Geo-lokation",
-                                      "EN": "Geo-location"},
-                                 "tag_label_description":
-                                     {"DA": "Fuld beskrivelse",
-                                      "EN": "Full Description"},
-                                 "file_menu_consolidate":
-                                     {"DA": "Konsolider metadata",
-                                      "EN": "Consolidate Metadata"},
-                                 "file_menu_copy":
-                                     {"DA": "Kopier metadata",
-                                      "EN": "Copy Metadata"},
-                                 "file_menu_paste":
-                                     {"DA": "Indsæt metadata",
-                                      "EN": "Paste Metadata"},
-                                 "file_menu_patch":
-                                     {"DA": "Udfyld metadata",
-                                      "EN": "Patch Metadata"},
-                                 "file_menu_paste_by_filename":
-                                     {"DA": "Indsæt metadata efter filnavn",
-                                      "EN": "Paste Metadata by Filename"},
-                                 "file_menu_patch_by_filename":
-                                     {"DA": "Udfyld metadata efter filnavn",
-                                      "EN": "Patch Metadata by Filename"},
-                                 "file_menu_chose_tags_to_paste":
-                                     {"DA": "Vælg hvad du vil overføre:",
-                                      "EN": "Choose what to transfer:"},
-                                 "folder_menu_standardize":
-                                     {"DA": "Standardiser filnavne",
-                                      "EN": "Standardize Filenames"},
-                                 "folder_menu_consolidate":
-                                     {"DA": "Konsolider metadata",
-                                      "EN": "Consolidate Metadata"},
-                                 "settings_window_title":
-                                     {"DA": "Indstillinger",
-                                      "EN": "Settings"},
-                                 "settings_labels_application_language":
-                                     {"DA": "Sprog",
-                                      "EN": "Language"},
-                                 "settings_labels_ui_mode":
-                                     {"DA": "Applikations-udseende",
-                                      "EN": "Application-mode"},
-                                 "settings_ui_mode.LIGHT":
-                                     {"DA": "Lyst tema",
-                                      "EN": "Light Theme"},
-                                 "settings_ui_mode.DARK":
-                                     {"DA": "Mørkt tema",
-                                      "EN": "Dark Theme"},
-                                 "preview_menu_open_in_default_program":
-                                     {"DA": "Åben",
-                                      "EN": "Open"},
-                                 "preview_menu_open_in_browser":
-                                     {"DA": "Åben i webbrowser",
-                                      "EN": "Open in Web Browser"},
-                                 }
+
     if settings.get("file_context_menu_actions") is None:
         settings["file_context_menu_actions"] = {"consolidate_metadata":
                                                      {"text_key": "file_menu_consolidate"},
@@ -747,11 +660,14 @@ def writeSettingsFile():
     file_settings['version']=settings.get('version')
     file_settings['language']=settings.get('language')
     file_settings['ui_mode']=settings.get('ui_mode')
+    file_settings['lr_integration_active']=settings.get('lr_integration_active')
+    file_settings['lr_db_path']=settings.get('lr_db_path')
+
     settings_json_object = json.dumps(file_settings, indent=4)
     with open(settings_path, "w") as outfile:
         outfile.write(settings_json_object)
 
-version = "2.5.1"   # Progress monitor visible in dark modegit
+version = "3.0.0"   # Lightroom Integration
 
 # Make location for Application, if missing
 exe_folder = os.path.dirname(os.path.abspath(sys.argv[0]))
@@ -766,6 +682,8 @@ if not os.path.isdir(app_data_location):
 
 settings_path = os.path.join(app_data_location, "settings.json")   # Path to settings-file
 queue_file_path = os.path.join(app_data_location, "queue.json")
+lr_queue_file_path = os.path.join(app_data_location, "lr_queue.json")
+
 
 # Define global variable for settings
 settings = {}
@@ -787,7 +705,6 @@ language = settings.get("language")
 logical_tags = settings.get("logical_tags")
 tags = settings.get("tags")
 file_type_tags = settings.get("file_type_tags")
-text_keys = settings.get("text_keys")
 file_context_menu_actions = settings.get("file_context_menu_actions")
 folder_context_menu_actions = settings.get("folder_context_menu_actions")
 settings_labels = settings.get("settings_labels")
@@ -795,6 +712,9 @@ file_name_padding = settings.get("file_name_padding")
 resource_path = settings.get('resource_path')
 ui_modes = settings.get('ui_modes')
 ui_mode = settings.get("ui_mode")
+lr_integration_active = settings.get("lr_integration_active")
+lr_db_path = settings.get("lr_db_path")
+
 print('path: '+ resource_path )
 
 
