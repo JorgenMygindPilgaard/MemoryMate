@@ -13,6 +13,7 @@ import re
 import util
 from value_classes import *
 import cv2
+from language import getText
 
 class FileMetadataChangedEmitter(QObject):
     instance = None
@@ -28,7 +29,6 @@ class FileMetadataChangedEmitter(QObject):
         return FileMetadataChangedEmitter.instance
     def send(self, file_name, old_logical_tag_values, new_logical_tag_values):
         self.change_signal.emit(file_name, old_logical_tag_values, new_logical_tag_values)
-
 
 class FileMetadata(QObject):
 #   app_path = sys.argv[0]
@@ -374,7 +374,7 @@ class FileMetadata(QObject):
                         if tag_content.get('tag_label') == True:
                             label_key = settings.logical_tags.get(ref_logical_tag).get("label_text_key")
                             if label_key is not None:
-                                label = settings.text_keys.get(label_key).get(settings.language) + ': '
+                                label = getText(label_key) + ': '
                             else:
                                 label = ""
                         else:

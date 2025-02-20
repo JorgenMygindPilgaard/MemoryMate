@@ -1,13 +1,16 @@
 import subprocess
 import sys
+from language import getText
 
 from PyQt6.QtWidgets import QTreeView, QMenu, QScrollArea, QWidget, QHBoxLayout, QVBoxLayout, QLabel, QLineEdit, \
-    QPushButton, QAbstractItemView, QDialog, QComboBox, QApplication
+    QPushButton, QAbstractItemView, QDialog, QComboBox, QApplication, QCheckBox, QTextEdit
 from PyQt6.QtCore import QModelIndex, Qt, QDir, QModelIndex,QItemSelectionModel, QObject, pyqtSignal
 from PyQt6.QtGui import QFileSystemModel,QAction
+
+import lightroom_integration
 import settings
 from file_metadata_util import FileMetadata, QueueHost, FileMetadataChangedEmitter, FileReadQueue, FileReadyEmitter, FilePreview
-from file_util import FileNameChangedEmitter
+from file_util import FileNameChangedEmitter, FileRenameDoneEmitter
 from ui_util import ProgressBarWidget
 import os
 from ui_widgets import TextLine, Text, DateTime, Date, TextSet, GeoLocation, Rotation, Rating, ImageRotatedEmitter
@@ -162,13 +165,13 @@ class FilePanel(QScrollArea):
         context_menu = QMenu()
 
         # Add the "Open in Browser" action to the context menu
-        open_in_browser_action_text = settings.text_keys.get("preview_menu_open_in_browser").get(settings.language)
+        open_in_browser_action_text = getText("preview_menu_open_in_browser")
         open_in_browser_action = QAction(open_in_browser_action_text)
         open_in_browser_action.triggered.connect(FilePanel.openInBrowser)
         context_menu.addAction(open_in_browser_action)
 
         # Add the "Open in Default Program" action to the context menu
-        open_in_default_program_action_text = settings.text_keys.get("preview_menu_open_in_default_program").get(settings.language)
+        open_in_default_program_action_text = getText("preview_menu_open_in_default_program")
         open_in_default_program_action = QAction(open_in_default_program_action_text)
         open_in_default_program_action.triggered.connect(FilePanel.openInDefaultProgram)
         context_menu.addAction(open_in_default_program_action)
@@ -211,7 +214,7 @@ class FilePanel(QScrollArea):
                 new_line = True
             tag_label_key = settings.logical_tags.get(logical_tag).get("label_text_key")
             if tag_label_key:
-                tag_label = settings.text_keys.get(tag_label_key).get(settings.language)
+                tag_label = getText(tag_label_key)
             tag_widget_type = settings.logical_tags.get(logical_tag).get("widget")
 
             if tag_label:
@@ -291,36 +294,36 @@ class FileList(QTreeView):
 
         # Add actions to the menu
         action_text_key = settings.file_context_menu_actions.get("consolidate_metadata").get("text_key")
-        action_text = settings.text_keys.get(action_text_key).get(settings.language)
+        action_text = getText(action_text_key)
         self.consolidate_metadata = self.menu.addAction(action_text)
 
         action_text_key = settings.folder_context_menu_actions.get("standardize_filenames").get("text_key")
-        action_text = settings.text_keys.get(action_text_key).get(settings.language)
+        action_text = getText(action_text_key)
         self.standardize_filenames = self.menu.addAction(action_text)
 
         action_text_key = settings.file_context_menu_actions.get("copy_metadata").get("text_key")
-        action_text = settings.text_keys.get(action_text_key).get(settings.language)
+        action_text = getText(action_text_key)
         self.copy_metadata = self.menu.addAction(action_text)
 
         action_text_key = settings.file_context_menu_actions.get("paste_metadata").get("text_key")
-        action_text = settings.text_keys.get(action_text_key).get(settings.language)
+        action_text = getText(action_text_key)
         self.paste_metadata = self.menu.addAction(action_text)
 
         action_text_key = settings.file_context_menu_actions.get("patch_metadata").get("text_key")
-        action_text = settings.text_keys.get(action_text_key).get(settings.language)
+        action_text = getText(action_text_key)
         self.patch_metadata = self.menu.addAction(action_text)
 
         action_text_key = settings.file_context_menu_actions.get("paste_by_filename").get("text_key")
-        action_text = settings.text_keys.get(action_text_key).get(settings.language)
+        action_text = getText(action_text_key)
         self.paste_by_filename = self.menu.addAction(action_text)
 
         action_text_key = settings.file_context_menu_actions.get("patch_by_filename").get("text_key")
-        action_text = settings.text_keys.get(action_text_key).get(settings.language)
+        action_text = getText(action_text_key)
         self.patch_by_filename = self.menu.addAction(action_text)
 
         self.menu.addSeparator()
         action_text_key = settings.file_context_menu_actions.get("choose_tags_to_paste").get("text_key")
-        action_text = settings.text_keys.get(action_text_key).get(settings.language)
+        action_text = getText(action_text_key)
         menu_text_line = QAction(action_text, self, enabled=False)
         self.menu.addAction(menu_text_line)  # Just a textline in menu saying "Choose what to paste"
 
@@ -337,7 +340,7 @@ class FileList(QTreeView):
 
             tag_label_text_key = settings.logical_tags.get(logical_tag).get("label_text_key")
             if tag_label_text_key:
-                tag_label = settings.text_keys.get(tag_label_text_key).get(settings.language)
+                tag_label = getText(tag_label_text_key)
                 tag_action = QAction(tag_label, self, checkable=True)
                 if settings.logical_tags.get(logical_tag).get("default_paste_select") == False:
                     tag_action.setChecked(False)
@@ -353,7 +356,7 @@ class FileList(QTreeView):
                             continue
                         tag_label_text_key = settings.logical_tags.get(logical_tag).get("value_parts").get(value_part).get("label_text_key")
                         if tag_label_text_key:
-                            tag_label = settings.text_keys.get(tag_label_text_key).get(settings.language)
+                            tag_label = getText(tag_label_text_key)
                             tag_action = QAction(tag_label, self, checkable=True)
                             if settings.logical_tags.get(logical_tag).get("value_parts").get(value_part).get("default_paste_select") == False:
                                 tag_action.setChecked(False)
@@ -660,7 +663,7 @@ class SettingsWindow(QDialog):
         super().__init__()
 
         # Prepare window
-        window_title = settings.text_keys.get("settings_window_title").get(settings.language)
+        window_title = getText("settings_window_title")
         self.setWindowTitle(window_title)
         self.setGeometry(100, 100, 400, 200)
         settings_layout = QVBoxLayout()
@@ -672,7 +675,7 @@ class SettingsWindow(QDialog):
             self.language_combobox.addItem(key+" - "+value)
             if key == settings.language:
                 self.language_combobox.setCurrentIndex(index)
-        language_label = QLabel(settings.text_keys.get("settings_labels_application_language").get(settings.language), self)
+        language_label = QLabel(getText("settings_labels_application_language"), self)
         language_layout = QHBoxLayout()
         language_layout.addWidget(language_label)
         language_layout.addWidget(self.language_combobox)
@@ -681,16 +684,34 @@ class SettingsWindow(QDialog):
         # Add ui_mode-selection
         self.ui_mode_combobox = QComboBox(self)
         for index, ui_mode in enumerate(settings.ui_modes):
-            self.ui_mode_combobox.addItem(settings.text_keys.get("settings_ui_mode."+ui_mode).get(settings.language))
+            self.ui_mode_combobox.addItem(getText("settings_ui_mode."+ui_mode))
             if ui_mode == settings.ui_mode:
                 self.ui_mode_combobox.setCurrentIndex(index)
         if self.ui_mode_combobox.currentIndex() is None:
             self.ui_mode_combobox.setCurrentIndex(0)
-        ui_mode_label = QLabel(settings.text_keys.get("settings_labels_ui_mode").get(settings.language), self)
+        ui_mode_label = QLabel(getText("settings_labels_ui_mode"), self)
         ui_mode_layout = QHBoxLayout()
         ui_mode_layout.addWidget(ui_mode_label)
         ui_mode_layout.addWidget(self.ui_mode_combobox)
         settings_layout.addLayout(ui_mode_layout)
+
+        # Add Lightroom integration fields
+        lr_integration_headline = QLabel(getText('settings_lr_integration_headline'))
+        settings_layout.addWidget(lr_integration_headline)
+        self.lr_integration_active_checkbox = QCheckBox(getText('settings_labels_lr_integration_active'))
+        self.lr_integration_active_checkbox.setChecked(settings.lr_integration_active)
+        settings_layout.addWidget(self.lr_integration_active_checkbox)
+        lr_integration_disclaimer_label = QLabel(getText('settings_lr_integration_disclaimer'))
+        lr_integration_disclaimer_label.setStyleSheet("color: #868686;")
+        settings_layout.addWidget(lr_integration_disclaimer_label)
+        self.lr_cat_file_selector = file_util.FileSelector(getText('settings_lr_file_selector_placeholder_text'),
+                                                           settings.lr_db_path,
+                                                           getText('settings_lr_file_selector_title'))
+        lr_cat_file_selector_label = QLabel(getText('settings_labels_lr_db_file'))
+        lr_cat_file_selector_layout = QHBoxLayout()
+        lr_cat_file_selector_layout.addWidget(lr_cat_file_selector_label)
+        lr_cat_file_selector_layout.addWidget(self.lr_cat_file_selector)
+        settings_layout.addLayout(lr_cat_file_selector_layout)
 
 
         settings_layout.addSpacing(20)
@@ -702,6 +723,8 @@ class SettingsWindow(QDialog):
         settings.settings["language"] = self.language_combobox.currentText()[:2]
         ui_mode = settings.ui_modes[self.ui_mode_combobox.currentIndex()]
         settings.settings["ui_mode"] = ui_mode
+        settings.settings["lr_integration_active"]=self.lr_integration_active_checkbox.isChecked()
+        settings.settings["lr_db_path"]=self.lr_cat_file_selector.getFilePath()
         settings.writeSettingsFile()
         python = sys.executable  # Get Python executable path
         script = sys.argv[0]  # Get the current script file
@@ -1059,6 +1082,11 @@ def onFileRenamed(old_file_name, new_file_name, update_original_filename_tag=Fal
                     file_metadata_pasted_emitter = FileMetadataPastedEmitter.getInstance()
                     file_metadata_pasted_emitter.emit(new_file_name)
 
+def onFileRenameDone(files):
+    if settings.lr_integration_active:
+        lightroom_integration.appendLightroomQueue(settings.lr_queue_file_path,files)
+        lightroom_integration.processLightroomQueue(settings.lr_db_path,settings.lr_queue_file_path)
+
 def onCurrentFileChanged(new_file_name):
     if new_file_name != FilePanel.file_name:
         FilePanel.saveMetadata()                      # Saves metadata for file currently in filepanel (if any)
@@ -1083,6 +1111,9 @@ file_metadata_changed_emitter.change_signal.connect(onMetadataChanged)
 
 file_name_changed_emitter = FileNameChangedEmitter.getInstance()
 file_name_changed_emitter.change_signal.connect(onFileRenamed)
+
+file_rename_done_emitter = FileRenameDoneEmitter.getInstance()
+file_rename_done_emitter.done_signal.connect(onFileRenameDone)
 
 current_file_changed_emitter = CurrentFileChangedEmitter.getInstance()
 current_file_changed_emitter.change_signal.connect(onCurrentFileChanged)

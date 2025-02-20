@@ -2,9 +2,10 @@ import copy
 import os
 import json
 from fnmatch import fnmatch
-from PyQt6.QtCore import QObject,pyqtSignal
+from PyQt6.QtCore import QObject,pyqtSignal,Qt
 import threading
 import time
+from PyQt6.QtWidgets import QWidget, QVBoxLayout, QLineEdit, QPushButton, QFileDialog
 
 class FileRenameError(Exception):
     pass
@@ -81,9 +82,25 @@ class FileNameChangedEmitter(QObject):
     def emit(self, old_file_name, new_file_name, update_original_filename_tag):
         self.change_signal.emit(old_file_name, new_file_name, update_original_filename_tag)
 
+class FileRenameDoneEmitter(QObject):
+    instance = None
+    done_signal = pyqtSignal(list)  # [{"old_name":<old filename>,"new_name":<new filename>}]
+
+    def __init__(self):
+        super().__init__()
+
+    @staticmethod
+    def getInstance():
+        if FileRenameDoneEmitter.instance == None:
+            FileRenameDoneEmitter.instance = FileRenameDoneEmitter()
+        return FileRenameDoneEmitter.instance
+    def emit(self, files=[]):
+        self.done_signal.emit(files)
+
 class FileRenamer(QObject):
     __instance = None
     change_signal = FileNameChangedEmitter.getInstance()  # Old filename, New filename
+    done_signal = FileRenameDoneEmitter.getInstance()
 
     def __init__(self, files=[]):
         super().__init__()
@@ -166,22 +183,48 @@ class FileRenamer(QObject):
                     self.__roll_back(renamed_files)
                     raise FileRenameError('Error renaming ' + old_name + ' to ' + new_name + ':\n'+str(e))
 
-        # Send signal for renaming to tmp-filename
-        if flag_create_tmp_files==True:
-            for file in self.files:
-                self.change_signal.emit(file.get('old_name'), file.get('tmp_name'),False)
+        # Send signal for renaming files
         for file in self.files:
-            if flag_create_tmp_files==True:
-                self.change_signal.emit(file.get('tmp_name'), file.get('new_name'),True)
-            else:
-                self.change_signal.emit(file.get('old_name'), file.get('new_name'),True)
+            self.change_signal.emit(file.get('old_name'), file.get('new_name'),True)
 
+        # Send signal for renaming done
+        old_new_files = [{"old_name": d["old_name"], "new_name": d["new_name"]} for d in self.files]
+        self.done_signal.emit(old_new_files)
 
     def __roll_back(self,files):
         for file in files.reverse():
             old_name = file.get('old_name')
             new_name = file.get('new_name')
             os.rename(new_name, old_name)
+
+class FileSelector(QWidget):
+    def __init__(self, placeholder_text=None, file_path=None, selector_title='Select File'):
+        super().__init__()
+        layout = QVBoxLayout()
+        self.file_path_entry = self.ClickableLineEdit(self, placeholder_text=placeholder_text, text=file_path,
+                                                      selector_title=selector_title)
+        layout.addWidget(self.file_path_entry)
+        self.setLayout(layout)
+
+    def getFilePath(self):
+        return self.file_path_entry.text()
+
+    class ClickableLineEdit(QLineEdit):
+        def __init__(self, parent=None, placeholder_text=None, text=None, selector_title='Select File'):
+            super().__init__(parent)
+            if placeholder_text:
+                self.setPlaceholderText(placeholder_text)
+            if text:
+                self.setText(text)
+            self.selector_title = selector_title
+
+        def mousePressEvent(self, event):
+            if event.button() == Qt.MouseButton.LeftButton:
+                file_path, _ = QFileDialog.getOpenFileName(self, self.selector_title)
+                if file_path:
+                    self.setText(file_path)
+            else:
+                super().mousePressEvent(event)  # Keep default behavior for other mouse actions
 
 
 # An instance of the JsonQueue can hold a queue with sets of json-data. The queue-data is stored in the self.queue list,
