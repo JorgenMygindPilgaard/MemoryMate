@@ -1105,7 +1105,6 @@ def onFileReady(file_name):
     if file_name == FilePanel.file_name:
         FilePanel.instance.prepareFilePanel()
 
-
 file_metadata_changed_emitter = FileMetadataChangedEmitter.getInstance()
 file_metadata_changed_emitter.change_signal.connect(onMetadataChanged)
 
