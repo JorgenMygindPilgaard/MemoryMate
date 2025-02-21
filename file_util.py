@@ -188,7 +188,11 @@ class FileRenamer(QObject):
             self.change_signal.emit(file.get('old_name'), file.get('new_name'),True)
 
         # Send signal for renaming done
-        old_new_files = [{"old_name": d["old_name"], "new_name": d["new_name"]} for d in self.files]
+        if flag_create_tmp_files:
+            old_new_files = [{"old_name": d["old_name"], "new_name": d["tmp_name"]} for d in self.files]
+            old_new_files.extend([{"old_name": d["tmp_name"], "new_name": d["new_name"]} for d in self.files])
+        else:
+            old_new_files = [{"old_name": d["old_name"], "new_name": d["new_name"]} for d in self.files]
         self.done_signal.emit(old_new_files)
 
     def __roll_back(self,files):
