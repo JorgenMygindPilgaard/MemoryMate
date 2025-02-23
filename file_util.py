@@ -67,24 +67,9 @@ def splitFileName(file_name):
             directory = ''
         return [directory, '', '']
 
-class FileNameChangedEmitter(QObject):
-    instance = None
-    change_signal = pyqtSignal(str, str, bool)  # old filename, new file name, update_original_filename_tag
-
-    def __init__(self):
-        super().__init__()
-
-    @staticmethod
-    def getInstance():
-        if FileNameChangedEmitter.instance == None:
-            FileNameChangedEmitter.instance = FileNameChangedEmitter()
-        return FileNameChangedEmitter.instance
-    def emit(self, old_file_name, new_file_name, update_original_filename_tag):
-        self.change_signal.emit(old_file_name, new_file_name, update_original_filename_tag)
-
 class FileRenameDoneEmitter(QObject):
     instance = None
-    done_signal = pyqtSignal(list)  # [{"old_name":<old filename>,"new_name":<new filename>}]
+    done_signal = pyqtSignal(list,bool)  # [{"old_name":<old filename>,"new_name":<new filename>}]
 
     def __init__(self):
         super().__init__()
@@ -94,12 +79,11 @@ class FileRenameDoneEmitter(QObject):
         if FileRenameDoneEmitter.instance == None:
             FileRenameDoneEmitter.instance = FileRenameDoneEmitter()
         return FileRenameDoneEmitter.instance
-    def emit(self, files=[]):
-        self.done_signal.emit(files)
+    def emit(self, files,update_original_filename_tag):
+        self.done_signal.emit(files,update_original_filename_tag)
 
 class FileRenamer(QObject):
     __instance = None
-    change_signal = FileNameChangedEmitter.getInstance()  # Old filename, New filename
     done_signal = FileRenameDoneEmitter.getInstance()
 
     def __init__(self, files=[]):
@@ -183,17 +167,13 @@ class FileRenamer(QObject):
                     self.__roll_back(renamed_files)
                     raise FileRenameError('Error renaming ' + old_name + ' to ' + new_name + ':\n'+str(e))
 
-        # Send signal for renaming files
-        for file in self.files:
-            self.change_signal.emit(file.get('old_name'), file.get('new_name'),True)
-
         # Send signal for renaming done
         if flag_create_tmp_files:
             old_new_files = [{"old_name": d["old_name"], "new_name": d["tmp_name"]} for d in self.files]
             old_new_files.extend([{"old_name": d["tmp_name"], "new_name": d["new_name"]} for d in self.files])
         else:
             old_new_files = [{"old_name": d["old_name"], "new_name": d["new_name"]} for d in self.files]
-        self.done_signal.emit(old_new_files)
+        self.done_signal.emit(old_new_files,True)
 
     def __roll_back(self,files):
         for file in files.reverse():
@@ -292,34 +272,36 @@ class JsonQueue(QObject):
 
         return data
 
-    def change_queue(self, find={}, change={}):
-        if change == {}:
+    def change_queue(self, queue_changes=[]):   # queue_changes = [{'find': {<find_key1>: <find_key1_value>, <find_key2>: <find_key2_value>...}, 'change':{<change_key1>: <change_key1_value>, <change_key2>: <change_key2_value>...}}]
+        if queue_changes == []:
             return
         queue_changed = False
 
         while self.queue_being_changed:   # Wait till queue is ready for change
             pass
-
         self.queue_being_changed = True
-        for index, queue_entry in enumerate(self.queue):
-            passed_find_filter = True
-            for find_key, find_value in find.items():
-                dummy = queue_entry.get(find_key)
-                print(dummy)
-                print(find_value)
-                if not queue_entry.get(find_key) == find_value:
-                    passed_find_filter = False
-                    break
-            if passed_find_filter:
-                for change_key, change_value in change.items():
-                    old_value = self.queue[index].get(change_key)
-                    if old_value is not None and old_value != change_value:
-                        self.queue[index][change_key] = change_value
-                        queue_changed = True
+
+        for queue_change in queue_changes:
+            find = queue_change.get('find')
+            change = queue_change.get('change')
+            for index, queue_entry in enumerate(self.queue):
+                passed_find_filter = True
+                for find_key, find_value in find.items():
+                    dummy = queue_entry.get(find_key)
+                    print(dummy)
+                    print(find_value)
+                    if not queue_entry.get(find_key) == find_value:
+                        passed_find_filter = False
+                        break
+                if passed_find_filter:
+                    for change_key, change_value in change.items():
+                        old_value = self.queue[index].get(change_key)
+                        if old_value is not None and old_value != change_value:
+                            self.queue[index][change_key] = change_value
+                            queue_changed = True
         if queue_changed:
             self.queue_being_changed = False
             self.update_queue_file()  # Update file with changed queue immediately
-
 
         self.queue_being_changed = False
 
