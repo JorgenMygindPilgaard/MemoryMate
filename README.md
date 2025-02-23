@@ -56,6 +56,10 @@ If you have a folder with multible files and folders below, and you want to rena
 Enter the prefix if needed, the numberpattern (a string of x n's) and if needed a postfix. 
 The example above will name the first file "2023-F035-001.jpg", the next "2023-F035-002.jpg" etc. (jpg-files as example). Files with same name (ignoring filetype) will get the same name after renaming also. That way you make sure that original/editet filepairs having same name before standardizing filenames, will also have same name after renaming has taken place.
 
+#### Integration to Adobe Lightroom Classic
+If you are using Lightroom Classic on the same computer as Memory Mate, you can have Memory Mate automatically update the filenames in you Lightroom catalouge, when you are using the "Standardize Filenames"-functionality in Memory Mate. By default the feature is switched off but is easily switched on in Memory Mate Settings (click the settings-wheel in top right corner). Just check the "Activate Integration"-checkbox, and enter path to your lightroom catalouge-file (.lrcat) in field below, and the integration will work.
+Notice, that Memory Mate utilizes an unofficial API for updating the filenames in the Lightroom Classic. Adobe does not offer an API for updating the catalouge. The integration has been tested with Lightroom Classic v. 13.5. The integration will most likely work with other versions, but there is no guarantee, so keep your lightroom catalouge backed up.
+
 #### Automatic backup running in background
 Memory Mate updates image-files when you change logical tag values. Some backup-solutions lock files when doing automatic backup. If an image is locked, Memory Mate will not be able to update the metadata. It is therefore recommended that you pause your backup-program while using Memory Mate to update metadata.
 

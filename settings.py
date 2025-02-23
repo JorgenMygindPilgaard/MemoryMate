@@ -31,6 +31,8 @@ def patchDefaultValues():
         settings["lr_db_path"] = ''
     if settings.get("file_types") is None:
         settings["file_types"] = ["jpg", "jpeg", "png", "bmp", "cr3", "cr2", "dng", "arw", "nef", "heic", "tif", "tiff", "gif","mp4", "m4v", "mov", "avi", "m2t", "m2ts","mts"]
+    if settings.get("raw_file_types") is None:
+        settings["raw_file_types"] = ["cr3", "cr2", "dng", "arw", "nef"]
     if settings.get("sidecar_tag_groups") is None:
         settings["sidecar_tag_groups"] = {"JSON": {"file_name_pattern": "<file_name>.<ext>.json"} }
     if settings.get("logical_tags") is None:
@@ -699,6 +701,7 @@ writeSettingsFile()           #Update Settingsfile with newest values
 # Set all variables from data in settings-file and defaultdata
 version = settings.get("version")            # Actually this is the version already assigned in top of settings
 file_types = settings.get("file_types")
+raw_file_types = settings.get("raw_file_types")
 sidecar_tag_groups=settings.get("sidecar_tag_groups")
 languages = settings.get("languages")
 language = settings.get("language")
