@@ -667,7 +667,7 @@ def writeSettingsFile():
     with open(settings_path, "w") as outfile:
         outfile.write(settings_json_object)
 
-version = "3.0.1"   # Bugfix: Send renaming to tmp-files as well
+version = "3.0.2"   # Bugfix: Incorrect file is shown in filepanel after rename into existing filename range. Bug is fixed
 
 # Make location for Application, if missing
 exe_folder = os.path.dirname(os.path.abspath(sys.argv[0]))

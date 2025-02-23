@@ -691,7 +691,7 @@ class FileReadQueue(QThread):
 
     @staticmethod
     def getInstance():
-        if not FileReadQueue.running:
+        if FileReadQueue.instance is None:
             FileReadQueue.getInstance_active = True
             FileReadQueue.instance = FileReadQueue()
             FileReadQueue.getInstance_active = False

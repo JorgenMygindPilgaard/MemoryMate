@@ -10,7 +10,7 @@ from PyQt6.QtGui import QFileSystemModel,QAction
 import lightroom_integration
 import settings
 from file_metadata_util import FileMetadata, QueueHost, FileMetadataChangedEmitter, FileReadQueue, FileReadyEmitter, FilePreview
-from file_util import FileNameChangedEmitter, FileRenameDoneEmitter
+from file_util import FileRenameDoneEmitter
 from ui_util import ProgressBarWidget
 import os
 from ui_widgets import TextLine, Text, DateTime, Date, TextSet, GeoLocation, Rotation, Rating, ImageRotatedEmitter
@@ -1051,41 +1051,44 @@ def onMetadataPasted(file_name):
     if file_name == FilePanel.file_name:
         dummy = FilePanel.getInstance(file_name)   #Triggers update of Filepanel
 
-def onFileRenamed(old_file_name, new_file_name, update_original_filename_tag=False):     # reacts on change filename signal from
-    # Update fileename in queue
-    json_queue_file = file_util.JsonQueue.getInstance(settings.queue_file_path)
-    json_queue_file.change_queue(find={'file': old_file_name}, change={'file': new_file_name})
-
-    # Update filename in file-panel
-    if FilePanel.file_name == old_file_name:
-        FilePanel.updateFilename(new_file_name)
-
-    # Update filename in preview-instance
-    file_preview = FilePreview.instance_index.get(old_file_name)
-    if file_preview:
-        file_preview.updateFilename(new_file_name)
-
-    # Update filename in metadata-instance
-    file_metadata = FileMetadata.instance_index.get(old_file_name)
-    if file_metadata:
-        file_metadata.updateFilename(new_file_name)
-
-# Set original filename tag in all files
-    if update_original_filename_tag==True:
-        if settings.logical_tags.get('original_filename'):
-            if new_file_name != '' and new_file_name != None:
-                file_metadata = FileMetadata.getInstance(new_file_name)
-                new_name_alone = file_util.splitFileName(new_file_name)[1]
-                if new_name_alone != '' and new_name_alone != None:
-                    logical_tags = {'original_filename': new_name_alone}
-                    file_metadata.setLogicalTagValues(logical_tags)
-                    file_metadata_pasted_emitter = FileMetadataPastedEmitter.getInstance()
-                    file_metadata_pasted_emitter.emit(new_file_name)
-
-def onFileRenameDone(files):
+def onFileRenameDone(files,update_original_filename_tag=False):
+# Update filenames in Lightroom Classic Catalog
     if settings.lr_integration_active:
         lightroom_integration.appendLightroomQueue(settings.lr_queue_file_path,files)
         lightroom_integration.processLightroomQueue(settings.lr_db_path,settings.lr_queue_file_path)
+
+# Update file-names in queue
+    queue_changes = []
+    for file in files:
+        queue_changes.append({'find': {'file': file.get('old_name')},'change': {'file': file.get('new_name')}})
+    json_queue_file = file_util.JsonQueue.getInstance(settings.queue_file_path)
+    json_queue_file.change_queue(queue_changes)
+
+# Update filename in preview-instance
+    for file in files:
+        file_preview = FilePreview.instance_index.get(file.get('old_name'))
+        if file_preview is not None:
+            file_preview.updateFilename(file.get('new_name'))
+
+# Update filename in metadata-instance
+    for file in files:
+        file_metadata = FileMetadata.instance_index.get(file.get('old_name'))
+        if file_metadata is not None:
+            file_metadata.updateFilename(file.get('new_name'))
+
+# Set original filename tag in all files
+    if update_original_filename_tag==True and settings.logical_tags.get('original_filename') is not None:
+        for file in files:
+            new_file_name = file.get('new_name')
+            if 'tmp' in new_file_name:
+                continue
+            file_metadata = FileMetadata.getInstance(new_file_name)
+            new_name_alone = file_util.splitFileName(new_file_name)[1]
+            if new_name_alone != '' and new_name_alone != None:
+                logical_tags = {'original_filename': new_name_alone}
+                file_metadata.setLogicalTagValues(logical_tags)
+                file_metadata_pasted_emitter = FileMetadataPastedEmitter.getInstance()
+                file_metadata_pasted_emitter.emit(new_file_name)
 
 def onCurrentFileChanged(new_file_name):
     if new_file_name != FilePanel.file_name:
@@ -1107,9 +1110,6 @@ def onFileReady(file_name):
 
 file_metadata_changed_emitter = FileMetadataChangedEmitter.getInstance()
 file_metadata_changed_emitter.change_signal.connect(onMetadataChanged)
-
-file_name_changed_emitter = FileNameChangedEmitter.getInstance()
-file_name_changed_emitter.change_signal.connect(onFileRenamed)
 
 file_rename_done_emitter = FileRenameDoneEmitter.getInstance()
 file_rename_done_emitter.done_signal.connect(onFileRenameDone)
