@@ -32,7 +32,7 @@ def patchDefaultValues():
     if settings.get("file_types") is None:
         settings["file_types"] = ["jpg", "jpeg", "png", "bmp", "cr3", "cr2", "dng", "arw", "nef", "heic", "tif", "tiff", "gif","mp4", "m4v", "mov", "avi", "m2t", "m2ts","mts"]
     if settings.get("raw_file_types") is None:
-        settings["raw_file_types"] = ["cr3", "cr2", "dng", "arw", "nef"]
+        settings["raw_file_types"] = ["cr3", "cr2", "arw", "nef", "dng"]
     if settings.get("sidecar_tag_groups") is None:
         settings["sidecar_tag_groups"] = {"JSON": {"file_name_pattern": "<file_name>.<ext>.json"} }
     if settings.get("logical_tags") is None:
@@ -608,28 +608,20 @@ def patchDefaultValues():
             "mts": {},
         }
 
-    if settings.get("file_context_menu_actions") is None:
-        settings["file_context_menu_actions"] = {"consolidate_metadata":
-                                                     {"text_key": "file_menu_consolidate"},
-                                                 "copy_metadata":
-                                                     {"text_key": "file_menu_copy"},
-                                                 "paste_metadata":
-                                                     {"text_key": "file_menu_paste"},
-                                                 "patch_metadata":
-                                                     {"text_key": "file_menu_patch"},
-                                                 "paste_by_filename":
-                                                     {"text_key": "file_menu_paste_by_filename"},
-                                                 "patch_by_filename":
-                                                     {"text_key": "file_menu_patch_by_filename"},
-                                                 "choose_tags_to_paste":
-                                                     {"text_key": "file_menu_chose_tags_to_paste"}
-                                                 }
-    if settings.get("folder_context_menu_actions") is None:
-        settings["folder_context_menu_actions"] = {"standardize_filenames":
-                                                       {"text_key": "folder_menu_standardize"},
-                                                   "consolidate_metadata":
-                                                       {"text_key": "floder_menu_consolidate"}
-                                                   }
+    if settings.get("file_context_menu") is None:
+        settings["file_context_menu"] = [{"id": "file_management",         "parent_id": "file_context_menu", "type":"menu","text_key": "file_menu_file_management"},
+                                         {"id": "consolidate_metadata",    "parent_id": "file_context_menu", "type":"action","text_key": "file_menu_consolidate"},
+                                         {"id": "copy_metadata",           "parent_id": "file_context_menu", "type":"action","text_key": "file_menu_copy"},
+                                         {"id": "paste_metadata",          "parent_id": "file_context_menu", "type":"action","text_key": "file_menu_paste"},
+                                         {"id": "patch_metadata",          "parent_id": "file_context_menu", "type":"action","text_key": "file_menu_patch"},
+                                         {"id": "paste_by_filename",       "parent_id": "file_context_menu", "type":"action","text_key": "file_menu_paste_by_filename"},
+                                         {"id": "patch_by_filename",       "parent_id": "file_context_menu", "type":"action","text_key": "file_menu_patch_by_filename"},
+                                         {"id": "separator",               "parent_id": "file_context_menu", "type": "separator"},
+                                         {"id": "choose_tags_to_paste",    "parent_id": "file_context_menu", "type":"text","text_key": "file_menu_chose_tags_to_paste"},
+                                         {"id": "standardize_filenames",   "parent_id": "file_management",   "type":"action","text_key": "file_menu_standardize"},
+                                         {"id": "preserve_originals",      "parent_id": "file_management",   "type":"action","text_key": "file_menu_preserve_originals"},
+                                         {"id": "delete_unused_originals", "parent_id": "file_management",   "type":"action","text_key": "file_menu_delete_unused_originals"}
+                                         ]
     if settings.get("settings_labels") is None:
         settings["settings_labels"] = {"application_language":
                                            {"text_key": "settings_labels_application_language"},
@@ -669,7 +661,7 @@ def writeSettingsFile():
     with open(settings_path, "w") as outfile:
         outfile.write(settings_json_object)
 
-version = "3.0.2"   # Bugfix: Incorrect file is shown in filepanel after rename into existing filename range. Bug is fixed
+version = "3.1.0"   # File Management
 
 # Make location for Application, if missing
 exe_folder = os.path.dirname(os.path.abspath(sys.argv[0]))
@@ -708,8 +700,7 @@ language = settings.get("language")
 logical_tags = settings.get("logical_tags")
 tags = settings.get("tags")
 file_type_tags = settings.get("file_type_tags")
-file_context_menu_actions = settings.get("file_context_menu_actions")
-folder_context_menu_actions = settings.get("folder_context_menu_actions")
+file_context_menu = settings.get("file_context_menu")
 settings_labels = settings.get("settings_labels")
 file_name_padding = settings.get("file_name_padding")
 resource_path = settings.get('resource_path')

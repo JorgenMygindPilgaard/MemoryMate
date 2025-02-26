@@ -10,7 +10,7 @@ from PyQt6.QtGui import QFileSystemModel,QAction
 import lightroom_integration
 import settings
 from file_metadata_util import FileMetadata, QueueHost, FileMetadataChangedEmitter, FileReadQueue, FileReadyEmitter, FilePreview
-from file_util import FileRenameDoneEmitter
+from file_util import FileRenameDoneEmitter, getFileList,splitFileName
 from ui_util import ProgressBarWidget
 import os
 from ui_widgets import TextLine, Text, DateTime, Date, TextSet, GeoLocation, Rotation, Rating, ImageRotatedEmitter
@@ -20,6 +20,8 @@ from exiftool_wrapper import ExifTool
 from PyQt6.QtGui import QPixmap
 import webbrowser
 import time
+import shutil
+
 
 class FileMetadataPastedEmitter(QObject):
     instance = None
@@ -290,48 +292,34 @@ class FileList(QTreeView):
 
     def createMenu(self, position):
 
-        self.menu = QMenu()
+        self.actions = {}   # {action: id}
+        self.menues = {"file_context_menu": QMenu()}
 
-        # Add actions to the menu
-        action_text_key = settings.file_context_menu_actions.get("consolidate_metadata").get("text_key")
-        action_text = getText(action_text_key)
-        self.consolidate_metadata = self.menu.addAction(action_text)
+        for file_context_menu_entry in settings.file_context_menu:
+            parent_menu_id = file_context_menu_entry.get('parent_id')
+            entry_type = file_context_menu_entry.get("type")
+            parent_menu = self.menues.get(parent_menu_id)
 
-        action_text_key = settings.folder_context_menu_actions.get("standardize_filenames").get("text_key")
-        action_text = getText(action_text_key)
-        self.standardize_filenames = self.menu.addAction(action_text)
+            if entry_type == "menu":
+                menu = QMenu(getText(file_context_menu_entry.get("text_key")))
+                self.menues[file_context_menu_entry.get("id")]=menu
+                parent_menu.addMenu(menu)
+            elif entry_type == 'action':   #action
+                action = QAction(getText(file_context_menu_entry.get("text_key")))
+                self.actions[file_context_menu_entry.get("id")] = action
+                parent_menu.addAction(action)
+            elif entry_type == 'text':
+                action = QAction(getText(file_context_menu_entry.get("text_key")),self,enabled=False)
+                parent_menu.addAction(action)  # Just a textline in menu saying "Choose what to paste"
+            elif entry_type == 'separator':
+                parent_menu.addSeparator()
 
-        action_text_key = settings.file_context_menu_actions.get("copy_metadata").get("text_key")
-        action_text = getText(action_text_key)
-        self.copy_metadata = self.menu.addAction(action_text)
-
-        action_text_key = settings.file_context_menu_actions.get("paste_metadata").get("text_key")
-        action_text = getText(action_text_key)
-        self.paste_metadata = self.menu.addAction(action_text)
-
-        action_text_key = settings.file_context_menu_actions.get("patch_metadata").get("text_key")
-        action_text = getText(action_text_key)
-        self.patch_metadata = self.menu.addAction(action_text)
-
-        action_text_key = settings.file_context_menu_actions.get("paste_by_filename").get("text_key")
-        action_text = getText(action_text_key)
-        self.paste_by_filename = self.menu.addAction(action_text)
-
-        action_text_key = settings.file_context_menu_actions.get("patch_by_filename").get("text_key")
-        action_text = getText(action_text_key)
-        self.patch_by_filename = self.menu.addAction(action_text)
-
-        self.menu.addSeparator()
-        action_text_key = settings.file_context_menu_actions.get("choose_tags_to_paste").get("text_key")
-        action_text = getText(action_text_key)
-        menu_text_line = QAction(action_text, self, enabled=False)
-        self.menu.addAction(menu_text_line)  # Just a textline in menu saying "Choose what to paste"
 
         # Ad checkable actions for each logical tag
+        parent_menu = self.menues.get("file_context_menu")
         self.logical_tag_actions = {}
         for logical_tag in settings.logical_tags:
-            if settings.logical_tags.get(logical_tag).get(
-                    "reference_tag"):  # Can't copy-paste a reference tag. It is derrived from the other tags
+            if settings.logical_tags.get(logical_tag).get("reference_tag"):  # Can't copy-paste a reference tag. It is derrived from the other tags
                 continue
             if settings.logical_tags.get(logical_tag).get('disable_in_context_menu') == True:   # Disable in context-menu
                 continue
@@ -347,7 +335,7 @@ class FileList(QTreeView):
                 else:
                     tag_action.setChecked(True)
                 self.logical_tag_actions[logical_tag] = tag_action
-                self.menu.addAction(tag_action)
+                parent_menu.addAction(tag_action)
                 tag_action.triggered.connect(self.toggleAction)
 
                 if settings.logical_tags.get(logical_tag).get("value_parts") is not None:
@@ -363,7 +351,7 @@ class FileList(QTreeView):
                             else:
                                 tag_action.setChecked(True)
                             self.logical_tag_actions[logical_tag+'.'+value_part] = tag_action
-                            self.menu.addAction(tag_action)
+                            parent_menu.addAction(tag_action)
                             tag_action.triggered.connect(self.toggleAction)
 
     def openMenu(self, position):
@@ -374,26 +362,27 @@ class FileList(QTreeView):
             self.source = []
             self.source_is_single_file = False
 
-        if self.source_is_single_file and len(self.source) == 1:  # Exactly one field selected
-            self.paste_metadata.setEnabled(True)
-            self.patch_metadata.setEnabled(True)
-            self.paste_by_filename.setEnabled(True)
-            self.patch_by_filename.setEnabled(True)
+        if self.source_is_single_file and len(self.source) == 1:  # Exactly one file selected
+            self.actions.get('paste_metadata').setEnabled(True)
+            self.actions.get('patch_metadata').setEnabled(True)
+            self.actions.get('paste_by_filename').setEnabled(True)
+            self.actions.get('patch_by_filename').setEnabled(True)
         elif len(self.source) >= 1:
-            self.paste_metadata.setEnabled(False)
-            self.patch_metadata.setEnabled(False)
-            self.paste_by_filename.setEnabled(True)
-            self.patch_by_filename.setEnabled(True)
+            self.actions.get('paste_metadata').setEnabled(False)
+            self.actions.get('patch_metadata').setEnabled(False)
+            self.actions.get('paste_by_filename').setEnabled(True)
+            self.actions.get('patch_by_filename').setEnabled(True)
         else:
-            self.paste_metadata.setEnabled(False)
-            self.patch_metadata.setEnabled(False)
-            self.paste_by_filename.setEnabled(False)
-            self.patch_by_filename.setEnabled(False)
+            self.actions.get('paste_metadata').setEnabled(False)
+            self.actions.get('patch_metadata').setEnabled(False)
+            self.actions.get('paste_by_filename').setEnabled(False)
+            self.actions.get('patch_by_filename').setEnabled(False)
 
-        action = self.menu.exec(self.viewport().mapToGlobal(position))
 
-        if action == self.consolidate_metadata:
+        action = self.menues.get("file_context_menu").exec(self.viewport().mapToGlobal(position))
+        action_id = next((k for k, v in self.actions.items() if v == action), None)  # Reverse lookup action_id from action
 
+        if action_id == 'consolidate_metadata':
             index = self.indexAt(position)  # Get index in File-list
             if index.isValid():
                 target = []
@@ -405,7 +394,7 @@ class FileList(QTreeView):
                 self.progress_bar = ProgressBarWidget('Consolidate',
                                                       self.consolidator)  # Progress-bar will start worker
 
-        elif action == self.standardize_filenames:
+        elif action_id == 'standardize_filenames':
             index = self.indexAt(position)  # Get index in File-list
             if index.isValid():
                 target = []
@@ -427,7 +416,7 @@ class FileList(QTreeView):
                     self.progress_bar = ProgressBarWidget('Standardize',
                                                           self.standardizer)  # Progress-bar will start worker
 
-        elif action == self.copy_metadata:
+        elif action_id == 'copy_metadata':
             self.source_is_single_file = False
             index = self.indexAt(position)  # Get index in File-list
             # Check if an item was clicked
@@ -442,10 +431,10 @@ class FileList(QTreeView):
                         self.source_is_single_file = True
             else:
                 self.source = []  # No item was clicked
-            for sorrce_file_name in self.source:
-                onMetadataCopied(sorrce_file_name)
+            for source_file_name in self.source:
+                onMetadataCopied(source_file_name)
 
-        elif action == self.paste_metadata:
+        elif action_id == 'paste_metadata':
             index = self.indexAt(position)  # Get index in File-list
             # Check if an item was clicked
             if index.isValid():  # A valid file was right-clicked
@@ -465,7 +454,7 @@ class FileList(QTreeView):
 
 
 
-        elif action == self.paste_by_filename:
+        elif action_id == 'paste_by_filename':
             index = self.indexAt(position)  # Get index in File-list
             # Check if an item was clicked
             if index.isValid():  # A valid file was right-clicked
@@ -484,7 +473,7 @@ class FileList(QTreeView):
                 self.progress_bar = ProgressBarWidget('Copy Tags', self.copier)  # Progress-bar will start worker
                 self.source = []
 
-        elif action == self.patch_metadata:
+        elif action_id == 'patch_metadata':
             index = self.indexAt(position)  # Get index in File-list
             # Check if an item was clicked
             if index.isValid():  # A valid file was right-clicked
@@ -503,7 +492,7 @@ class FileList(QTreeView):
                 self.source = []
 
 
-        elif action == self.patch_by_filename:
+        elif action_id == 'patch_by_filename':
             index = self.indexAt(position)  # Get index in File-list
             # Check if an item was clicked
             if index.isValid():  # A valid file was right-clicked
@@ -524,6 +513,20 @@ class FileList(QTreeView):
 
             else:
                 self.menu.target_file_name = None  # No item was clicked
+        elif action_id == 'preserve_originals':
+            index = self.indexAt(position)  # Get index in File-list
+            if index.isValid():
+                target = self.model.filePath(index)
+                self.preserver = PreserveOriginals(target)
+                self.progress_bar = ProgressBarWidget('Preserve Originals', self.preserver)  # Progress-bar will start worker
+
+        elif action_id == 'delete_unused_originals':
+            index = self.indexAt(position)  # Get index in File-list
+            if index.isValid():
+                target = self.model.filePath(index)
+                self.deleter = DeleteUnusedOriginals(target,await_start_signal=True)
+                self.progress_bar = ProgressBarWidget('Delete Unused Originals', self.deleter)  # Progress-bar will start worker
+
         elif action == None:
             pass
         else:
@@ -982,6 +985,146 @@ class ConsolidateMetadata(QObject):
             file_metadata_pasted_emitter = FileMetadataPastedEmitter.getInstance()
             file_metadata_pasted_emitter.emit(file_name)
 
+        self.done_signal.emit()
+
+class PreserveOriginals(QObject):
+    progress_init_signal = pyqtSignal(int)       # Sends number of entries to be processed
+    progress_signal = pyqtSignal(int)    # Sends number of processed records
+    done_signal = pyqtSignal()
+    error_signal = pyqtSignal(Exception, bool)     #Sends exception and retry_allowed (true/false)
+
+    def __init__(self,target, await_start_signal=False):
+        # target is a folder
+        super().__init__()
+        self.target=target
+        if not await_start_signal:
+            self.start()
+
+    def getRawNonRawByBaseName(self,files):
+        # Returns lists of raw-files and list of non-raw files per basename
+        raw_files = {}
+        non_raw_files = {}
+        for file in files:
+            split_file_name = splitFileName(file)
+            base_name = split_file_name[1]
+            file_type = split_file_name[2].lower()
+            if file_type in settings.raw_file_types:
+                if raw_files.get(base_name) is None:
+                    raw_files[base_name]=[file]
+                else:
+                    raw_files[base_name].append(file)
+            elif file_type in settings.file_types:
+                if non_raw_files.get(base_name) is None:
+                    non_raw_files[base_name]=[file]
+                else:
+                    non_raw_files[base_name].append(file)
+        return raw_files, non_raw_files
+
+
+    def start(self):
+        if not os.path.isdir(self.target):  # Only works for one single dir as target
+            return
+
+        # Create originals folder if it does not exist
+        originals_path = self.target + '/' + getText('originals_folder_name')
+        os.makedirs(originals_path,exist_ok=True)  #Create originals folder if it is missing
+
+        # Get files from originals folder
+        file_name_pattern = ["*." + filetype for filetype in settings.file_types]
+        original_files = getFileList(originals_path,pattern=file_name_pattern)  #Image files already in originals folder
+        original_raw_files, original_non_raw_files = self.getRawNonRawByBaseName(original_files)
+
+        # Get files from target-folder
+        target_files = getFileList(self.target,pattern=file_name_pattern)  #Image files in target-folder
+        target_raw_files, target_non_raw_files = self.getRawNonRawByBaseName(target_files)
+
+
+        total_count = len(target_raw_files) * 2 + len(target_non_raw_files)
+        self.progress_init_signal.emit(total_count)
+        count = 0
+
+        # Copy raw-files from target to originals, if missing in originals
+        for base_name in target_raw_files:
+            count += 1
+            self.progress_signal.emit(count)
+            if original_raw_files.get(base_name) is None:   # Original-folder is missing the raw-file
+                target_raw_file = target_raw_files.get(base_name)[0]
+                original_raw_file = shutil.copy2(target_raw_file, originals_path)
+                original_raw_files[base_name]=[original_raw_file]    # Keep track that the original now exists
+
+        # Copy non-raw files from target to originals, if missing in originals both as non-raw and raw files
+        for base_name in target_non_raw_files:
+            count += 1
+            self.progress_signal.emit(count)
+            if original_raw_files.get(base_name) is None and original_non_raw_files.get(base_name) is None:   # Original-folder is missing the raw-file
+                target_non_raw_file = target_non_raw_files.get(base_name)[0]
+                original_non_raw_file = shutil.copy2(target_non_raw_file, originals_path)
+                original_non_raw_files[base_name]=[original_non_raw_file]    # Keep track that the original now exists
+
+        # Delete originals from target-folder if non-original exists in target folder
+        for base_name in target_raw_files:
+            count += 1
+            self.progress_signal.emit(count)
+            if target_non_raw_files.get(base_name) is not None:
+                for file in target_raw_files.get(base_name):
+                    os.remove(file)
+
+        self.done_signal.emit()
+
+
+class DeleteUnusedOriginals(QObject):
+    progress_init_signal = pyqtSignal(int)       # Sends number of entries to be processed
+    progress_signal = pyqtSignal(int)    # Sends number of processed records
+    done_signal = pyqtSignal()
+    error_signal = pyqtSignal(Exception, bool)     #Sends exception and retry_allowed (true/false)
+
+    def __init__(self,target, await_start_signal=False):
+        # target is a folder
+        super().__init__()
+        self.target=target
+        if not await_start_signal:
+            self.start()
+
+    def getFilesByBaseName(self,files):
+        # Returns lists of raw-files and list of non-raw files per basename
+        base_name_files = {}
+        for file in files:
+            split_file_name = splitFileName(file)
+            base_name = split_file_name[1]
+            if base_name_files.get(base_name) is None:
+                base_name_files[base_name]=[file]
+            else:
+                base_name_files[base_name].append(file)
+        return base_name_files
+
+
+    def start(self):
+        if not os.path.isdir(self.target):  # Only works for one single dir as target
+            return
+
+        # Set path to originals
+        originals_path = self.target + '/' + getText('originals_folder_name')
+        if not os.path.isdir(originals_path):  # Nothing to do if originals does not exist
+            return
+
+        # Get files from originals folder
+        file_name_pattern = ["*." + filetype for filetype in settings.file_types]
+        original_files = getFileList(originals_path,pattern=file_name_pattern)  # Image files already in originals folder
+        original_base_name_files = self.getFilesByBaseName(original_files)
+
+        # Get files from target-folder
+        target_files = getFileList(self.target,pattern=file_name_pattern)  #Image files in target-folder
+        target_base_name_files = self.getFilesByBaseName(target_files)
+
+        # Investigate if original basename esist in target(main) folder, and delete original files for base-name if not
+        file_count = len(original_base_name_files)
+        self.progress_init_signal.emit(file_count)
+
+        for index, base_name in enumerate(original_base_name_files):
+            self.progress_signal.emit(index+1)
+            if target_base_name_files.get(base_name) is None:   # Original-folder is missing the raw-file
+                for file in original_base_name_files[base_name]:
+                    os.remove(file)
         self.done_signal.emit()
 
 class InputFileNamePattern(QDialog):
