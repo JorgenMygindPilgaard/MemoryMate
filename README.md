@@ -57,10 +57,10 @@ The example above will name the first file "2023-F035-001.jpg", the next "2023-F
 
 #### Preserve Originals
 If you have a folder with a mixture or raw-files and non-raw-files (usually jpg-files) from your camera, you can preserve all raw-files in a folder sub-called "Originals" easily. Right-click the folder and select "File Management-->Preserve Originals".
-After this action, all files will be represented in both the main folder which you right--clicked and the "Originals"-subfolder. The main-folder will hold the jpg-files preferable _but will still contain a copy of the raw-file in cases where the jpg-counterpart is missing_. Likewise the "Originals"-folder will contain the raw-files preferable _but will hold a copy of the jpg-file in cases where no raw-file counterpart exist._
+After this action, all files will be represented in both the main folder which you right-clicked and the "Originals"-subfolder. The main-folder will hold the jpg-files preferable _but will still contain a copy of the raw-file in cases where the jpg-counterpart is missing_. Likewise the "Originals"-folder will contain the raw-files preferable _but will hold a copy of the jpg-file in cases where no raw-file counterpart exist._
 
 #### Delete Unused Originals
-After having transferred images from your camera to a folder, and preserved originals (see above), normally you would go through your jpg-files in the jpg-folder, and delete shots you don't want to keep. After having cleaned up jpg-images you don't want to keep in the main-folder, you can easily delete the corresponding originasl: Right-click the folder and select "File Management-->Delete Unused Originals".
+After having transferred images from your camera to a folder, and preserved originals (see above), normally you would go through your jpg-files in the main-folder, and delete shots you don't want to keep. After having cleaned up jpg-images you don't want to keep in the main-folder, you can easily delete the corresponding originasl: Right-click the folder and select "File Management-->Delete Unused Originals".
 All files in the "Originals"-folder without a counterpart in the main-folder will be deleted.
 
 ![Menu for File Management](originals_management.png)
