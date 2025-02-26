@@ -49,12 +49,21 @@ Do you have images with title, description etc. not written to all physical tags
 Mark the file/files/folder/folders. Then right-click the selection and select "Copy Metadata". Then select target file/files/filder/folders, right-click, tick the tags you want to paste (take care not pasting all tags. Can't be regretted), and select "Paste Metadata". If you have chosen more than one source-file, the "Paste Metadata" option is greyed out, and can't be used. You can in stead chose "Paste Metadata by Filename". When you paste using that option, Memory Mate will copy metadata from files in the selected source to metadata of files *with the same filename* in the target (ignoring the file type). That is very handy, if you store your original, raw files in a separate folder, and have edited metadata for all the corresponding jpg-files. You can then simply paste by filename to your original raw-files in one go.
 
 #### Standardize filenames
-If you have a folder with multible files and folders below, and you want to rename these files in a systematic way, ordered by date/time taken, the application can help you. Mark the files/folder/folders containing where renaming should take place. Right-click the selection and chose "Standardize Filenames". A popup will now ask you for prefix, numbering and postfix for your naming:
+If you have a folder with multible files and folders below, and you want to rename these files in a systematic way, ordered by date/time taken, the application can help you. Mark the files/folder/folders containing where renaming should take place. Right-click the selection and chose "File Management-->Standardize Filenames". A popup will now ask you for prefix, numbering and postfix for your naming:
+Enter the prefix if needed, the numberpattern (a string of x n's) and if needed a postfix. 
+The example above will name the first file "2023-F035-001.jpg", the next "2023-F035-002.jpg" etc. (jpg-files as example). Files with same name (ignoring filetype) will get the same name after renaming also. That way you make sure that original/editet filepairs having same name before standardizing filenames, will also have same name after renaming has taken place.
 
 ![Popup for filename pattern](StandardizeFilenamesPopup.jpg)
 
-Enter the prefix if needed, the numberpattern (a string of x n's) and if needed a postfix. 
-The example above will name the first file "2023-F035-001.jpg", the next "2023-F035-002.jpg" etc. (jpg-files as example). Files with same name (ignoring filetype) will get the same name after renaming also. That way you make sure that original/editet filepairs having same name before standardizing filenames, will also have same name after renaming has taken place.
+#### Preserve Originals
+If you have a folder with a mixture or raw-files and non-raw-files (usually jpg-files) from your camera, you can preserve all raw-files in a folder sub-called "Originals" easily. Right-click the folder and select "File Management-->Preserve Originals".
+After this action, all files will be represented in both the main folder which you right--clicked and the "Originals"-subfolder. The main-folder will hold the jpg-files preferable _but will still contain a copy of the raw-file in cases where the jpg-counterpart is missing_. Likewise the "Originals"-folder will contain the raw-files preferable _but will hold a copy of the jpg-file in cases where no raw-file counterpart exist._
+
+#### Delete Unused Originals
+After having transferred images from your camera to a folder, and preserved originals (see above), normally you would go through your jpg-files in the jpg-folder, and delete shots you don't want to keep. After having cleaned up jpg-images you don't want to keep in the main-folder, you can easily delete the corresponding originasl: Right-click the folder and select "File Management-->Delete Unused Originals".
+All files in the "Originals"-folder without a counterpart in the main-folder will be deleted.
+
+![Menu for File Management](originals_management.png)
 
 #### Integration to Adobe Lightroom Classic
 If you are using Lightroom Classic on the same computer as Memory Mate, you can have Memory Mate automatically update the filenames in you Lightroom catalouge, when you are using the "Standardize Filenames"-functionality in Memory Mate. By default the feature is switched off but is easily switched on in Memory Mate Settings (click the settings-wheel in top right corner). Just check the "Activate Integration"-checkbox, and enter path to your lightroom catalouge-file (.lrcat) in field below, and the integration will work.

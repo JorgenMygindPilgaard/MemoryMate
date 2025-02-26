@@ -50,6 +50,9 @@ keys_texts = {"tag_label_rating":
               "tag_label_description":
                 {"DA": "Fuld beskrivelse",
                  "EN": "Full Description"},
+              "file_menu_file_management":
+                  {"DA": "Fil styring",
+                   "EN": "File Management"},
               "file_menu_consolidate":
                 {"DA": "Konsolider metadata",
                  "EN": "Consolidate Metadata"},
@@ -71,12 +74,18 @@ keys_texts = {"tag_label_rating":
               "file_menu_chose_tags_to_paste":
                 {"DA": "Vælg hvad du vil overføre:",
                  "EN": "Choose what to transfer:"},
-              "folder_menu_standardize":
+              "file_menu_standardize":
                 {"DA": "Standardiser filnavne",
                  "EN": "Standardize Filenames"},
-              "folder_menu_consolidate":
-                {"DA": "Konsolider metadata",
-                 "EN": "Consolidate Metadata"},
+              "file_menu_preserve_originals":
+                {"DA": "Gem originaler",
+                 "EN": "Preserve Originals"},
+              "file_menu_delete_unused_originals":
+                {"DA": "Slet ubrugte originaler",
+                 "EN": "Delete unused Originals"},
+              "originals_folder_name":
+                  {"DA": "Originaler",
+                   "EN": "Originals"},
               "settings_window_title":
                 {"DA": "Indstillinger",
                  "EN": "Settings"},
