@@ -386,7 +386,7 @@ class FileList(QTreeView):
         action_id = next((k for k, v in self.actions.items() if v == action), None)  # Reverse lookup action_id from action
 
         if action_id == 'consolidate_metadata':
-            index = self.indexAt(position)  # Get index in File-list
+            index = self.indexAt(self.position)  # Get index in File-list
             if index.isValid():
                 target = []
                 for index in self.selectedIndexes():
@@ -398,7 +398,7 @@ class FileList(QTreeView):
                                                       self.consolidator)  # Progress-bar will start worker
 
         elif action_id == 'standardize_filenames':
-            index = self.indexAt(position)  # Get index in File-list
+            index = self.indexAt(self.position)  # Get index in File-list
             if index.isValid():
                 target = []
                 for index in self.selectedIndexes():
@@ -421,7 +421,7 @@ class FileList(QTreeView):
 
         elif action_id == 'copy_metadata':
             self.source_is_single_file = False
-            index = self.indexAt(position)  # Get index in File-list
+            index = self.indexAt(self.position)  # Get index in File-list
             # Check if an item was clicked
             if index.isValid():  # A valid file was right-clicked
                 self.source = []
@@ -438,7 +438,7 @@ class FileList(QTreeView):
                 onMetadataCopied(source_file_name)
 
         elif action_id == 'paste_metadata':
-            index = self.indexAt(position)  # Get index in File-list
+            index = self.indexAt(self.position)  # Get index in File-list
             # Check if an item was clicked
             if index.isValid():  # A valid file was right-clicked
                 target = []
@@ -458,7 +458,7 @@ class FileList(QTreeView):
 
 
         elif action_id == 'paste_by_filename':
-            index = self.indexAt(position)  # Get index in File-list
+            index = self.indexAt(self.position)  # Get index in File-list
             # Check if an item was clicked
             if index.isValid():  # A valid file was right-clicked
                 target = []
@@ -477,7 +477,7 @@ class FileList(QTreeView):
                 self.source = []
 
         elif action_id == 'patch_metadata':
-            index = self.indexAt(position)  # Get index in File-list
+            index = self.indexAt(self.position)  # Get index in File-list
             # Check if an item was clicked
             if index.isValid():  # A valid file was right-clicked
                 target = []
@@ -496,7 +496,7 @@ class FileList(QTreeView):
 
 
         elif action_id == 'patch_by_filename':
-            index = self.indexAt(position)  # Get index in File-list
+            index = self.indexAt(self.position)  # Get index in File-list
             # Check if an item was clicked
             if index.isValid():  # A valid file was right-clicked
                 target = []
@@ -517,14 +517,14 @@ class FileList(QTreeView):
             else:
                 self.menu.target_file_name = None  # No item was clicked
         elif action_id == 'preserve_originals':
-            index = self.indexAt(position)  # Get index in File-list
+            index = self.indexAt(self.position)  # Get index in File-list
             if index.isValid():
                 target = self.model.filePath(index)
                 self.preserver = PreserveOriginals(target)
                 self.progress_bar = ProgressBarWidget('Preserve Originals', self.preserver)  # Progress-bar will start worker
 
         elif action_id == 'delete_unused_originals':
-            index = self.indexAt(position)  # Get index in File-list
+            index = self.indexAt(self.position)  # Get index in File-list
             if index.isValid():
                 target = self.model.filePath(index)
                 self.deleter = DeleteUnusedOriginals(target,await_start_signal=True)
