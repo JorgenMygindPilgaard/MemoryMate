@@ -1,3 +1,4 @@
+import copy
 import subprocess
 import sys
 from language import getText
@@ -354,8 +355,8 @@ class FileList(QTreeView):
                             parent_menu.addAction(tag_action)
                             tag_action.triggered.connect(self.toggleAction)
 
-    def openMenu(self, position):
-        if not hasattr(self, 'menu'):
+    def openMenu(self, position=None):
+        if not hasattr(self, 'menues'):
             self.createMenu(position)
 
         if not hasattr(self, 'source'):
@@ -378,8 +379,10 @@ class FileList(QTreeView):
             self.actions.get('paste_by_filename').setEnabled(False)
             self.actions.get('patch_by_filename').setEnabled(False)
 
+        if position:
+            self.position = copy.deepcopy(position)
 
-        action = self.menues.get("file_context_menu").exec(self.viewport().mapToGlobal(position))
+        action = self.menues.get("file_context_menu").exec(self.viewport().mapToGlobal(self.position))
         action_id = next((k for k, v in self.actions.items() if v == action), None)  # Reverse lookup action_id from action
 
         if action_id == 'consolidate_metadata':
@@ -530,7 +533,7 @@ class FileList(QTreeView):
         elif action == None:
             pass
         else:
-            self.openMenu(position)  # Toggle one of the logical tags was chosen
+            self.openMenu()  # Toggle one of the logical tags was chosen. No position provided: Position on screen is kept
 
     def unselectAll(self):
         self.selectionModel().clearSelection()  # Unselect any file, as soon selection will be renamed
