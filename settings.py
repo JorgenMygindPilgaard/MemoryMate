@@ -661,7 +661,7 @@ def writeSettingsFile():
     with open(settings_path, "w") as outfile:
         outfile.write(settings_json_object)
 
-version = "3.1.0"   # File Management
+version = "3.1.1"   # File Management
 
 # Make location for Application, if missing
 exe_folder = os.path.dirname(os.path.abspath(sys.argv[0]))
