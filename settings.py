@@ -14,7 +14,10 @@ def patchDefaultValues():
     global settings
     if settings.get("languages") is None:
         settings["languages"] = {"DA": "Danish",
-                                 "EN": "English"}
+                                 "EN": "English",
+                                 "FR": "French",
+                                 "ES": "Spanish",
+                                 "DE": "German"}
     if settings.get("ui_modes") is None:
         settings["ui_modes"] = ["LIGHT",
                                "DARK"]
@@ -619,6 +622,7 @@ def patchDefaultValues():
                                          {"id": "separator",               "parent_id": "file_context_menu", "type": "separator"},
                                          {"id": "choose_tags_to_paste",    "parent_id": "file_context_menu", "type":"text","text_key": "file_menu_chose_tags_to_paste"},
                                          {"id": "standardize_filenames",   "parent_id": "file_management",   "type":"action","text_key": "file_menu_standardize"},
+                                         {"id": "fetch_originals",         "parent_id": "file_management",   "type":"action","text_key": "file_menu_fetch_originals"},
                                          {"id": "preserve_originals",      "parent_id": "file_management",   "type":"action","text_key": "file_menu_preserve_originals"},
                                          {"id": "delete_unused_originals", "parent_id": "file_management",   "type":"action","text_key": "file_menu_delete_unused_originals"}
                                          ]
@@ -661,7 +665,7 @@ def writeSettingsFile():
     with open(settings_path, "w") as outfile:
         outfile.write(settings_json_object)
 
-version = "3.2.1"   # File Management
+version = "3.3.0"   # Languages
 
 # Make location for Application, if missing
 exe_folder = os.path.dirname(os.path.abspath(sys.argv[0]))

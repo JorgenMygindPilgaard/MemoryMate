@@ -4,7 +4,7 @@ import sqlite3
 import os
 from language import getText
 from PyQt6.QtWidgets import QMessageBox
-
+from datetime import  datetime
 
 def isLightroomRunning():
     """Check if Adobe Lightroom Classic is running."""
@@ -57,9 +57,18 @@ def processLightroomQueue(lrcat_path, json_path,silent=False):
             conn = sqlite3.connect(lrcat_path)
             cursor = conn.cursor()
 
+            processed_paths = set()
             for entry in queue_entries:
                 old_path = entry.get("old_name")  # Full old file path
                 new_path = entry.get("new_name")  # Full new file path
+
+                # Check if old_path exists in previously processed new_paths
+                # if old_path in processed_paths:
+                #     conn.commit()
+                #     conn.close()
+                #     conn = sqlite3.connect(lrcat_path)
+                #     cursor = conn.cursor()
+                #     processed_paths.clear()
 
                 # Extract components
                 old_dir, old_filename = os.path.split(old_path)
@@ -91,15 +100,33 @@ def processLightroomQueue(lrcat_path, json_path,silent=False):
                 if file_row:
                     file_id = file_row[0]
 
+                    # Step 3: Rename deleted files as deleted_<filename> in lr catalouge to avoid collisions
+                    cursor.execute("""
+                        SELECT id_local FROM AgLibraryFile
+                        WHERE folder = ? AND idx_filename = ?
+                    """, (folder_id, new_filename))
+                    file_row_deleted = cursor.fetchone()
+                    if file_row_deleted:
+                        file_id_deleted = file_row_deleted[0]
+
+                    # Set filename as deleted_filename in lr-catalouge, if file has been deleted on disk
+                        now = datetime.now()
+                        date_time_str = now.strftime("%Y-%m-%d %H:%M:%S")
+
+                        cursor.execute("""
+                            UPDATE AgLibraryFile
+                            SET idx_filename = ?, lc_idx_filename = ?, baseName = ?
+                            WHERE id_local = ?
+                        """, ('deleted '+date_time_str+' '+new_filename, 'deleted '+date_time_str+' '+new_filename.lower(), 'deleted '+date_time_str+' '+new_basename, file_id_deleted))
+
                     # Step 3: Update the filename in AgLibraryFile
                     cursor.execute("""
                         UPDATE AgLibraryFile
                         SET idx_filename = ?, lc_idx_filename = ?, baseName = ?
                         WHERE id_local = ?
                     """, (new_filename, new_filename.lower(), new_basename, file_id))
-        #            print(f"Updated: {old_path} → {new_filename}")
-        #        else:
-        #            print(f"Skipped (file not found in correct folder): {old_path}")
+
+                # processed_paths.add(new_path)
 
             # Commit changes and close connection
             conn.commit()
