@@ -6,7 +6,7 @@ Greetings from passed times. I want to put greetings on "the back" of our digita
 
 ## How does it look
 
-![The UI is kept simple...](MemoryMateUI.jpg)
+![The UI is kept simple...](docs/MemoryMateUI.jpg)
 ## Installation
 There are two ways to install the application:
 ### 1. Installation package
@@ -53,7 +53,7 @@ If you have a folder with multible files and folders below, and you want to rena
 Enter the prefix if needed, the numberpattern (a string of x n's) and if needed a postfix. 
 The example above will name the first file "2023-F035-001.jpg", the next "2023-F035-002.jpg" etc. (jpg-files as example). Files with same name (ignoring filetype) will get the same name after renaming also. That way you make sure that original/editet filepairs having same name before standardizing filenames, will also have same name after renaming has taken place.
 
-![Popup for filename pattern](StandardizeFilenamesPopup.jpg)
+![Popup for filename pattern](docs/StandardizeFilenamesPopup.jpg)
 
 #### Preserve Originals
 If you have a folder with a mixture or raw-files and non-raw-files (usually jpg-files) from your camera, you can preserve all raw-files in a folder sub-called "Originals" easily. Right-click the folder and select "File Management-->Preserve Originals".
@@ -63,7 +63,7 @@ After this action, all files will be represented in both the main folder which y
 After having transferred images from your camera to a folder, and preserved originals (see above), normally you would go through your jpg-files in the main-folder, and delete shots you don't want to keep. After having cleaned up jpg-images you don't want to keep in the main-folder, you can easily delete the corresponding originasl: Right-click the folder and select "File Management-->Delete Unused Originals".
 All files in the "Originals"-folder without a counterpart in the main-folder will be deleted.
 
-![Menu for File Management](originals_management.png)
+![Menu for File Management](docs/originals_management.png)
 
 #### Integration to Adobe Lightroom Classic
 If you are using Lightroom Classic on the same computer as Memory Mate, you can have Memory Mate automatically update the filenames in you Lightroom catalouge, when you are using the "Standardize Filenames"-functionality in Memory Mate. By default the feature is switched off but is easily switched on in Memory Mate Settings (click the settings-wheel in top right corner). Just check the "Activate Integration"-checkbox, and enter path to your lightroom catalouge-file (.lrcat) in field below, and the integration will work.
