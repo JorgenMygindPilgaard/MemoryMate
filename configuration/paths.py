@@ -20,11 +20,10 @@ class Paths:
             os.mkdir(Paths.paths['data'])
 
         if hasattr(sys, '_MEIPASS'):     # Execute an installed version
-            Paths.paths['resources']=sys._MEIPASS
-            Paths.paths['configuration']=sys._MEIPASS
+            Paths.paths['resources']=os.path.join(sys._MEIPASS, 'resources')
         else:                           # Execute in debugging
             Paths.paths['resources']='resources'
-            Paths.paths['configuration']='configuration'
+
 
 
 
