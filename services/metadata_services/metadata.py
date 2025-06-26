@@ -22,7 +22,7 @@ class FileMetadata(QObject):
 #   exif_configuration = os.path.join(app_dir, 'exiftool_memory_mate.cfg')
 
     exif_executable = os.path.join(Paths.get('resources'), 'exiftool_memory_mate.exe')
-    exif_configuration = os.path.join(Paths.get('configuration'), 'exiftool_memory_mate.cfg')
+    exif_configuration = os.path.join(Paths.get('resources'), 'exiftool_memory_mate.cfg')
     get_instance_mutex = QMutex()
 
 
