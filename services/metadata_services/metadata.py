@@ -1,9 +1,7 @@
 import os
-import re
 import time
 from PyQt6.QtCore import QObject, QMutex, QMutexLocker
 from configuration.language import Texts
-from configuration.settings import Settings
 from configuration.paths import Paths
 from controller.events.emitters.file_metadata_changed_emitter import FileMetadataChangedEmitter
 from controller.events.emitters.file_metadata_ready_emitter import FileMetadataReadyEmitter
@@ -13,6 +11,7 @@ from services.stack_services.stack import Stack
 from services.queue_services.queue import Queue
 from services.utility_services.rreplace import rreplace
 from services.metadata_services.metadata_value_classes import *
+from services.file_services.file_get_original import fileGetOriginal
 
 
 class FileMetadata(QObject):
@@ -61,6 +60,7 @@ class FileMetadata(QObject):
         self.name_postfix = self.split_name[2]                          # "-Enhanced-NR-SAI"
         self.is_virgin=False                                       # "Virgin means memory_mate never wrote metadata to file before. Assume not virgin tll metadata has been read
         self.date_time_change = None
+        self.delay = 1
 
     @staticmethod
     def getInstance(file_name):
@@ -93,8 +93,8 @@ class FileMetadata(QObject):
     @staticmethod
     def processReadStackEntry(stack_entry):
         metadata_action_done = FileMetadata.getInstance(stack_entry).readLogicalTagValues()
-        if metadata_action_done != 'NOTHING DONE':
-            FileMetadataReadyEmitter.getInstance().emit(stack_entry)
+        # if metadata_action_done != 'NOTHING DONE':
+        #     FileMetadataReadyEmitter.getInstance().emit(stack_entry)
 
     def __escapeExceptDotStar(self,pattern):
         escaped_pattern = ''
@@ -137,9 +137,9 @@ class FileMetadata(QObject):
                         match = re.search(escaped_postfix_pattern,
                                           name_alone)  # ! added to make sure to find last occurrence postfix
                         if match:
-                            postfix_found = True
                             end_pos = len(name_alone)
                             if match.end() == end_pos:
+                                postfix_found = True
                                 found_postfix_pattern = match.group(0)  # Remove ! from found_postfix
                                 postfix = found_postfix_pattern + postfix
                                 name_alone = rreplace(name_alone, found_postfix_pattern, '')
@@ -200,6 +200,7 @@ class FileMetadata(QObject):
             self.saved_logical_tag_instances = copy.deepcopy(self.logical_tag_instances)
             self.logical_tags_missing_value = []
             self.metadata_status = ''
+            FileMetadataReadyEmitter.getInstance().emit(self.file_name)
             return 'DATA READ'
 
         file_names_tags = {}                                 #A dictionary with imate-file-name and it's tags plus sidecar file-name(s) and it's/their tags
@@ -261,6 +262,8 @@ class FileMetadata(QObject):
                     if isinstance(tag_value,list):
                         tag_value = list(map(str, tag_value))
                     self.tag_values[tag] = tag_value    # These are the physical tag name-value pairs (tag-name includes # where relevant)
+        if not self.tag_values.get('XMP:MemoryMateSaveDateTime'):     #Memory Mate never wrote to file before. Get fall-back tag-values for missing logical tags that has fall-back tag assigned
+            self.is_virgin=True
 
         # Finally map tag_values to logical_tag_instances
         self.logical_tag_instances = {}
@@ -271,7 +274,7 @@ class FileMetadata(QObject):
             # Get instance of value-class for the logical tag
             logical_tag_class_name = Settings.get('logical_tags').get(logical_tag).get("value_class")
             logical_tag_class = globals().get(logical_tag_class_name) if logical_tag_class_name is not None else None
-            logical_tag_instance = logical_tag_class() if logical_tag_class is not None else None
+            logical_tag_instance = logical_tag_class(logical_tag=logical_tag ) if logical_tag_class is not None else None
 
             if logical_tag_instance is None:
                 print('Logical tag Class not found: ' + logical_tag)
@@ -300,17 +303,19 @@ class FileMetadata(QObject):
                 self.logical_tags_missing_value.append(logical_tag)
 
         self.saved_logical_tag_instances = copy.deepcopy(self.logical_tag_instances)
+
+#        self.__patchLogicalTagValuesFromOriginals()    # If a new Lightroom-export has overwritten jpg, the custom XMP-tags (MemoryMate version, save-date/time, description_only) are lost. These are recreated from original
         self.__updateLogicalTagValuesFromQueue()
         self.__updateLogicalTagValuesFromFallbackTags()
         self.__updateReferenceTags()
 
         # Read fallback_tag (if assigned) into missing logical tags
         self.metadata_status = ''
+        FileMetadataReadyEmitter.getInstance().emit(self.file_name)
         return 'DATA READ'
 
     def __updateLogicalTagValuesFromFallbackTags(self):
-        if not self.tag_values.get('XMP:MemoryMateSaveDateTime'):     #Memory Mate never wrote to file before. Get fall-back tag-values for missing logical tags that has fall-back tag assigned
-            self.is_virgin=True
+        if self.is_virgin:
             for logical_tag in self.logical_tags_missing_value:
                 fallback_tag = Settings.get('logical_tags').get(logical_tag).get('fallback_tag')
                 if fallback_tag:
@@ -318,8 +323,6 @@ class FileMetadata(QObject):
                     fallback_tag_value = fallback_tag_instance.getValue() if fallback_tag_instance is not None else None
                     if fallback_tag_value:
                         self.logical_tag_instances[logical_tag].setValue(fallback_tag_value)
-
-
 
     def __splitTag(self,full_logical_tag):
         if "." in full_logical_tag:
@@ -344,6 +347,17 @@ class FileMetadata(QObject):
             if queue_entry.get('file') == self.file_name:
                 queue_logical_tag_values = queue_entry.get('logical_tag_values')
                 self.__updateLogicalTagValues(queue_logical_tag_values,queue_entry.get('overwrite'))
+
+    def __patchLogicalTagValuesFromOriginals(self):
+        if not self.tag_values.get('XMP:MemoryMateSaveDateTime'):    # If this is missing, a new lightroom-export from original has taken place, and custom tags are lost.
+            original_file_name = fileGetOriginal(self.file_name)
+            if original_file_name is None:
+                return
+            original_file_metadata = FileMetadata.getInstance(original_file_name)
+            original_file_metadata.readLogicalTagValues()
+            original_logical_tag_values = original_file_metadata.getLogicalTagValues()
+            self.__updateLogicalTagValues(original_logical_tag_values, overwrite=False)
+
 
     def __updateReferenceTags(self):
         new_line = False

@@ -45,6 +45,11 @@ class SettingsWindow(QDialog):
         ui_mode_layout.addWidget(self.ui_mode_combobox)
         settings_layout.addLayout(ui_mode_layout)
 
+        # Add auto-consolidate checkbox
+        self.auto_consolidate_active_checkbox = QCheckBox(Texts.get('settings_labels_auto_consolidate_active'))
+        self.auto_consolidate_active_checkbox.setChecked(Settings.get('auto_consolidate_active'))
+        settings_layout.addWidget(self.auto_consolidate_active_checkbox)
+
         # Add Lightroom integration fields
         lr_integration_headline = QLabel(Texts.get('settings_lr_integration_headline'))
         settings_layout.addWidget(lr_integration_headline)
@@ -71,8 +76,9 @@ class SettingsWindow(QDialog):
 
     def saveSettings(self):
         Settings.set("language",self.language_combobox.currentText()[:2])
-        ui_mode = Settings.get('ui_modes').get(self.ui_mode_combobox.currentIndex())
+        ui_mode = Settings.get('ui_modes')[self.ui_mode_combobox.currentIndex()]
         Settings.set('ui_mode',ui_mode)
+        Settings.set('auto_consolidate_active', self.auto_consolidate_active_checkbox.isChecked())
         Settings.set('lr_integration_active',self.lr_integration_active_checkbox.isChecked())
         Settings.set('lr_db_path',self.lr_cat_file_selector.getFilePath())
         Settings.writeSettingsFile()

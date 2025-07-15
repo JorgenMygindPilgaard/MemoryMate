@@ -40,15 +40,19 @@ class ConsolidateMetadata(QObject):
         file_count = len(file_names)
         self.progress_init_signal.emit(file_count)
 
-        # Consolidate file metadata force-saving
-        for index, file_name in enumerate(file_names):
-            self.progress_signal.emit(index+1)
 
+        # Instanciate file metadata instances for all files
+        # Stack all files with meta-data read pending
+        for file_name in file_names:
+            if FileMetadata.getInstance(file_name).getStatus() == 'PENDING_READ':
+                Stack.getInstance('metadata.read').push(file_name)
+
+        # Read metadata for the files and consolidate (force-saving)
+        for index, file_name in enumerate(reversed(file_names)):
+            self.progress_signal.emit(index+1)
             file_metadata = FileMetadata.getInstance(file_name)
-            Stack.getInstance('metadata_read').push(file_name)
-            while file_metadata.getStatus() == 'READ':  # If instance being read, wait for it to finalize
+            while file_metadata.getStatus() != '':
                 time.sleep(self.delay)
-                status = file_metadata.getStatus()  # Line added to be able to see status during debugging
             file_metadata.setLogicalTagValues(logical_tag_values={},force_rewrite=True)
             file_metadata_pasted_emitter = FileMetadataPastedEmitter.getInstance()
             file_metadata_pasted_emitter.emit(file_name)

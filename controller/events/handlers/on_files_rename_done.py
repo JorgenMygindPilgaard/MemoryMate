@@ -1,4 +1,5 @@
 from configuration.settings import Settings
+from configuration.paths import Paths
 from controller.events.emitters.file_metadata_pasted_emitter import FileMetadataPastedEmitter
 from services.integration_services import lightroom_integration
 from view.ui_components.file_preview import FilePreview
@@ -10,14 +11,14 @@ from services.metadata_services.metadata import FileMetadata
 def onFileRenameDone(files,update_original_filename_tag=False):
 # Update filenames in Lightroom Classic Catalog
     if Settings.get('lr_integration_active'):
-        lightroom_integration.appendLightroomQueue(Settings.get('lr_queue_file_path'), files)
-        lightroom_integration.processLightroomQueue(Settings.get('lr_db_path'), Settings.get('lr_queue_file_path'))
+        lightroom_integration.appendLightroomQueue(Paths.get('lr_queue'), files)
+        lightroom_integration.processLightroomQueue(Settings.get('lr_db_path'), Paths.get('lr_queue'))
 
 # Update file-names in queue
     queue_changes = []
     for file in files:
         queue_changes.append({'find': {'file': file.get('old_name')},'change': {'file': file.get('new_name')}})
-    json_queue_file = JsonQueueFile.getInstance(Settings.get('queue_file_path'))
+    json_queue_file = JsonQueueFile.getInstance(Paths.get('queue'))
     json_queue_file.change_queue(queue_changes)
 
 # Update filename in preview-instance

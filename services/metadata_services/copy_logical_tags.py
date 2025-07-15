@@ -60,16 +60,22 @@ class CopyLogicalTags(QObject):
         copy_file_count=len(source_targets)
         self.progress_init_signal.emit(copy_file_count)
 
-        for index, source_target in enumerate(source_targets):
+        # Instanciate file metadata instances for all source-files
+        # Stack all files with meta-data read pending
+        for source_target in source_targets:
+            source_file_name = source_target[0]
+            if FileMetadata.getInstance(source_file_name).getStatus() == 'PENDING_READ':
+                Stack.getInstance('metadata.read').push(source_file_name)
+
+        # Read metadata for the files and consolidate (force-saving)
+        for index, source_target in enumerate(reversed(source_targets)):
+            self.progress_signal.emit(index+1)
             source_file_name = source_target[0]
             target_file_name = source_target[1]
             source_file_metadata = FileMetadata.getInstance(source_file_name)
             while source_file_metadata.getStatus() != '':
-                if source_file_metadata.getStatus() == 'PENDING_READ':
-                    Stack.getInstance('metadata.read)').push(source_file_name)
-                    time.sleep(self.delay)
+                time.sleep(self.delay)
             target_file_metadata = FileMetadata.getInstance(target_file_name)
-            self.progress_signal.emit(index + 1)
             target_tag_values = {}
             for logical_tag in self.logical_tags:
                 source_tag_value = None

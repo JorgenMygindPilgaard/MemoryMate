@@ -447,6 +447,16 @@ class Texts:
             "SV": "Lightroom-integration:",
             "IT": "Integrazione Lightroom:"
           },
+          "settings_labels_auto_consolidate_active": {
+            "DA": "Automatisk konsolidering af metadata i valgte mapper",
+            "EN": "Automatic consolidation of metadata in selected folders",
+            "FR": "Consolidation automatique des métadonnées dans les dossiers sélectionnés",
+            "ES": "Consolidación automática de metadatos en las carpetas seleccionadas",
+            "DE": "Automatische Konsolidierung von Metadaten in ausgewählten Ordnern",
+            "FI": "Metatietojen automaattinen yhdistäminen valituissa kansioissa",
+            "SV": "Automatisk konsolidering av metadata i valda mappar",
+            "IT": "Consolidamento automatico dei metadati nelle cartelle selezionate"
+          },
           "settings_labels_lr_integration_active": {
             "DA": "Aktiver integration",
             "EN": "Activate Integration",
@@ -458,14 +468,14 @@ class Texts:
             "IT": "Attiva integrazione"
           },
           "settings_lr_integration_disclaimer": {
-            "DA": "Lightroom integrationen opdaterer filnavnene i dit Lightroom Classic katalog\nnår du bruger \"Standardiser filnavne\"-funktionen i Memory Mate.\nOpdateringen af filnavne sker vha. en uofficiel API. Adobe stiller ikke nogen API til rådighed for opdatering af filnavne i kataloget.\n\nVær derfor opmærksom på flg: \n  1. Efter hver opdatering af Lightroom skal du tjekke og opdatere filnavn på katalog-filen i feltet herunder\n  2. Der er en (omend lille) risiko for at Lightroom-databasen bliver korumperet, da opdatering sker med en uofficiel API",
-            "EN": "The Lightroom Integration will update filenames in your Lightroom Classic Catalogue\nwhen you use the \"Standardise Filenames\"-functionality in Memory Mate.\nThe update of filenames is utilizing an unofficial API. Adobe does not offer an API for updating filenames in the catalogue.\n\nPlease be aware:\n  1. After each version-update of Lightroom you need to check and update the filename of the catalogue-file in the below field\n  2. There is a slight risk of corruption of your Lightroom catalogue as the update utilizes an unofficial API",
-            "FR": "L'intégration de Lightroom mettra à jour les noms de fichiers dans votre catalogue Lightroom Classic\nlorsque vous utilisez la fonctionnalité \"Standardiser les noms de fichiers\" dans Memory Mate.\nLa mise à jour des noms de fichiers utilise une API non officielle. Adobe ne propose pas d'API pour mettre à jour les noms de fichiers dans le catalogue.\n\nVeuillez noter:\n  1. Après chaque mise à jour de Lightroom, vous devez vérifier et mettre à jour le nom du fichier de catalogue dans le champ ci-dessous\n  2. Il existe un léger risque de corruption de votre catalogue Lightroom, car la mise à jour utilise une API non officielle",
-            "ES": "La integración con Lightroom actualizará los nombres de archivo en su catálogo de Lightroom Classic\ncuando utilice la función \"Estandarizar nombres de archivos\" en Memory Mate.\nLa actualización de nombres de archivo utiliza una API no oficial. Adobe no proporciona una API para actualizar nombres de archivo en el catálogo.\n\nTenga en cuenta:\n  1. Después de cada actualización de Lightroom, debe verificar y actualizar el nombre del archivo de catálogo en el campo a continuación\n  2. Existe un pequeño riesgo de corrupción de su catálogo de Lightroom, ya que la actualización utiliza una API no oficial",
-            "DE": "Die Lightroom-Integration aktualisiert Dateinamen in Ihrem Lightroom Classic-Katalog,\nwenn Sie die Funktion \"Dateinamen standardisieren\" in Memory Mate verwenden.\nDie Aktualisierung der Dateinamen erfolgt über eine inoffizielle API. Adobe stellt keine API zur Aktualisierung von Dateinamen im Katalog bereit.\n\nBitte beachten Sie:\n  1. Nach jeder Version von Lightroom müssen Sie den Dateinamen der Katalogdatei im untenstehenden Feld überprüfen und aktualisieren\n  2. Es besteht ein geringes Risiko, dass Ihre Lightroom-Datenbank beschädigt wird, da die Aktualisierung über eine inoffizielle API erfolgt",
-            "FI": "Lightroom-integraatio päivittää tiedostonimet Lightroom Classic -luettelossasi,\nkun käytät Memory Maten \"Vakiinnuta tiedostonimet\" -toimintoa.\nTiedostonimien päivitys tapahtuu epävirallisen API:n avulla. Adobe ei tarjoa API:a tiedostonimien päivittämiseen luettelossa.\n\nHuomioi seuraavat:\n  1. Jokaisen Lightroom-päivityksen jälkeen sinun on tarkistettava ja päivitettävä luettelotiedoston nimi alla olevassa kentässä\n  2. Lightroom-tietokannan vioittumisriski on pieni, koska päivitys tapahtuu epävirallisen API:n avulla",
-            "SV": "Lightroom-integrationen uppdaterar filnamnen i din Lightroom Classic-katalog\nnär du använder funktionen \"Standardisera filnamn\" i Memory Mate.\nUppdateringen av filnamnen sker med hjälp av ett inofficiellt API. Adobe erbjuder inte ett API för att uppdatera filnamn i katalogen.\n\nVar vänlig uppmärksamma:\n  1. Efter varje versionuppdatering av Lightroom måste du kontrollera och uppdatera filnamnet på katalogfilen i fältet nedan\n  2. Det finns en liten risk för korruption av din Lightroom-katalog eftersom uppdateringen använder ett inofficiellt API",
-            "IT": "L'integrazione con Lightroom aggiornerà i nomi dei file nel tuo catalogo Lightroom Classic\nquando utilizzi la funzione \"Standardizza nomi file\" in Memory Mate.\nL'aggiornamento dei nomi file utilizza un'API non ufficiale. Adobe non offre un'API per aggiornare i nomi file nel catalogo.\n\nNota bene:\n  1. Dopo ogni aggiornamento di versione di Lightroom, è necessario controllare e aggiornare il nome del file di catalogo nel campo sottostante\n  2. Esiste un leggero rischio di danneggiamento del catalogo Lightroom poiché l'aggiornamento utilizza un'API non ufficiale"
+            "DA": "Lightroom integrationen opdaterer filnavnene i dit Lightroom Classic katalog\nnår du bruger \"Standardiser filnavne\"-funktionen i Memory Mate.",
+            "EN": "The Lightroom Integration will update filenames in your Lightroom Classic Catalogue\nwhen you use the \"Standardise Filenames\"-functionality in Memory Mate.",
+            "FR": "L'intégration de Lightroom mettra à jour les noms de fichiers dans votre catalogue Lightroom Classic\nlorsque vous utilisez la fonctionnalité \"Standardiser les noms de fichiers\" dans Memory Mate.",
+            "ES": "La integración con Lightroom actualizará los nombres de archivo en su catálogo de Lightroom Classic\ncuando utilice la función \"Estandarizar nombres de archivos\" en Memory Mate.",
+            "DE": "Die Lightroom-Integration aktualisiert Dateinamen in Ihrem Lightroom Classic-Katalog,\nwenn Sie die Funktion \"Dateinamen standardisieren\" in Memory Mate verwenden.",
+            "FI": "Lightroom-integraatio päivittää tiedostonimet Lightroom Classic -luettelossasi,\nkun käytät Memory Maten \"Vakiinnuta tiedostonimet\" -toimintoa.",
+            "SV": "Lightroom-integrationen uppdaterar filnamnen i din Lightroom Classic-katalog\nnär du använder funktionen \"Standardisera filnamn\" i Memory Mate.",
+            "IT": "L'integrazione con Lightroom aggiornerà i nomi dei file nel tuo catalogo Lightroom Classic\nquando utilizzi la funzione \"Standardizza nomi file\" in Memory Mate."
           },
           "settings_labels_lr_db_file": {
             "DA": "Lightroom katalog-fil",
