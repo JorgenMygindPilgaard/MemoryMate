@@ -1,8 +1,11 @@
 from datetime import datetime, timedelta,timezone
+from configuration.settings import Settings
 import copy
+import re
 
 class StringValue():
-    def __init__(self):
+    def __init__(self,logical_tag=None):
+        self.logical_tag = logical_tag
         self.value = None                # String
 
     def setValueFromExif(self, value,exif_tag):
@@ -11,7 +14,7 @@ class StringValue():
         if self.value is not None:    # Only set value from first exif-tag with value
             return
 
-        self.value = str_value = str(value)
+        self.value = value
 
     def setValue(self,value,part=None,overwrite=True):
         if not overwrite and self.value is not None:
@@ -31,7 +34,8 @@ class StringValue():
         return self.value
 
 class ListValue():
-    def __init__(self):
+    def __init__(self,logical_tag=None):
+        self.logical_tag = logical_tag
         self.value = None                # List of strings
 
     def setValueFromExif(self, value,exif_tag):
@@ -74,7 +78,8 @@ class ListValue():
         return self.value
 
 class RotationValue():
-    def __init__(self):
+    def __init__(self,logical_tag=None):
+        self.logical_tag = logical_tag
         self.value = None                # Rotation 0, 90, 180, 270
         self.orientation = None          # 0°:1, 90°:8, 180°:3, 270°:6
 
@@ -133,7 +138,8 @@ class RotationValue():
         return self.value
 
 class RatingValue():
-    def __init__(self):
+    def __init__(self,logical_tag=None):
+        self.logical_tag = logical_tag
         self.value = None                # Rating between 0 and 5
 
     def setValueFromExif(self, value,exif_tag):
@@ -173,7 +179,8 @@ class RatingValue():
         return self.value
 
 class DateTimeValue():
-    def __init__(self):
+    def __init__(self,logical_tag=None):
+        self.logical_tag = logical_tag
         self.value = None
         self.date_time_change = None
         self.old_value = None
@@ -515,7 +522,8 @@ class DateTimeValue():
             return None
 
 class GeoLocationValue():
-    def __init__(self):
+    def __init__(self,logical_tag=None):
+        self.logical_tag = logical_tag
         self.value = None                # 37.7749,-122.4194
         self.latitude = None
         self.longitude = None

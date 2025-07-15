@@ -63,12 +63,16 @@ class StandardizeFilenames(QObject):
         # Instanciate file metadata instances for all files
         files = []
         self.progress_init_signal.emit(file_count)
-        for index, file_name in enumerate(self.target_file_names):
+        # Stack all files with meta-data read pending
+        for file_name in self.target_file_names:
+            if FileMetadata.getInstance(file_name).getStatus() == 'PENDING_READ':
+                Stack.getInstance('metadata.read').push(file_name)
+
+        # Read metadata for the files
+        for index, file_name in enumerate(reversed(self.target_file_names)):
             self.progress_signal.emit(index+1)
             file_metadata = FileMetadata.getInstance(file_name)
             while file_metadata.getStatus() != '':
-                if file_metadata.getStatus() == 'PENDING_READ':
-                    Stack.getInstance('metadata.read').push(file_name)
                 time.sleep(self.delay)
             file_date = file_metadata.getLogicalTagValues().get("date")
             if file_date is None:

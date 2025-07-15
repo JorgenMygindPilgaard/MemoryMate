@@ -35,6 +35,8 @@ class Settings():
             Settings.set("ui_modes",["LIGHT","DARK"])
         if Settings.get("ui_mode") is None:
             Settings.set("ui_mode","LIGHT")
+        if Settings.get("auto_consolidate_active") is None:
+            Settings.set("auto_consolidate_active",False)
         if Settings.get("lr_integration_active") is None:
             Settings.set("lr_integration_active",False)
         if Settings.get("lr_db_path") is None:
@@ -698,6 +700,7 @@ class Settings():
         file_settings['version'] = Settings.get('version')
         file_settings['language'] = Settings.get('language')
         file_settings['ui_mode'] = Settings.get('ui_mode')
+        file_settings['auto_consolidate_active'] = Settings.get('auto_consolidate_active')
         file_settings['lr_integration_active'] = Settings.get('lr_integration_active')
         file_settings['lr_db_path'] = Settings.get('lr_db_path')
         settings_json_object = json.dumps(file_settings, indent=4)
@@ -711,7 +714,7 @@ class Settings():
         Settings.set('old_version',Settings.get('version'))  # Old version from file. (might come in handy to know that version has changed)
 
 #---------------------------Correct version here when deploying a new version of Memory Mate----------------------------
-        Settings.set('version','3.4.0')
+        Settings.set('version','3.5.0')
 # ----------------------------------------------------------------------------------------------------------------------
 
         Settings.writeSettingsFile()
