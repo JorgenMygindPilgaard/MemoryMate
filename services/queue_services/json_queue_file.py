@@ -31,7 +31,7 @@ class JsonQueueFile(QObject):
                     for line in lines:
                         self.queue.append(json.loads(line))
             self.queue_size = len(self.queue)
-        self.queue_size_changed.emit(self.queue_size)  # Send size when processing starts
+        self.queue_size_changed.emit(self.queue_size)  # Send size when queue-manager has initialized
 
     @staticmethod
     def getInstance(file_path):
@@ -40,8 +40,15 @@ class JsonQueueFile(QObject):
             json_queue=JsonQueueFile(file_path.replace('/','\\'))
         return json_queue
 
-    def enqueue(self, data):
+    def enqueue(self, data,unique_data=None):
         with QMutexLocker(self.queue_mutex):
+            if unique_data:   # Return, if a queue-entry with same unique data already exist
+                if isinstance(unique_data, dict):
+                    match_found = any(all(item.get(key) == value for key, value in unique_data.items()) for item in self.queue)
+                else:
+                    match_found = unique_data in self.queue
+                if match_found:
+                    return
             self.queue.append(data)  # Append data in memory
             self.queue_size += 1
             self.queue_size_changed.emit(self.queue_size)
@@ -99,6 +106,10 @@ class JsonQueueFile(QObject):
     def entries(self):
         with QMutexLocker(self.queue_mutex):
             return self.queue[self.index:]
+
+    def size(self):
+        with QMutexLocker(self.queue_mutex):
+            return self.queue_size
 
     def _periodic_update_queue_file(self, delay=5):
         delta = time.time() - self.last_file_write_time

@@ -1,7 +1,7 @@
 import copy
 import os
 
-from PyQt6.QtCore import QDir, Qt, QModelIndex, QItemSelectionModel
+from PyQt6.QtCore import QDir, Qt, QModelIndex, QItemSelectionModel, QTimer
 from PyQt6.QtGui import QFileSystemModel, QAction
 from PyQt6.QtWidgets import QTreeView, QAbstractItemView, QMenu, QDialog
 
@@ -47,9 +47,16 @@ class FileList(QTreeView):
         # Set root-path
         self.setRootPath(dir_path)
 
-        # Prepare ontext menu
+        # Prepare context menu
         self.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
         self.customContextMenuRequested.connect(self.openMenu)
+
+        # Keep track of when all directories are loaded, and set scroll position after last one is loaded
+        self.pending_folders = set()
+        self.pending_vertical_scroll_position = None  # Set in method setVerticalScrollPosition
+        if dir_path is not None and dir_path !='':
+            self.pending_folders.add(dir_path)
+        self.model.directoryLoaded.connect(self.onDirectoryLoaded)
 
     def createMenu(self, position):
 
@@ -371,13 +378,18 @@ class FileList(QTreeView):
         return list(set(open_folders))
 
     def setOpenFolders(self, open_folders=[]):
+        pending_folders = []
         if open_folders:
             for open_folder in open_folders:
                 # Find the QModelIndex corresponding to the folder_path
                 folder_index = self.model.index(open_folder)
                 if folder_index.isValid():  # Check if the folder exists in the model
-                    # Expand the folder
-                    self.setExpanded(folder_index, True)
+                    pending_folders.append(open_folder)
+        if pending_folders:
+            self.pending_folders.update(pending_folders)
+            for pending_folder in pending_folders:
+                folder_index = self.model.index(pending_folder)
+                self.setExpanded(folder_index, True)
 
     def getSelectedItems(self):
         selected_items = []
@@ -416,6 +428,20 @@ class FileList(QTreeView):
        return self.verticalScrollBar().value()
 
     def setVerticalScrollPosition(self, scroll_position):
-        if scroll_position != None:
-
+        if scroll_position is None:
+            return
+        self.pending_vertical_scroll_position = scroll_position
+        if not self.pending_folders:
             self.verticalScrollBar().setValue(scroll_position)
+
+    def onDirectoryLoaded(self, path: str):
+        # This is called whe a folder is expanded. It keeps track of when the last folder has been expanded.
+        # When that happens, it sets the correct scroll-position from last time program was loaded, but only at program-load,
+        # where the pendig-folder list gets populated from last program run.
+        if not self.pending_folders:
+            return   # Pending folders from last program run has already been loaded. Now user just navigates the tree.
+        self.pending_folders.discard(path)
+        if not self.pending_folders:
+            if self.pending_vertical_scroll_position:
+                QTimer.singleShot(0, lambda: self.setVerticalScrollPosition(self.pending_vertical_scroll_position))
+

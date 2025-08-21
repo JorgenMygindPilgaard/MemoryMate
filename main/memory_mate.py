@@ -1,5 +1,7 @@
 import sys
 import qdarkstyle
+from PyQt6.QtCore import QTimer
+
 from configuration.paths import Paths
 
 from PyQt6.QtWidgets import QDialog, QApplication
@@ -13,6 +15,7 @@ from services.queue_services.queue import Queue
 from services.stack_services.stack import Stack
 from view.windows.initial_settings_window import InitialSettingsWindow
 from view.windows.main_window import MainWindow
+from services.utility_services.parameter_manager import ParameterManager
 
 # Prepare application
 app = QApplication(sys.argv)
@@ -36,7 +39,11 @@ else:
 initializeConnections()
 
 # Prepare queues and stacks
-Queue.getInstance('metadata.write',FileMetadata,'processWriteQueueEntry',Paths.get('queue')).start()
+metadata_write_queue = Queue.getInstance('metadata.write',FileMetadata,'processWriteQueueEntry',Paths.get('queue'))  # Queue will be started by main-window, if not paused
+ui_status = ParameterManager.getInstance(Paths.get('ui_status'))
+if ui_status.getParameter('is_paused'):
+    metadata_write_queue.pause()
+metadata_write_queue.start()
 Stack.getInstance('metadata.read',FileMetadata,'processReadStackEntry').start()
 Stack.getInstance('preview.read',FilePreview,'processReadStackEntry').start()
 

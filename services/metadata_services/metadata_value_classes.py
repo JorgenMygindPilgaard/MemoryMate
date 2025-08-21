@@ -1,7 +1,6 @@
 from datetime import datetime, timedelta,timezone
 from configuration.settings import Settings
 import copy
-import re
 
 class StringValue():
     def __init__(self,logical_tag=None):
@@ -14,21 +13,31 @@ class StringValue():
         if self.value is not None:    # Only set value from first exif-tag with value
             return
 
-        self.value = value
+        cleaned_value = str(value).strip()
+        if cleaned_value == '':
+            self.value = None
+        else:
+            self.value = cleaned_value
 
     def setValue(self,value,part=None,overwrite=True):
         if not overwrite and self.value is not None:
             return
-        if value == '':
-            self.value = None
+        if isinstance(value,str):
+            cleaned_value = str(value).strip()
+            if cleaned_value =='':
+                self.value = None
+            else:
+                self.value = cleaned_value
         else:
-            self.value = value
+            self.value = None
 
     def getExifValue(self,exif_tag):
         if self.value is None:
-            return ''
-        else:
-            return self.value
+            return None
+        if exif_tag == 'IPTC:Caption-Abstract':
+            if len(self.value.encode('utf-8')) >= 2000:
+                return None
+        return self.value
 
     def getValue(self,part=None):
         return self.value
@@ -43,36 +52,55 @@ class ListValue():
             return
         if self.value is not None:    # Only set value from first exif-tag with value
             return
+
         if isinstance(value, list):
-            self.value = [str(num) for num in value]
-            value_dummy = self.value
-        else:
-            if exif_tag == "EXIF:XPKeywords":
-                self.value = [keyword.strip() for keyword in value.split(";")]
+            cleaned_list = [str(list_entry).strip() for list_entry in value if str(list_entry).strip() != '' and list_entry is not None]
+            if cleaned_list == []:
+                self.value = None
             else:
-                self.value = [str(value)]
+                self.value = cleaned_list
+        elif isinstance(value,str):
+            if exif_tag == "EXIF:XPKeywords":
+                self.value = [str(keyword).strip() for keyword in value.split(";")]
+            else:
+                cleaned_value = str(value).strip()
+                if cleaned_value == '':
+                    self.value = None
+                else:
+                    self.value = [cleaned_value]
 
     def setValue(self,value,part=None,overwrite=True):
         if not overwrite and self.value is not None:
             return
-        if value == '' or value == [] or value is None:
-            self.value = None
-        elif isinstance(value, list):
-            self.value = value
+        if isinstance(value, list):
+            cleaned_list = [str(list_entry).strip() for list_entry in value if str(list_entry).strip() != '' and list_entry is not None]
+            if cleaned_list == []:
+                self.value = None
+            else:
+                self.value = cleaned_list
+        elif isinstance(value, str):
+            cleaned_value = str(value).strip()
+            if cleaned_value == '':
+                self.value = None
+            else:
+                self.value = [cleaned_value]
         else:
-            self.value = [value]
+            self.value = None
 
     def getExifValue(self,exif_tag):
         if exif_tag == "EXIF:XPKeywords":
             if self.value is None:
-                return ""
+                return None
             else:
                 return ";".join(map(str, self.value))
         else:
             if self.value is None:
-                return []
+                return None
             else:
-                return self.value
+                if len(self.value)==1:
+                    return self.value[0]   #If only one value in list, it should return as string, not list, as this is how exiftool delivers it
+                else:
+                    return self.value
 
     def getValue(self,part=None):
         return self.value
@@ -88,17 +116,18 @@ class RotationValue():
             return
         if self.value is not None:    # Only set value from first exif-tag with value
             return
+
         if exif_tag == 'EXIF:Orientation#':     #Orientation id-number being set
-            if value == 1:
+            if value == 1 or value == 2:     # 1: Normal, 2: Flipped horizontally (mirrored)
                 self.value = 0
-            elif value == 8:
-                self.value = 90
-            elif value == 3:
+            elif value == 3 or value == 4:   # 3: Rotated 180°, 4: Flipped vertically (mirrored)
                 self.value = 180
-            elif value == 6:
+            elif value == 5 or value == 6:   # 5: Transpose (Mirror across top-left ↔ bottom-right line), 6: Rotated 270° CCW
                 self.value = 270
+            elif value == 7 or value == 8:   # 7: Traverse (Mirror across top-right ↔ bottom-left line), 8: Rotated 90° CCW
+                self.value = 90
             else:
-                self.value = 0
+                self.value = None   #Not defined value leads to "None"
         elif exif_tag == 'Composite:Rotation':      # Composite:Rotation direction is clockwise, logical tag Rotation is counter clockwise
             self.value = 360 - value
             if self.value >=  360:
@@ -122,10 +151,10 @@ class RotationValue():
             elif self.value == 270:
                 return 6
             else:
-                return 1
+                return None
         elif exif_tag == 'Composite:Rotation':      # Composite:Rotation direction is clockwise, logical tag Rotation is counter clockwise
             if self.value is None:
-                value = 360
+                value = None
             else:
                 value = 360 - self.value
             if value >=  360:
@@ -147,7 +176,7 @@ class RatingValue():
             return
         if self.value is not None:    # Only set value from first exif-tag with value
             return
-        if exif_tag == 'XMP-microsoft:RatingPercent':
+        if exif_tag == 'XMP:RatingPercent':
             if value == 0:                          # 0% --> Rating 0
                 self.value = 0
             elif value == 1:                        # 1% --> Rating 1
@@ -165,7 +194,7 @@ class RatingValue():
     def getExifValue(self, exif_tag):
         if self.value is None:
             return self.value
-        elif exif_tag == 'XMP-microsoft:RatingPercent':
+        elif exif_tag == 'XMP:RatingPercent':
             if self.value == 0:
                 return 0
             elif self.value == 1:
@@ -232,9 +261,14 @@ class DateTimeValue():
                 dot_index = date_time.find('.')
                 if dot_index != -1:
                     if utc_offset_index == -1:
-                        date_time_parts['fraction_of_second'] = date_time[dot_index + 1:]
+                        fraction_of_second = date_time[dot_index + 1:]
                     else:
-                        date_time_parts['fraction_of_second'] = date_time[dot_index + 1:utc_offset_index]
+                        fraction_of_second = date_time[dot_index + 1:utc_offset_index]
+
+                    if fraction_of_second.strip('0 '):     # String contains more than just space and 0
+                        date_time_parts['fraction_of_second'] = fraction_of_second
+                    else:
+                        date_time_parts['fraction_of_second'] = None
         return date_time_parts
 
     def __mergeDataTimeParts(self, date_time_parts):
@@ -250,7 +284,10 @@ class DateTimeValue():
             date_time = date_time + '.' + date_time_parts['fraction_of_second']
         if date_time_parts.get('utc_offset') is not None:
             date_time = date_time + date_time_parts['utc_offset']
-        return date_time
+        if date_time == '':
+            return None
+        else:
+            return date_time
 
     def __getUtcOffset(self,local_date_time,utc_date_time):
         # Return None if can't be calculated
@@ -445,6 +482,10 @@ class DateTimeValue():
             if part == 'latest_change':
                 self.date_time_parts['local_date_time'] = self.__addTime(self.date_time_parts.get('local_date_time'),value)  # Add delta to local date/time
                 self.date_time_parts['utc_date_time'] = self.__addTime(self.date_time_parts.get('utc_date_time'),value)      # Add delta to local date/time
+            elif part == 'fraction_of_second':
+                if value is not None:
+                    if str(value).strip("0 "):   # Contains no only space and 0
+                        self.date_time_parts[part] = str(value)
             else:
                 self.date_time_parts[part] = value
         else:
@@ -467,14 +508,24 @@ class DateTimeValue():
         test_value = self.value
 
     def getExifValue(self,exif_tag):
+        if self.value is None:
+            return None
         # Local date-time with fraction and offset
-        if exif_tag in ['XMP:Date','IPTC:DateCreated','QuickTime:CreationDate','RIFF:DateTimeOriginal','File:FileCreateDate']:   # 2024:10:15 14:00:00.123+02:00
+        if exif_tag in ['XMP:Date','XMP:DateCreated','QuickTime:CreationDate','RIFF:DateTimeOriginal','File:FileCreateDate']:   # 2024:10:15 14:00:00.123+02:00
             date_time = self.value
             # 2024-15-15T14:00:00.123+02:00--> 2024:10:15 14:00:00.123+02:00
             date_time = self.__replaceChar(date_time,4,':')
             date_time = self.__replaceChar(date_time,7,':')
             date_time = self.__replaceChar(date_time,10,' ')
             return date_time
+
+        elif exif_tag in ['IPTC:DateCreated']:   # 2024:10:15
+            # 2024-15-15T14:00:00.123+02:00--> 2024:10:15
+            date = self.value[:10]
+            date = self.__replaceChar(date,4,':')
+            date = self.__replaceChar(date,7,':')
+            return date
+
 
         # Local date-time without fraction and offset
         elif exif_tag in ['EXIF:DateTimeOriginal', 'EXIF:CreateDate', 'EXIF:ModifyDate']:  # 2024:10:15 14:00:00
@@ -498,16 +549,22 @@ class DateTimeValue():
         # utc-offset
         elif exif_tag in ['EXIF:OffsetTimeOriginal', 'EXIF:OffsetTimeDigitized', 'EXIF:OffsetTime']:  # +02:00
             utc_offset = self.date_time_parts.get('utc_offset')
-            if  utc_offset in ['Z',None]:
-                return ''
+            if  utc_offset == 'Z':
+                return '+00:00'
             else:
                 return utc_offset
 
         elif exif_tag in ['EXIF:SubSecTimeOriginal', 'EXIF:SubSecTimeDigitized', 'EXIF:SubSecTime']:  # 123
-            fraction = self.date_time_parts.get('fraction_of_second')
-            if fraction is None:
-                return ''
-            return fraction.replace(".", "")
+            fraction = None
+            fraction_str = self.date_time_parts.get('fraction_of_second')
+            if isinstance(fraction_str,str):
+                fraction_str = fraction_str.replace(".", "")
+            try:
+                fraction = int(fraction_str)
+            except:
+                pass
+            return fraction
+
 
     def getValue(self,part=None):
         if part is None:
@@ -555,7 +612,11 @@ class GeoLocationValue():
         self.value = value
 
     def getExifValue(self,exif_tag):
-        return self.value
+        if self.value is None:
+            return None
+        else:
+            return self.value.replace(',',' ',1)  # Space separates longitude and latitude
+
 
     def getValue(self,part=None):
         return self.value

@@ -1,6 +1,8 @@
 import os
 import time
 from PyQt6.QtCore import QObject, QMutex, QMutexLocker
+import re
+
 from configuration.language import Texts
 from configuration.paths import Paths
 from controller.events.emitters.file_metadata_changed_emitter import FileMetadataChangedEmitter
@@ -9,6 +11,7 @@ from services.file_services.file_split_name import splitFileName
 from services.metadata_services.exiftool_wrapper import ExifTool
 from services.stack_services.stack import Stack
 from services.queue_services.queue import Queue
+from services.utility_services.hash import hashCode
 from services.utility_services.rreplace import rreplace
 from services.metadata_services.metadata_value_classes import *
 from services.file_services.file_get_original import fileGetOriginal
@@ -148,8 +151,44 @@ class FileMetadata(QObject):
 
         return [prefix, name_alone, postfix]
 
+    def getTagsHashTag(self):
+        if self.metadata_status != '':
+            raise Exception('Metadata not yet read. status is ' + self.metadata_status)
+        hash_code = self.tag_values.get('XMP:MemoryMateTagsHash')
+        return self.tag_values.get('XMP:MemoryMateTagsHash')
+
+    def getTagsHash(self):
+        if self.metadata_status != '':
+            raise Exception('Metadata not yet read. status is ' + self.metadata_status)
+        tag_values = copy.deepcopy(self.tag_values)
+
+        # Remove MemoryMate controll-tags. These should not be a part of the hash
+        tag_values.pop('XMP:MemoryMateSaveVersion', None)   # Don't include MemoryMate control tags in Hash
+        tag_values.pop('XMP:MemoryMateSaveDateTime', None)  # Don't include MemoryMate control tags in Hash
+        tag_values.pop('XMP:MemoryMateTagsHash', None)      # Don't include MemoryMate control tags in Hash
+
+        write_tag_values = copy.deepcopy(tag_values)
+
+        # Remove all non-writable tags. these should not be a part of hash
+        for tag in write_tag_values:
+            value = tag_values.get(tag)
+            if value is None:
+                tag_values.pop(tag, None)
+                continue
+            access = Settings.get('tags').get(tag).get('access')
+            if not access:
+                tag_values.pop(tag,None)
+            else:
+                if not 'Write' in access:
+                    tag_values.pop(tag, None)
+
+
+        hash_code = hashCode(tag_values)
+        return hash_code
+
     def getStatus(self):       # Status can be PENDING_READ (Metadata not yet read from file), READ (Metadata being read) or <blank> (Metadata read)
         return self.metadata_status
+
     def getFileType(self):
         if self.metadata_status != '':
             raise Exception('Metadata not yet read. status is '+ self.metadata_status)
@@ -205,11 +244,12 @@ class FileMetadata(QObject):
 
         file_names_tags = {}                                 #A dictionary with imate-file-name and it's tags plus sidecar file-name(s) and it's/their tags
 
-
+        self.tag_values = {}
         for logical_tag in logical_tags_tags:
             logical_tag_tags = logical_tags_tags[logical_tag]
             sidecar_file_names = {}
             for tag in logical_tag_tags:
+                self.tag_values[tag]=None
                 sidecar_file_name = None
                 tag_attributes = Settings.get('tags').get(tag)
                 if tag_attributes is not None:
@@ -250,7 +290,6 @@ class FileMetadata(QObject):
                             file_name_tags.append(tag)
 
         # Now get values for these tags using exif-tool
-        self.tag_values = {}
         for file_name in file_names_tags:
             tags = file_names_tags.get(file_name)
             with ExifTool(executable=self.exif_executable,configuration=self.exif_configuration) as ex:
@@ -305,7 +344,7 @@ class FileMetadata(QObject):
         self.saved_logical_tag_instances = copy.deepcopy(self.logical_tag_instances)
 
 #        self.__patchLogicalTagValuesFromOriginals()    # If a new Lightroom-export has overwritten jpg, the custom XMP-tags (MemoryMate version, save-date/time, description_only) are lost. These are recreated from original
-        self.__updateLogicalTagValuesFromQueue()
+        self.__updateLogicalTagValuesFromQueue()   #Sets self.is_virgin to False, if file found in Queue
         self.__updateLogicalTagValuesFromFallbackTags()
         self.__updateReferenceTags()
 
@@ -347,6 +386,7 @@ class FileMetadata(QObject):
             if queue_entry.get('file') == self.file_name:
                 queue_logical_tag_values = queue_entry.get('logical_tag_values')
                 self.__updateLogicalTagValues(queue_logical_tag_values,queue_entry.get('overwrite'))
+                self.is_virgin = False
 
     def __patchLogicalTagValuesFromOriginals(self):
         if not self.tag_values.get('XMP:MemoryMateSaveDateTime'):    # If this is missing, a new lightroom-export from original has taken place, and custom tags are lost.
@@ -442,7 +482,12 @@ class FileMetadata(QObject):
         if due_for_queuing:
             self.file_status = 'QUEUING'
             metadata_write_queue = Queue.getInstance('metadata.write')
-            metadata_write_queue.enqueue({'file': self.file_name, 'overwrite': overwrite,'logical_tag_values': logical_tag_values, 'force_rewrite': force_rewrite})
+            # Special case for consolidation should only be added once:
+            if overwrite and logical_tag_values == {} and force_rewrite:
+                unique_data = {'file': self.file_name, 'overwrite': overwrite, 'logical_tag_values': logical_tag_values,'force_rewrite': force_rewrite}
+            else:
+                unique_data = None
+            metadata_write_queue.enqueue({'file': self.file_name, 'overwrite': overwrite,'logical_tag_values': logical_tag_values, 'force_rewrite': force_rewrite},unique_data)
             self.file_status = ''
             metadata_write_queue.start()
 
@@ -475,9 +520,15 @@ class FileMetadata(QObject):
                             tag_values[tag] = self.logical_tag_instances[logical_tag].getExifValue(tag)
 
             if tag_values != {} and tag_values is not None:
+                for tag in tag_values:    # Update persisted tags in object
+                    tag_value = tag_values[tag]
+                    if tag_value != self.tag_values.get(tag):
+                        self.tag_values[tag] = tag_values[tag]     # Update or add real values
+
+                tag_values['XMP:MemoryMateTagsHash'] = self.tag_values['XMP:MemoryMateTagsHash'] = self.getTagsHash()   # Hashes only tags with value
+
                 with ExifTool(executable=self.exif_executable, configuration=self.exif_configuration) as ex:
                     ex.setTags(self.file_name, tag_values,'WRITE')
-
             self.saved_logical_tag_instances = copy.deepcopy(self.logical_tag_instances)
             self.file_status = ''
             self.is_virgin=False

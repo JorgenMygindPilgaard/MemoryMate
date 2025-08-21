@@ -13,7 +13,10 @@ class QueueStatusMonitor(QHBoxLayout):
         super().__init__()
         self.queue = queue
         self.queue.queue_size_changed.connect(self.onQueueSizeChanged)
-        self.queue_size = 0
+        if queue is not None:
+            self.queue_size = queue.size()
+        else:
+            self.queue_size = 0
         self.init_ui()
 
     def init_ui(self):
@@ -31,18 +34,23 @@ class QueueStatusMonitor(QHBoxLayout):
         self.play_pause_label.leaveEvent = self.onPlayPauseLeave
 
         # Create a label for displaying the queue size
+
         self.queue_size_label = QLabel("")
+        if self.queue_size != 0:
+            self.queue_size_label.setText(str(self.queue_size))
         self.queue_size_label.setSizePolicy(QSizePolicy.Policy.Minimum, QSizePolicy.Policy.Minimum)
 
         # Load the processing.gif and display it using a QMovie
         self.movie = QMovie(os.path.join(Paths.get('resources'), "processing.gif"))
         self.movie.setScaledSize(QSize(25,18))
 
-
         # Set the maximum height for the gif label to match the queue size label
         self.gif_label = QLabel()
 #        self.gif_label.setMaximumHeight(self.queue_size_label.sizeHint().height())
         self.gif_label.setSizePolicy(QSizePolicy.Policy.Minimum,QSizePolicy.Policy.Minimum)  # Set size policy
+        if self.queue_size > 0 and not self.queue.queue_worker_paused:
+            self.gif_label.setMovie(self.movie)
+            self.movie.start()
 
         # Create an empty label to take up space
         self.space_label = QLabel()
@@ -53,7 +61,6 @@ class QueueStatusMonitor(QHBoxLayout):
         self.addWidget(self.gif_label)
         self.addWidget(self.queue_size_label)
         self.addWidget(self.space_label)
-
 
     def onPlayPauseEnter(self,event):
         self.play_pause_label.setCursor(Qt.CursorShape.PointingHandCursor)  # Change cursor to pointing hand when mouse enters

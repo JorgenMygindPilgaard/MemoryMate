@@ -16,6 +16,7 @@ from view.windows.file_list import FileList
 from view.windows.file_panel import FilePanel
 from view.ui_components.settings_wheel import SettingsWheeel
 from services.utility_services.parameter_manager import ParameterManager
+from controller.events.handlers.on_current_file_changed import StackCoordinator
 
 
 class MainWindow(QMainWindow):
@@ -49,6 +50,7 @@ class MainWindow(QMainWindow):
         else:
             FileMetadata.getInstance(current_file).readLogicalTagValues()
             FilePreview.getInstance(current_file).readImage()
+            StackCoordinator.getInstance().doStacking(current_file)
         # CurrentFileChangedEmitter.getInstance().emit(current_file)
         # FileMetadata.getInstance(current_file).readLogicalTagValues()
         # FilePreview.getInstance(current_file).readImage()
@@ -60,12 +62,9 @@ class MainWindow(QMainWindow):
         # File (Right part of MainWindow)
         self.file_panel = FilePanel.getInstance(current_file)
 
-        # Prepare metadata write queue
+        # Get metadata write queue instance (prepared in memory_mate.py)
         self.metadata_write_queue = Queue.getInstance('metadata.write', FileMetadata, 'processWriteQueueEntry',
                                                       Paths.get('queue'))  # Instanciate Queue for updating metadata
-        if self.ui_status.getParameter('is_paused'):
-            self.metadata_write_queue.pause()
-        self.metadata_write_queue.start()  # Måske ikke nødvendigt
 
         # Status of file-processing (Top line of main-window)
         self.metadata_write_queue_status_monitor = QueueStatusMonitor(self.metadata_write_queue)
@@ -78,6 +77,7 @@ class MainWindow(QMainWindow):
         self.file_list.setOpenFolders(self.ui_status.getParameter('open_folders'))
         self.file_list.setSelectedItems(self.ui_status.getParameter('selected_items'))
         self.file_list.setCurrentItem(self.ui_status.getParameter('current_file'))
+        self.file_list.setVerticalScrollPosition(self.ui_status.getParameter('vertical_scroll_position'))
 
         # Main-widget (Central widget of MainWindow)
         main_widget = QWidget()
@@ -103,10 +103,6 @@ class MainWindow(QMainWindow):
             is_maximized = True
         if is_maximized:
             self.showMaximized()
-
-        self.file_list.setVerticalScrollPosition(self.ui_status.getParameter('vertical_scroll_position'))
-        # if self.ui_status.getParameter('geometry'):
-        #     self.setGeometry(self.ui_status.getParameter('geometry').toVariang())
 
         self.file_panel.installEventFilter(self)
 

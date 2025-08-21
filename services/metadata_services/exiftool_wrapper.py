@@ -147,6 +147,7 @@ class ExifTool(object):
         args = []
         tags.append('XMP:MemoryMateSaveDateTime')
         tags.append('XMP:MemoryMateSaveVersion')
+        tags.append('XMP:MemoryMateTagsHash')
         for tag in tags:
             if tag[0]!='-':
                 tag='-'+tag

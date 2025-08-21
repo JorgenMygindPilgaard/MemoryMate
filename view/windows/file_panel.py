@@ -77,7 +77,7 @@ class FilePanel(QScrollArea):
             for logical_tag in FilePanel.tags:
                 tag_widget = FilePanel.tags[logical_tag][1]
                 if tag_widget != None:
-                    logical_tag_values[logical_tag] = tag_widget.logical_tag_value()
+                    logical_tag_values[logical_tag] = tag_widget.logicalTagValue()
             if logical_tag_values != {}:
                 FilePanel.file_metadata.setLogicalTagValues(logical_tag_values)
 

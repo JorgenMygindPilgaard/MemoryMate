@@ -14,8 +14,15 @@ class MemoryQueue(QObject):
         self.queue_size_changed.emit(self.queue_size)     # Emit queue-size 0 at start
         self.index = 0  # Current index to be processed
 
-    def enqueue(self, data):
+    def enqueue(self, data,unique_data=None):
         with QMutexLocker(self.queue_mutex):
+            if unique_data:   # Return, if a queue-entry with same unique data already exist
+                if isinstance(unique_data, dict):
+                    match_found = any(all(item.get(key) == value for key, value in unique_data.items()) for item in self.queue)
+                else:
+                    match_found = unique_data in self.queue
+                if match_found:
+                    return
             self.queue.append(data)  # Append data in memory
             self.queue_size +=1
             self.queue_size_changed.emit(self.queue_size)
@@ -63,4 +70,8 @@ class MemoryQueue(QObject):
     def entries(self):
         with QMutexLocker(self.queue_mutex):
             return self.queue
+
+    def size(self):
+        with QMutexLocker(self.queue_mutex):
+            return self.queue_size
 

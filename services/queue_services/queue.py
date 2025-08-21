@@ -26,6 +26,7 @@ class Queue(QObject):
             self.queue_manager = JsonQueueFile.getInstance(self.queue_file_path)
         else:
             self.queue_manager = MemoryQueue()
+        self.queue_manager.queue_size_changed.connect(self.onQueueSizeChanged)
         self.queue_worker_running = False
         self.queue_worker_processing = False
         self.queue_worker_paused = False
@@ -39,8 +40,8 @@ class Queue(QObject):
             Queue.get_instance_active = False
         return queue
 
-    def enqueue(self,data):
-        self.queue_manager.enqueue(data)
+    def enqueue(self,data,unique_data=None):    # If Queue already holds an entry with data as in unique_data, queuing i skipped
+        self.queue_manager.enqueue(data,unique_data)
 
     def start(self):
         if not self.queue_worker_running:
@@ -48,7 +49,6 @@ class Queue(QObject):
             self.queue_worker = QueueWorker(queue=self)
             self.queue_worker.waiting.connect(self.onWorkerWaiting)       # Queue-worker is waiting for something to process
             self.queue_worker.processing.connect(self.onWorkerProcessing) # Queue is being processed. This can be used to show running-indicator in app.
-            self.queue_worker.queue_size_changed.connect(self.onQueueSizeChanged)
             self.queue_worker.start()
             if QCoreApplication.instance() is not None:
                 QCoreApplication.instance().aboutToQuit.connect(self.queue_worker.onAboutToQuit)
@@ -72,6 +72,9 @@ class Queue(QObject):
     def entries(self):
         return self.queue_manager.entries()
 
+    def size(self):
+        return self.queue_manager.size()
+
     def onWorkerWaiting(self):
         self.queue_worker_running = True
         self.queue_worker_processing = False
@@ -81,14 +84,12 @@ class Queue(QObject):
         self.queue_worker_processing = True
 
     def onQueueSizeChanged(self,queue_size):
-        self.queue_size = queue_size
-        self.queue_size_changed.emit(self.queue_size)
+         self.queue_size_changed.emit(queue_size)  #Simply pass on the queue-handler event. (The queue-handler event is an internal event, not subscribed to by external queue-users)
 
 
 class QueueWorker(QThread):
     waiting = pyqtSignal()
     processing = pyqtSignal()
-    queue_size_changed = pyqtSignal(int)   # Queue size: e.g. 1kb
 
     def __init__(self,queue,delay=5):
         super().__init__()
@@ -98,9 +99,6 @@ class QueueWorker(QThread):
 
     def run(self):
         self.waiting.emit()
-        self.queue.queue_manager.queue_size_changed.connect(self.onQueueSizeChanged)
-        self.queue_size = self.queue.queue_manager.queue_size
-        self.queue_size_changed.emit(self.queue_size)
         while True:
             if self.queue.queue_worker_paused:
                 time.sleep(self.delay)
@@ -117,7 +115,4 @@ class QueueWorker(QThread):
     def onAboutToQuit(self):
         self.queue.queue_manager.quitPrepare()
         self.quit()
-
-    def onQueueSizeChanged(self,queue_size):
-        self.queue_size_changed.emit(queue_size)
 
