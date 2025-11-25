@@ -1,6 +1,7 @@
 import sys
 
-from PyQt6.QtWidgets import QDialog, QVBoxLayout, QComboBox, QLabel, QHBoxLayout, QCheckBox, QPushButton, QApplication
+from PyQt6.QtWidgets import QDialog, QVBoxLayout, QComboBox, QLabel, QHBoxLayout, QCheckBox, QPushButton, QApplication, \
+    QTabWidget, QWidget
 
 from configuration.language import Texts
 from configuration.settings import Settings
@@ -19,6 +20,14 @@ class SettingsWindow(QDialog):
         settings_layout = QVBoxLayout()
         self.setLayout(settings_layout)
 
+        # Tab widget ---
+        self.tabs = QTabWidget()
+        settings_layout.addWidget(self.tabs)
+
+        # General tab ---
+        general_tab = QWidget()
+        general_layout = QVBoxLayout(general_tab)
+
         # Add language selection box
         self.language_combobox = QComboBox(self)
         for index, (key, value) in enumerate(Settings.get('languages').items()):
@@ -29,7 +38,7 @@ class SettingsWindow(QDialog):
         language_layout = QHBoxLayout()
         language_layout.addWidget(language_label)
         language_layout.addWidget(self.language_combobox)
-        settings_layout.addLayout(language_layout)
+        general_layout.addLayout(language_layout)
 
         # Add ui_mode-selection
         self.ui_mode_combobox = QComboBox(self)
@@ -43,22 +52,37 @@ class SettingsWindow(QDialog):
         ui_mode_layout = QHBoxLayout()
         ui_mode_layout.addWidget(ui_mode_label)
         ui_mode_layout.addWidget(self.ui_mode_combobox)
-        settings_layout.addLayout(ui_mode_layout)
+        general_layout.addLayout(ui_mode_layout)
+
+        self.tabs.addTab(general_tab, Texts.get("settings_general_tab_title"))
 
         # Add auto-consolidate checkbox
+        # General tab ---
+        consolidate_tab = QWidget()
+        consolidate_layout = QVBoxLayout(consolidate_tab)
+
         self.auto_consolidate_active_checkbox = QCheckBox(Texts.get('settings_labels_auto_consolidate_active'))
         self.auto_consolidate_active_checkbox.setChecked(Settings.get('auto_consolidate_active'))
-        settings_layout.addWidget(self.auto_consolidate_active_checkbox)
+        consolidate_layout.addWidget(self.auto_consolidate_active_checkbox)
+        auto_consolidate_explanation_label = QLabel(Texts.get('settings_auto_consolidate_explanation'))
+        auto_consolidate_explanation_label.setStyleSheet("color: #868686;")
+        consolidate_layout.addWidget(auto_consolidate_explanation_label)
+
+        self.tabs.addTab(consolidate_tab, Texts.get("settings_consolidate_tab_title"))
+
 
         # Add Lightroom integration fields
+        lightroom_tab = QWidget()
+        lightroom_layout = QVBoxLayout(lightroom_tab)
+
         lr_integration_headline = QLabel(Texts.get('settings_lr_integration_headline'))
-        settings_layout.addWidget(lr_integration_headline)
+        lightroom_layout.addWidget(lr_integration_headline)
         self.lr_integration_active_checkbox = QCheckBox(Texts.get('settings_labels_lr_integration_active'))
         self.lr_integration_active_checkbox.setChecked(Settings.get('lr_integration_active'))
-        settings_layout.addWidget(self.lr_integration_active_checkbox)
-        lr_integration_disclaimer_label = QLabel(Texts.get('settings_lr_integration_disclaimer'))
-        lr_integration_disclaimer_label.setStyleSheet("color: #868686;")
-        settings_layout.addWidget(lr_integration_disclaimer_label)
+        lightroom_layout.addWidget(self.lr_integration_active_checkbox)
+        lr_integration_explanation_label = QLabel(Texts.get('settings_lr_integration_explanation'))
+        lr_integration_explanation_label.setStyleSheet("color: #868686;")
+        lightroom_layout.addWidget(lr_integration_explanation_label)
         self.lr_cat_file_selector = FileSelector(Texts.get('settings_lr_file_selector_placeholder_text'),
                                                            Settings.get('lr_db_path'),
                                                            Texts.get('settings_lr_file_selector_title'))
@@ -66,8 +90,27 @@ class SettingsWindow(QDialog):
         lr_cat_file_selector_layout = QHBoxLayout()
         lr_cat_file_selector_layout.addWidget(lr_cat_file_selector_label)
         lr_cat_file_selector_layout.addWidget(self.lr_cat_file_selector)
-        settings_layout.addLayout(lr_cat_file_selector_layout)
+        lightroom_layout.addLayout(lr_cat_file_selector_layout)
 
+        self.tabs.addTab(lightroom_tab, Texts.get("settings_lightroom_tab_title"))
+
+
+
+
+        # Add Garmin integration fields
+        garmin_tab = QWidget()
+        garmin_layout = QVBoxLayout(garmin_tab)
+
+        garmin_integration_headline = QLabel(Texts.get('settings_garmin_integration_headline'))
+        garmin_layout.addWidget(garmin_integration_headline)
+        self.garmin_integration_active_checkbox = QCheckBox(Texts.get('settings_labels_garmin_integration_active'))
+        self.garmin_integration_active_checkbox.setChecked(Settings.get('garmin_integration_active'))
+        garmin_layout.addWidget(self.garmin_integration_active_checkbox)
+        garmin_integration_explanation_label = QLabel(Texts.get('settings_garmin_integration_explanation'))
+        garmin_integration_explanation_label.setStyleSheet("color: #868686;")
+        garmin_layout.addWidget(garmin_integration_explanation_label)
+
+        self.tabs.addTab(garmin_tab, Texts.get("settings_garmin_tab_title"))
 
         settings_layout.addSpacing(20)
         self.ok_button = QPushButton("OK")
@@ -81,6 +124,7 @@ class SettingsWindow(QDialog):
         Settings.set('auto_consolidate_active', self.auto_consolidate_active_checkbox.isChecked())
         Settings.set('lr_integration_active',self.lr_integration_active_checkbox.isChecked())
         Settings.set('lr_db_path',self.lr_cat_file_selector.getFilePath())
+        Settings.set('garmin_integration_active',self.garmin_integration_active_checkbox.isChecked())
         Settings.writeSettingsFile()
         python = sys.executable  # Get Python executable path
         script = sys.argv[0]  # Get the current script file

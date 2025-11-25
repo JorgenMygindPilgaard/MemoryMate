@@ -68,7 +68,7 @@ class StandardizeFilenames(QObject):
             if FileMetadata.getInstance(file_name).getStatus() == 'PENDING_READ':
                 Stack.getInstance('metadata.read').push(file_name)
 
-        # Read metadata for the files
+        # Read metadata for the files. Needed for sorting by time
         for index, file_name in enumerate(reversed(self.target_file_names)):
             self.progress_signal.emit(index+1)
             file_metadata = FileMetadata.getInstance(file_name)
@@ -148,10 +148,10 @@ class StandardizeFilenames(QObject):
             renamer= FileRenamer.getInstance(files_for_renaming)
             try:
                 metadata_write_queue = Queue.getInstance('metadata.write')
-                ExifTool.closeProcess(process_id='WRITE')  # Close write-process, so that data in queue can be changed safely
-                metadata_write_queue.stop()  # Make sure not to collide with update of metadata
+                metadata_write_queue.pause()  # Make sure not to collide with update of metadata
+                ExifTool.waitUntillReady(process_id='WRITE')  # Wait untill write is ready
                 renamer.start()
-                metadata_write_queue.start()  # Start Queue-worker again
+                metadata_write_queue.resume()  # Start Queue-worker again
             except Exception as e:
                 self.error_signal.emit(e,False)
                 self.done_signal.emit()

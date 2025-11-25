@@ -41,69 +41,84 @@ class Settings():
             Settings.set("lr_integration_active",False)
         if Settings.get("lr_db_path") is None:
             Settings.set("lr_db_path",'')
+        if Settings.get("garmin_integration_active") is None:
+            Settings.set("garmin_integration_active",False)
         if Settings.get("file_types") is None:
             Settings.set("file_types", ["jpg", "jpeg", "png", "bmp", "cr3", "cr2", "dng", "arw", "nef", "heic","tif", "tiff", "gif", "mp4", "m4v", "mov", "avi", "m2t", "m2ts", "mts"])
         if Settings.get("raw_file_types") is None:
             Settings.set("raw_file_types", ["cr3", "cr2", "arw", "nef", "dng"])
-        if Settings.get("sidecar_tag_groups") is None:
-            Settings.set("sidecar_tag_groups",{"JSON": {"file_name_pattern": "<file_name>.<ext>.json"}})
+        if Settings.get("sidecar_file_source_ids") is None:
+            Settings.set("sidecar_file_source_ids",{"JSON": {"file_name_pattern": "<file_name>.<ext>.json"}})
         if Settings.get("logical_tags") is None:
             Settings.set("logical_tags",{
-                "make": {"value_class": "StringValue"},
-                "model": {"value_class": "StringValue"},
-                "lens_model": {"value_class": "StringValue"},
-                "focal_length": {"value_class": "StringValue"},
-                "aperture": {"value_class": "StringValue"},
-                "shutter_speed": {"value_class": "StringValue"},
-                "iso": {"value_class": "StringValue"},
+                "make": {"value_class": "StringValue",
+                         "access": "Read"},
+                "model": {"value_class": "StringValue",
+                          "access": "Read"},
+                "lens_model": {"value_class": "StringValue",
+                               "access": "Read"},
+                "focal_length": {"value_class": "StringValue",
+                                 "access": "Read"},
+                "aperture": {"value_class": "StringValue",
+                             "access": "Read/Write"},
+                "shutter_speed": {"value_class": "StringValue",
+                                  "access": "Read"},
+                "iso": {"value_class": "StringValue",
+                        "access": "Read"},
                 "rotation": {"widget": "Rotation",
-                             "value_class": "RotationValue"},
+                             "value_class": "RotationValue",
+                             "access": "Read/Write"},
                 "rating": {"widget": "Rating",
                            "value_class": "RatingValue",
-                           "label_text_key": "tag_label_rating"},
+                           "label_text_key": "tag_label_rating",
+                           "access": "Read/Write"},
                 "title": {"widget": "TextLine",
                           "value_class": "StringValue",
-                          "label_text_key": "tag_label_title"},
+                          "label_text_key": "tag_label_title",
+                          "access": "Read/Write"},
                 "date": {"widget": "DateTime",
                          "value_class": "DateTimeValue",
-                         "value_parts": {"utc_offset": {"label_text_key": "tag_label_date.utc_offset",
-                                                        # Value-parts addressable by setValue and getValue
-                                                        "default_paste_select": False},
-                                         # ..and added in context-menu in addition
-                                         "latest_change": {"label_text_key": "tag_label_date.latest_change",
-                                                           "default_paste_select": False},
+                         # Value-parts addressable by setValue and getValue and added in context-menu in addition
+                         "value_parts": {"utc_offset": {"label_text_key": "tag_label_date.utc_offset"},
+                                         "latest_change": {"label_text_key": "tag_label_date.latest_change"},
                                          "old_value": {"disable_in_context_menu": True}
                                          },
                          "label_text_key": "tag_label_date",
-                         "default_paste_select": False},
+                         "access": "Read/Write"},
                 "description_only": {"widget": "Text",
                                      "value_class": "StringValue",
                                      "label_text_key": "tag_label_description_only",
-                                     "fallback_tag": "description"},
+                                     "fallback_tag": "description",
+                                     "access": "Read/Write"},
                 # If description_only is blank in metadata, it is populated from description
                 "persons": {"widget": "TextSet",
                             "value_class": "ListValue",
                             "label_text_key": "tag_label_persons",
-                            "Autocomplete": True},
+                            "Autocomplete": True,
+                            "access": "Read/Write"},
                 "photographer": {"widget": "TextLine",
                                  "value_class": "StringValue",
                                  "label_text_key": "tag_label_photographer",
-                                 "Autocomplete": True},
+                                 "Autocomplete": True,
+                                 "access": "Read/Write"},
                 "source": {"widget": "TextLine",
                            "value_class": "StringValue",
                            "label_text_key": "tag_label_source",
-                           "Autocomplete": True},
+                           "Autocomplete": True,
+                           "access": "Read/Write"},
                 "original_filename": {"widget": "TextLine",
                                       "value_class": "StringValue",
-                                      "label_text_key": "tag_label_original_filename"},
+                                      "label_text_key": "tag_label_original_filename",
+                                      "access": "Read/Write"},
                 "geo_location": {"widget": "GeoLocation",
                                  "value_class": "GeoLocationValue",
                                  "label_text_key": "tag_label_geo_location",
-                                 "default_paste_select": False},
+                                 "access": "Read/Write"},
                 "description": {"widget": "Text",
                                 "value_class": "StringValue",
                                 "label_text_key": "tag_label_description",
                                 "reference_tag": True,
+                                "access": "Read/Write",
                                 "reference_tag_content": [{"type": "tag", "tag_name": "title", "new_line": True},
                                                           {"type": "tag", "tag_name": "description_only",
                                                            "new_line": True},
@@ -120,6 +135,7 @@ class Settings():
                 "camera_settings": {"widget": "TextLine",
                                     "value_class": "StringValue",
                                     "reference_tag": True,
+                                    "access": "Read",
                                     "reference_tag_separator": ", ",
                                     "reference_tag_content": [{"type": "tag", "tag_name": "make"},
                                                               {"type": "tag", "tag_name": "model"},
@@ -175,7 +191,8 @@ class Settings():
                 "QuickTime:Artist": {"access": "Read/Write"},
                 "QuickTime:CreationDate": {"access": "Read/Write"},
                 "RIFF:DateTimeOriginal": {"access": "Read"},
-                "Composite:GPSPosition#": {"access": "Read/Write"},
+                "Composite:GPSPosition": {"access": "Read/Write"},
+                "Garmin:GPSPosition": {"access": "Read", "active_switch": "garmin_integration_active","source_type": "api", "source_id": "GpsApi","source_parameters":{"service_name":"garmin_connect"} },  # Standard-source for tags is files own metadata. In this case , source is the GpsApi
                 "EXIF:Orientation#": {"access": "Read/Write"},
                 "QuickTime:Rotation#": {"access": "Read/Write"},
                 "Composite:Rotation": {"access": "Read/Write"},
@@ -193,13 +210,12 @@ class Settings():
                 "Composite:ShutterSpeed": {"access": "Read"},
                 "EXIF:ISO": {"access": "Read"},
                 "Composite:ISO": {"access": "Read"},
-                "JSON:GeoDataExifLatitude": {"access": "Read", "sidecar_tag_group": "JSON"},
-                "JSON:GeoDataExifLongitude": {"access": "Read", "sidecar_tag_group": "JSON"},
-                "JSON:GeoDataLatitude": {"access": "Read", "sidecar_tag_group": "JSON"},
-                "JSON:GeoDataLongitude": {"access": "Read", "sidecar_tag_group": "JSON"},
-                "JSON:PhotoTakenTimeTimestamp": {"access": "Read",
-                                              "sidecar_tag_group": "JSON"},
-                "JSON:description": {"access": "Read", "sidecar_tag_group": "JSON"},
+                "JSON:GeoDataExifLatitude": {"access": "Read", "source_type": "sidecar_file","source_id": "JSON"},
+                "JSON:GeoDataExifLongitude": {"access": "Read", "source_type": "sidecar_file","source_id": "JSON"},
+                "JSON:GeoDataLatitude": {"access": "Read", "source_type": "sidecar_file","source_id": "JSON"},
+                "JSON:GeoDataLongitude": {"access": "Read", "source_type": "sidecar_file","source_id": "JSON"},
+                "JSON:PhotoTakenTimeTimestamp": {"access": "Read","source_type": "sidecar_file","source_id": "JSON"},
+                "JSON:description": {"access": "Read", "source_type": "sidecar_file","source_id": "JSON"},
                                          })
         if Settings.get("file_type_tags") is None:
             Settings.set("file_type_tags",{
@@ -223,14 +239,15 @@ class Settings():
                         "persons": ["XMP-iptcExt:PersonInImage", "XMP-MP:RegionPersonDisplayName", "XMP:Subject",
                                     "EXIF:XPKeywords", "IPTC:Keywords"],
                         "photographer": ["XMP:Creator", "EXIF:Artist", "EXIF:XPAuthor", "IPTC:By-line"],
-                        "geo_location": ["Composite:GPSPosition#",
+                        "geo_location": ["Composite:GPSPosition",
                                          "JSON:GeoDataExifLatitude", "JSON:GeoDataExifLongitude",
                                          "JSON:GeoDataLatitude", "JSON:GeoDataLongitude"],
                         "source": ["XMP:Source"],
                         "original_filename": ["XMP:PreservedFileName"],
                         "description": ["XMP:Description", "EXIF:XPComment", "EXIF:UserComment",
                                         "EXIF:ImageDescription",
-                                        "IPTC:Caption-Abstract", "JSON:description"]
+                                        "IPTC:Caption-Abstract", "JSON:description"],
+                        "-unassigned-": ["Garmin:GPSPosition"]
                         },
 
                 "jpeg": {"rotation": ["EXIF:Orientation#"],
@@ -253,14 +270,15 @@ class Settings():
                          "persons": ["XMP-iptcExt:PersonInImage", "XMP-MP:RegionPersonDisplayName", "XMP:Subject",
                                      "EXIF:XPKeywords", "IPTC:Keywords"],
                          "photographer": ["XMP:Creator", "EXIF:Artist", "EXIF:XPAuthor", "IPTC:By-line"],
-                         "geo_location": ["Composite:GPSPosition#",
+                         "geo_location": ["Composite:GPSPosition",
                                           "JSON:GeoDataExifLatitude", "JSON:GeoDataExifLongitude",
                                           "JSON:GeoDataLatitude", "JSON:GeoDataLongitude"],
                          "source": ["XMP:Source"],
                          "original_filename": ["XMP:PreservedFileName"],
                          "description": ["XMP:Description", "EXIF:XPComment", "EXIF:UserComment",
                                          "EXIF:ImageDescription",
-                                         "IPTC:Caption-Abstract", "JSON:description"]
+                                         "IPTC:Caption-Abstract", "JSON:description"],
+                        "-unassigned-": ["Garmin:GPSPosition"]
                          },
                 "png": {"rotation": ["EXIF:Orientation#"],
                         "camera_settings": [],
@@ -282,14 +300,15 @@ class Settings():
                         "persons": ["XMP-iptcExt:PersonInImage", "XMP-MP:RegionPersonDisplayName", "XMP:Subject",
                                     "EXIF:XPKeywords", "IPTC:Keywords"],
                         "photographer": ["XMP:Creator", "EXIF:Artist", "EXIF:XPAuthor", "IPTC:By-line"],
-                        "geo_location": ["Composite:GPSPosition#",
+                        "geo_location": ["Composite:GPSPosition",
                                          "JSON:GeoDataExifLatitude", "JSON:GeoDataExifLongitude",
                                          "JSON:GeoDataLatitude", "JSON:GeoDataLongitude"],
                         "source": ["XMP:Source"],
                         "original_filename": ["XMP:PreservedFileName"],
                         "description": ["XMP:Description", "EXIF:XPComment", "EXIF:UserComment",
                                         "EXIF:ImageDescription",
-                                        "IPTC:Caption-Abstract", "JSON:description"]
+                                        "IPTC:Caption-Abstract", "JSON:description"],
+                        "-unassigned-": ["Garmin:GPSPosition"]
                         },
                 "bmp": {},
                 "cr3": {"rotation": ["EXIF:Orientation#"],
@@ -311,13 +330,14 @@ class Settings():
                         "persons": ["XMP-iptcExt:PersonInImage", "XMP-MP:RegionPersonDisplayName", "XMP:Subject",
                                     "EXIF:XPKeywords"],
                         "photographer": ["XMP:Creator", "EXIF:Artist", "EXIF:XPAuthor"],
-                        "geo_location": ["Composite:GPSPosition#",
+                        "geo_location": ["Composite:GPSPosition",
                                          "JSON:GeoDataExifLatitude", "JSON:GeoDataExifLongitude",
                                          "JSON:GeoDataLatitude", "JSON:GeoDataLongitude"],
                         "source": ["XMP:Source"],
                         "original_filename": ["XMP:PreservedFileName"],
                         "description": ["XMP:Description", "EXIF:XPComment", "EXIF:UserComment",
-                                        "EXIF:ImageDescription", "JSON:description"]
+                                        "EXIF:ImageDescription", "JSON:description"],
+                        "-unassigned-": ["Garmin:GPSPosition"]
                         },
 
                 "cr2": {"rotation": ["EXIF:Orientation#"],
@@ -340,13 +360,14 @@ class Settings():
                         "persons": ["XMP-iptcExt:PersonInImage", "XMP-MP:RegionPersonDisplayName", "XMP:Subject",
                                     "EXIF:XPKeywords"],
                         "photographer": ["XMP:Creator", "EXIF:Artist", "EXIF:XPAuthor"],
-                        "geo_location": ["Composite:GPSPosition#",
+                        "geo_location": ["Composite:GPSPosition",
                                          "JSON:GeoDataExifLatitude", "JSON:GeoDataExifLongitude",
                                          "JSON:GeoDataLatitude", "JSON:GeoDataLongitude"],
                         "source": ["XMP:Source"],
                         "original_filename": ["XMP:PreservedFileName"],
                         "description": ["XMP:Description", "EXIF:XPComment", "EXIF:UserComment",
-                                        "EXIF:ImageDescription", "JSON:description"]
+                                        "EXIF:ImageDescription", "JSON:description"],
+                        "-unassigned-": ["Garmin:GPSPosition"]
                         },
                 "nef": {"rotation": ["EXIF:Orientation#"],
                         "camera_settings": [],
@@ -368,13 +389,14 @@ class Settings():
                         "persons": ["XMP-iptcExt:PersonInImage", "XMP-MP:RegionPersonDisplayName", "XMP:Subject",
                                     "EXIF:XPKeywords"],
                         "photographer": ["XMP:Creator", "EXIF:Artist", "EXIF:XPAuthor"],
-                        "geo_location": ["Composite:GPSPosition#",
+                        "geo_location": ["Composite:GPSPosition",
                                          "JSON:GeoDataExifLatitude", "JSON:GeoDataExifLongitude",
                                          "JSON:GeoDataLatitude", "JSON:GeoDataLongitude"],
                         "source": ["XMP:Source"],
                         "original_filename": ["XMP:PreservedFileName"],
                         "description": ["XMP:Description", "EXIF:XPComment", "EXIF:UserComment",
-                                        "EXIF:ImageDescription", "JSON:description"]
+                                        "EXIF:ImageDescription", "JSON:description"],
+                        "-unassigned-": ["Garmin:GPSPosition"]
                         },
                 "dng": {"rotation": ["EXIF:Orientation#"],
                         "camera_settings": [],
@@ -396,14 +418,15 @@ class Settings():
                         "persons": ["XMP-iptcExt:PersonInImage", "XMP-MP:RegionPersonDisplayName", "XMP:Subject",
                                     "EXIF:XPKeywords", "IPTC:Keywords"],
                         "photographer": ["XMP:Creator", "EXIF:Artist", "EXIF:XPAuthor", "IPTC:By-line"],
-                        "geo_location": ["Composite:GPSPosition#",
+                        "geo_location": ["Composite:GPSPosition",
                                          "JSON:GeoDataExifLatitude", "JSON:GeoDataExifLongitude",
                                          "JSON:GeoDataLatitude", "JSON:GeoDataLongitude"],
                         "source": ["XMP:Source"],
                         "original_filename": ["XMP:PreservedFileName"],
                         "description": ["XMP:Description", "EXIF:XPComment", "EXIF:UserComment",
                                         "EXIF:ImageDescription",
-                                        "IPTC:Caption-Abstract", "JSON:description"]
+                                        "IPTC:Caption-Abstract", "JSON:description"],
+                        "-unassigned-": ["Garmin:GPSPosition"]
                         },
                 "arw": {"rotation": ["EXIF:Orientation#"],
                         "camera_settings": [],
@@ -425,14 +448,15 @@ class Settings():
                         "persons": ["XMP-iptcExt:PersonInImage", "XMP-MP:RegionPersonDisplayName", "XMP:Subject",
                                     "EXIF:XPKeywords", "IPTC:Keywords"],
                         "photographer": ["XMP:Creator", "EXIF:Artist", "EXIF:XPAuthor", "IPTC:By-line"],
-                        "geo_location": ["Composite:GPSPosition#",
+                        "geo_location": ["Composite:GPSPosition",
                                          "JSON:GeoDataExifLatitude", "JSON:GeoDataExifLongitude",
                                          "JSON:GeoDataLatitude", "JSON:GeoDataLongitude"],
                         "source": ["XMP:Source"],
                         "original_filename": ["XMP:PreservedFileName"],
                         "description": ["XMP:Description", "EXIF:XPComment", "EXIF:UserComment",
                                         "EXIF:ImageDescription",
-                                        "IPTC:Caption-Abstract", "JSON:description"]
+                                        "IPTC:Caption-Abstract", "JSON:description"],
+                        "-unassigned-": ["Garmin:GPSPosition"]
                         },
                 "heic": {"rotation": ["QuickTime:Rotation#"],
                          "camera_settings": [],
@@ -448,19 +472,19 @@ class Settings():
                          "date": ["EXIF:DateTimeOriginal", "EXIF:OffsetTimeOriginal", "EXIF:SubSecTimeOriginal",
                                   "XMP:Date", "XMP:DateCreated",
                                   "EXIF:CreateDate", "EXIF:OffsetTimeDigitized", "EXIF:SubSecTimeDigitized",
-                                  "EXIF:ModifyDate", "EXIF:OffsetTime", "EXIF:SubSecTime",
-                                  "IPTC:DateCreated", "JSON:PhotoTakenTimeTimestamp"],
+                                  "EXIF:ModifyDate", "EXIF:OffsetTime", "EXIF:SubSecTime", "JSON:PhotoTakenTimeTimestamp"],
                          "description_only": ["XMP:DescriptionOnly"],
                          "persons": ["XMP-iptcExt:PersonInImage", "XMP-MP:RegionPersonDisplayName", "XMP:Subject",
                                      "EXIF:XPKeywords"],
                          "photographer": ["XMP:Creator", "EXIF:Artist", "EXIF:XPAuthor"],
-                         "geo_location": ["Composite:GPSPosition#",
+                         "geo_location": ["Composite:GPSPosition",
                                           "JSON:GeoDataExifLatitude", "JSON:GeoDataExifLongitude",
                                           "JSON:GeoDataLatitude", "JSON:GeoDataLongitude"],
                          "source": ["XMP:Source"],
                          "original_filename": ["XMP:PreservedFileName"],
                          "description": ["XMP:Description", "EXIF:XPComment", "EXIF:UserComment",
-                                         "EXIF:ImageDescription", "JSON:description"]
+                                         "EXIF:ImageDescription", "JSON:description"],
+                        "-unassigned-": ["Garmin:GPSPosition"]
                          },
                 "tif": {"rotation": ["EXIF:Orientation#"],
                         "camera_settings": [],
@@ -482,14 +506,15 @@ class Settings():
                         "persons": ["XMP-iptcExt:PersonInImage", "XMP-MP:RegionPersonDisplayName", "XMP:Subject",
                                     "EXIF:XPKeywords", "IPTC:Keywords"],
                         "photographer": ["XMP:Creator", "EXIF:Artist", "EXIF:XPAuthor", "IPTC:By-line"],
-                        "geo_location": ["Composite:GPSPosition#",
+                        "geo_location": ["Composite:GPSPosition",
                                          "JSON:GeoDataExifLatitude", "JSON:GeoDataExifLongitude",
                                          "JSON:GeoDataLatitude", "JSON:GeoDataLongitude"],
                         "source": ["XMP:Source"],
                         "original_filename": ["XMP:PreservedFileName"],
                         "description": ["XMP:Description", "EXIF:XPComment", "EXIF:UserComment",
                                         "EXIF:ImageDescription",
-                                        "IPTC:Caption-Abstract", "JSON:description"]
+                                        "IPTC:Caption-Abstract", "JSON:description"],
+                        "-unassigned-": ["Garmin:GPSPosition"]
                         },
                 "tiff": {"rotation": ["EXIF:Orientation#"],
                          "camera_settings": [],
@@ -511,14 +536,15 @@ class Settings():
                          "persons": ["XMP-iptcExt:PersonInImage", "XMP-MP:RegionPersonDisplayName", "XMP:Subject",
                                      "EXIF:XPKeywords", "IPTC:Keywords"],
                          "photographer": ["XMP:Creator", "EXIF:Artist", "EXIF:XPAuthor", "IPTC:By-line"],
-                         "geo_location": ["Composite:GPSPosition#",
+                         "geo_location": ["Composite:GPSPosition",
                                           "JSON:GeoDataExifLatitude", "JSON:GeoDataExifLongitude",
                                           "JSON:GeoDataLatitude", "JSON:GeoDataLongitude"],
                          "source": ["XMP:Source"],
                          "original_filename": ["XMP:PreservedFileName"],
                          "description": ["XMP:Description", "EXIF:XPComment", "EXIF:UserComment",
                                          "EXIF:ImageDescription",
-                                         "IPTC:Caption-Abstract", "JSON:description"]
+                                         "IPTC:Caption-Abstract", "JSON:description"],
+                        "-unassigned-": ["Garmin:GPSPosition"]
                          },
 
                 "gif": {"rotation": ["EXIF:Orientation#"],
@@ -541,13 +567,14 @@ class Settings():
                         "persons": ["XMP-iptcExt:PersonInImage", "XMP-MP:RegionPersonDisplayName", "XMP:Subject",
                                     "EXIF:XPKeywords"],
                         "photographer": ["XMP:Creator", "EXIF:Artist", "EXIF:XPAuthor"],
-                        "geo_location": ["Composite:GPSPosition#",
+                        "geo_location": ["Composite:GPSPosition",
                                          "JSON:GeoDataExifLatitude", "JSON:GeoDataExifLongitude",
                                          "JSON:GeoDataLatitude", "JSON:GeoDataLongitude"],
                         "source": ["XMP:Source"],
                         "original_filename": ["XMP:PreservedFileName"],
                         "description": ["XMP:Description", "EXIF:XPComment", "EXIF:UserComment",
-                                        "EXIF:ImageDescription", "JSON:description"]
+                                        "EXIF:ImageDescription", "JSON:description"],
+                        "-unassigned-": ["Garmin:GPSPosition"]
                         },
                 "mp4": {"rotation": ["Composite:Rotation"],
                         "camera_settings": [],
@@ -561,20 +588,18 @@ class Settings():
                         "rating": ["XMP:Rating", "XMP:RatingPercent"],
                         "title": ["XMP:Title", "QuickTime:Title"],
                         "date": ["QuickTime:CreationDate",
-                                 "EXIF:DateTimeOriginal", "EXIF:OffsetTimeOriginal", "EXIF:SubSecTimeOriginal",
                                  "XMP:Date", "XMP:DateCreated",
-                                 "EXIF:CreateDate", "EXIF:OffsetTimeDigitized", "EXIF:SubSecTimeDigitized",
-                                 "EXIF:ModifyDate", "EXIF:OffsetTime", "EXIF:SubSecTime",
                                  "QuickTime:CreateDate", "QuickTime:TrackCreateDate", "JSON:PhotoTakenTimeTimestamp"],
                         "description_only": ["XMP:DescriptionOnly"],
                         "persons": ["XMP:Subject", "QuickTime:Category"],
                         "photographer": ["XMP:Creator", "QuickTime:Artist"],
-                        "geo_location": ["Composite:GPSPosition#",
+                        "geo_location": ["Composite:GPSPosition",
                                          "JSON:GeoDataExifLatitude", "JSON:GeoDataExifLongitude",
                                          "JSON:GeoDataLatitude", "JSON:GeoDataLongitude"],
                         "source": ["XMP:Source"],
                         "original_filename": ["XMP:PreservedFileName"],
-                        "description": ["XMP:Description", "QuickTime:Comment", "JSON:description"]
+                        "description": ["XMP:Description", "QuickTime:Comment", "JSON:description"],
+                        "-unassigned-": ["Garmin:GPSPosition"]
                         },
                 "m4v": {"rotation": ["Composite:Rotation"],
                         "camera_settings": [],
@@ -588,20 +613,18 @@ class Settings():
                         "rating": ["XMP:Rating", "XMP:RatingPercent"],
                         "title": ["XMP:Title", "QuickTime:Title"],
                         "date": ["QuickTime:CreationDate",
-                                 "EXIF:DateTimeOriginal", "EXIF:OffsetTimeOriginal", "EXIF:SubSecTimeOriginal",
                                  "XMP:Date", "XMP:DateCreated",
-                                 "EXIF:CreateDate", "EXIF:OffsetTimeDigitized", "EXIF:SubSecTimeDigitized",
-                                 "EXIF:ModifyDate", "EXIF:OffsetTime", "EXIF:SubSecTime",
                                  "QuickTime:CreateDate", "QuickTime:TrackCreateDate", "JSON:PhotoTakenTimeTimestamp"],
                         "description_only": ["XMP:DescriptionOnly"],
                         "persons": ["XMP:Subject", "QuickTime:Category"],
                         "photographer": ["XMP:Creator", "QuickTime:Artist"],
-                        "geo_location": ["Composite:GPSPosition#",
+                        "geo_location": ["Composite:GPSPosition",
                                          "JSON:GeoDataExifLatitude", "JSON:GeoDataExifLongitude",
                                          "JSON:GeoDataLatitude", "JSON:GeoDataLongitude"],
                         "source": ["XMP:Source"],
                         "original_filename": ["XMP:PreservedFileName"],
-                        "description": ["XMP:Description", "QuickTime:Comment", "JSON:description"]
+                        "description": ["XMP:Description", "QuickTime:Comment", "JSON:description"],
+                        "-unassigned-": ["Garmin:GPSPosition"]
                         },
                 "mov": {"rotation": ["Composite:Rotation"],
                         "camera_settings": [],
@@ -615,22 +638,21 @@ class Settings():
                         "rating": ["XMP:Rating", "XMP:RatingPercent"],
                         "title": ["XMP:Title", "QuickTime:Title"],
                         "date": ["QuickTime:CreationDate",
-                                 "EXIF:DateTimeOriginal", "EXIF:OffsetTimeOriginal", "EXIF:SubSecTimeOriginal",
                                  "XMP:Date", "XMP:DateCreated",
-                                 "EXIF:CreateDate", "EXIF:OffsetTimeDigitized", "EXIF:SubSecTimeDigitized",
-                                 "EXIF:ModifyDate", "EXIF:OffsetTime", "EXIF:SubSecTime",
                                  "QuickTime:CreateDate", "QuickTime:TrackCreateDate", "JSON:PhotoTakenTimeTimestamp"],
                         "description_only": ["XMP:DescriptionOnly"],
                         "persons": ["XMP:Subject", "QuickTime:Category"],
                         "photographer": ["XMP:Creator", "QuickTime:Artist"],
-                        "geo_location": ["Composite:GPSPosition#",
+                        "geo_location": ["Composite:GPSPosition",
                                          "JSON:GeoDataExifLatitude", "JSON:GeoDataExifLongitude",
                                          "JSON:GeoDataLatitude", "JSON:GeoDataLongitude"],
                         "source": ["XMP:Source"],
                         "original_filename": ["XMP:PreservedFileName"],
-                        "description": ["XMP:Description", "QuickTime:Comment", "JSON:description"]
+                        "description": ["XMP:Description", "QuickTime:Comment", "JSON:description"],
+                        "-unassigned-": ["Garmin:GPSPosition"]
                         },
-                "avi": {"date": ["JSON:PhotoTakenTimeTimestamp", "RIFF:DateTimeOriginal"]
+                "avi": {"date": ["JSON:PhotoTakenTimeTimestamp", "RIFF:DateTimeOriginal"],
+                        "-unassigned-": ["Garmin:GPSPosition"]
                         },
                 "m2t": {},
                 "m2ts": {},
@@ -639,31 +661,32 @@ class Settings():
 
         if Settings.get("file_context_menu") is None:
             Settings.set("file_context_menu",[
-                {"id": "file_management", "parent_id": "file_context_menu", "type": "menu",
-                 "text_key": "file_menu_file_management"},
-                {"id": "consolidate_metadata", "parent_id": "file_context_menu", "type": "action",
-                 "text_key": "file_menu_consolidate"},
-                {"id": "copy_metadata", "parent_id": "file_context_menu", "type": "action",
-                 "text_key": "file_menu_copy"},
-                {"id": "paste_metadata", "parent_id": "file_context_menu", "type": "action",
-                 "text_key": "file_menu_paste"},
-                {"id": "patch_metadata", "parent_id": "file_context_menu", "type": "action",
-                 "text_key": "file_menu_patch"},
-                {"id": "paste_by_filename", "parent_id": "file_context_menu", "type": "action",
-                 "text_key": "file_menu_paste_by_filename"},
-                {"id": "patch_by_filename", "parent_id": "file_context_menu", "type": "action",
-                 "text_key": "file_menu_patch_by_filename"},
-                {"id": "separator", "parent_id": "file_context_menu", "type": "separator"},
-                {"id": "choose_tags_to_paste", "parent_id": "file_context_menu", "type": "text",
-                 "text_key": "file_menu_chose_tags_to_paste"},
-                {"id": "standardize_filenames", "parent_id": "file_management", "type": "action",
-                 "text_key": "file_menu_standardize"},
-                {"id": "fetch_originals", "parent_id": "file_management", "type": "action",
-                 "text_key": "file_menu_fetch_originals"},
-                {"id": "preserve_originals", "parent_id": "file_management", "type": "action",
-                 "text_key": "file_menu_preserve_originals"},
-                {"id": "delete_unused_originals", "parent_id": "file_management", "type": "action",
-                 "text_key": "file_menu_delete_unused_originals"}
+                {"id": "file_management", "parent_id": "file_context_menu", "type": "menu","text_key": "file_menu_file_management"},
+                {"id": "consolidate_metadata", "parent_id": "file_context_menu", "type": "action","text_key": "file_menu_consolidate"},
+                {"id": "copy_metadata", "parent_id": "file_context_menu", "type": "action","text_key": "file_menu_copy"},
+                {"id": "paste", "parent_id": "file_context_menu", "type": "menu","text_key": "file_menu_paste"},
+                {"id": "patch", "parent_id": "file_context_menu", "type": "menu","text_key": "file_menu_patch"},
+                {"id": "delete", "parent_id": "file_context_menu", "type": "menu","text_key": "file_menu_delete"},
+                {"id": "empty_clipboard", "parent_id": "file_context_menu", "type": "action","text_key": "file_menu_empty_clipboard"},
+                {"id": "paste_metadata", "parent_id": "paste", "type": "action","text_key": "file_menu_paste_metadata"},
+                {"id": "patch_metadata", "parent_id": "patch", "type": "action","text_key": "file_menu_patch_metadata"},
+                {"id": "delete_metadata", "parent_id": "delete", "type": "action","text_key": "file_menu_delete_metadata"},
+                {"id": "paste_by_filename", "parent_id": "paste", "type": "action","text_key": "file_menu_paste_by_filename"},
+                {"id": "patch_by_filename", "parent_id": "patch", "type": "action","text_key": "file_menu_patch_by_filename"},
+                {"id": "paste_geo_location_from_garmin", "active_switch": "garmin_integration_active","parent_id": "paste", "type": "action","text_key": "file_menu_paste_geo_location_from_garmin"},
+                {"id": "patch_geo_location_from_garmin", "active_switch": "garmin_integration_active","parent_id": "patch", "type": "action","text_key": "file_menu_patch_geo_location_from_garmin"},
+                {"id": "paste_original_filename_from_filename", "parent_id": "paste", "type": "action","text_key": "file_menu_paste_original_filename_from_filename"},
+                {"id": "patch_original_filename_from_filename", "parent_id": "patch", "type": "action","text_key": "file_menu_patch_original_filename_from_filename"},
+                {"id": "choose_tags_to_paste", "parent_id": "paste", "type": "text","text_key": "file_menu_chose_tags_to_paste"},
+                {"id": "separator", "parent_id": "paste", "type": "separator"},
+                {"id": "choose_tags_to_patch", "parent_id": "patch", "type": "text","text_key": "file_menu_chose_tags_to_patch"},
+                {"id": "separator", "parent_id": "patch", "type": "separator"},
+                {"id": "choose_tags_to_delete", "parent_id": "delete", "type": "text","text_key": "file_menu_chose_tags_to_delete"},
+                {"id": "separator", "parent_id": "delete", "type": "separator"},
+                {"id": "standardize_filenames", "parent_id": "file_management", "type": "action","text_key": "file_menu_standardize"},
+                {"id": "fetch_originals", "parent_id": "file_management", "type": "action","text_key": "file_menu_fetch_originals"},
+                {"id": "preserve_originals", "parent_id": "file_management", "type": "action","text_key": "file_menu_preserve_originals"},
+                {"id": "delete_unused_originals", "parent_id": "file_management", "type": "action","text_key": "file_menu_delete_unused_originals"}
                 ])
         if Settings.get("settings_labels") is None:
             Settings.set("settings_labels",{
@@ -702,6 +725,7 @@ class Settings():
         file_settings['auto_consolidate_active'] = Settings.get('auto_consolidate_active')
         file_settings['lr_integration_active'] = Settings.get('lr_integration_active')
         file_settings['lr_db_path'] = Settings.get('lr_db_path')
+        file_settings['garmin_integration_active'] = Settings.get('garmin_integration_active')
         settings_json_object = json.dumps(file_settings, indent=4)
         with open(Paths.get('settings'), "w") as outfile:
             outfile.write(settings_json_object)
@@ -713,7 +737,7 @@ class Settings():
         Settings.set('old_version',Settings.get('version'))  # Old version from file. (might come in handy to know that version has changed)
 
 #---------------------------Correct version here when deploying a new version of Memory Mate----------------------------
-        Settings.set('version','3.5.0')
+        Settings.set('version','4.0.0')
 # ----------------------------------------------------------------------------------------------------------------------
 
         Settings.writeSettingsFile()

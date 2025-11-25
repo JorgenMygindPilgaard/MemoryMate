@@ -12,22 +12,17 @@ class StringValue():
             return
         if self.value is not None:    # Only set value from first exif-tag with value
             return
-
-        cleaned_value = str(value).strip()
-        if cleaned_value == '':
+        self.value = str(value).strip()
+        if self.value == '':
             self.value = None
-        else:
-            self.value = cleaned_value
 
     def setValue(self,value,part=None,overwrite=True):
         if not overwrite and self.value is not None:
             return
         if isinstance(value,str):
-            cleaned_value = str(value).strip()
-            if cleaned_value =='':
+            self.value = str(value).strip()
+            if self.value == '':
                 self.value = None
-            else:
-                self.value = cleaned_value
         else:
             self.value = None
 
@@ -280,8 +275,9 @@ class DateTimeValue():
             if date_time_parts.get('local_date_time') is not None:
                 date_time = date_time + date_time_parts['local_date_time']
 
-        if date_time_parts.get('fraction_of_second') is not None:
-            date_time = date_time + '.' + date_time_parts['fraction_of_second']
+        if date_time != '':
+            if date_time_parts.get('fraction_of_second') is not None:
+                date_time = date_time + '.' + date_time_parts['fraction_of_second']
         if date_time_parts.get('utc_offset') is not None:
             date_time = date_time + date_time_parts['utc_offset']
         if date_time == '':
@@ -512,35 +508,48 @@ class DateTimeValue():
             return None
         # Local date-time with fraction and offset
         if exif_tag in ['XMP:Date','XMP:DateCreated','QuickTime:CreationDate','RIFF:DateTimeOriginal','File:FileCreateDate']:   # 2024:10:15 14:00:00.123+02:00
-            date_time = self.value
-            # 2024-15-15T14:00:00.123+02:00--> 2024:10:15 14:00:00.123+02:00
-            date_time = self.__replaceChar(date_time,4,':')
-            date_time = self.__replaceChar(date_time,7,':')
-            date_time = self.__replaceChar(date_time,10,' ')
-            return date_time
+            if self.date_time_parts.get('local_date_time') is None and self.date_time_parts.get('utc_date_time') is None:
+                return None
+            else:
+                date_time = self.value
+                # 2024-15-15T14:00:00.123+02:00--> 2024:10:15 14:00:00.123+02:00
+                date_time = self.__replaceChar(date_time,4,':')
+                date_time = self.__replaceChar(date_time,7,':')
+                date_time = self.__replaceChar(date_time,10,' ')
+                return date_time
 
+
+        # Local date
         elif exif_tag in ['IPTC:DateCreated']:   # 2024:10:15
-            # 2024-15-15T14:00:00.123+02:00--> 2024:10:15
-            date = self.value[:10]
-            date = self.__replaceChar(date,4,':')
-            date = self.__replaceChar(date,7,':')
-            return date
+            if self.date_time_parts.get('local_date_time') is None and self.date_time_parts.get('utc_date_time') is None:
+                return None
+            else:
+                # 2024-15-15T14:00:00.123+02:00--> 2024:10:15
+                date = self.value[:10]
+                date = self.__replaceChar(date,4,':')
+                date = self.__replaceChar(date,7,':')
+                return date
 
 
         # Local date-time without fraction and offset
         elif exif_tag in ['EXIF:DateTimeOriginal', 'EXIF:CreateDate', 'EXIF:ModifyDate']:  # 2024:10:15 14:00:00
-            date_time = self.date_time_parts.get('local_date_time')
-            date_time = self.__replaceChar(date_time,4,':')
-            date_time = self.__replaceChar(date_time,7,':')
-            date_time = self.__replaceChar(date_time,10,' ')
-            return date_time
+            if self.date_time_parts.get('local_date_time') is None and self.date_time_parts.get('utc_date_time') is None:
+                return None
+            else:
+                date_time = self.date_time_parts.get('local_date_time')
+                date_time = self.__replaceChar(date_time,4,':')
+                date_time = self.__replaceChar(date_time,7,':')
+                date_time = self.__replaceChar(date_time,10,' ')
+                return date_time
 
         # UTC date-time with fraction, without utc-offset
         elif exif_tag in ['QuickTime:MediaCreateDate', 'QuickTime:CreateDate', 'QuickTime:TrackCreateDate']:  # 2024:10:15T14:00:00.123
             date_time = self.date_time_parts.get('utc_date_time')
             if date_time is not None:
                 if self.date_time_parts.get('fraction_of_second') is not None:
-                    date_time = date_time + self.date_time_parts.get('fraction_of_second')
+                    fraction_of_seconds = float('0.'+str(self.date_time_parts.get('fraction_of_second')))
+                    if fraction_of_seconds >= 0.5:
+                        date_time = self.__addTime(date_time,1)
                 date_time = self.__replaceChar(date_time,4,':')
                 date_time = self.__replaceChar(date_time,7,':')
                 date_time = self.__replaceChar(date_time,10,' ')
@@ -569,6 +578,8 @@ class DateTimeValue():
     def getValue(self,part=None):
         if part is None:
             return self.value
+        elif part == 'utc_date_time':
+            return self.date_time_parts.get('utc_date_time')
         elif part == 'utc_offset':
             return self.date_time_parts.get('utc_offset')
         elif part == 'latest_change':
@@ -598,25 +609,50 @@ class GeoLocationValue():
             if self.longitude is None and str(value) != '0.0':
                 self.longitude = value
         else:
-            self.value = value.replace(' ', ',', 1)
+            if ',' in value:
+                self.latitude, self.longitude = (value.split(",", 1))    # " 55.65656565 N,  "9.65656565 E"
+
+                self.latitude = self.latitude.replace(" ","")                 # "55.65656565N"
+                self.latitude = self.latitude.replace("N","")                 # "55.65656565"
+                if "S" in self.latitude:                                      # "10.65656565S"
+                    self.latitude = "-"+self.latitude.replace("S","")         # "-10.65656565"
+
+                self.longitude = self.longitude.replace(" ","")               # "9.65656565E"
+                self.longitude = self.longitude.replace("E","")               # "9.65656565"
+                if "W" in self.longitude:                                     # "10.65656565W"
+                    self.longitude = "-"+self.longitude.replace("W","")     # "-10.65656565"
 
         # Set missing values where possible
-        if self.value is not None:
-            self.latitude, self.longitude = self.value.split(',',1)
-        elif self.latitude is not None and self.longitude is not None:
-            self.value = str(self.latitude) + ',' + str(self.longitude)
+        if self.latitude is not None and self.latitude is not None:
+            self.value = self.latitude + "," + self.longitude
 
     def setValue(self,value,part=None,overwrite=True):
         if not overwrite and self.value is not None:
             return
         self.value = value
+        if self.value is None:
+            self.latitude = None
+            self.longitude = None
+        else:
+            self.latitude, self.longitude = (self.value.split(",", 1))  # "55.65656565,"9.65656565"
 
     def getExifValue(self,exif_tag):
         if self.value is None:
             return None
         else:
-            return self.value.replace(',',' ',1)  # Space separates longitude and latitude
-
+            if exif_tag == 'Composite:GPSPosition':
+                if "-" in self.latitude:
+                    latitude_string = self.latitude.replace("-","")+" S"
+                else:
+                    latitude_string = self.latitude + " N"
+                if "-" in self.longitude:
+                    longitude_string = self.longitude.replace("-","")+" W"
+                else:
+                    longitude_string = self.longitude+" E"
+                result = latitude_string+", " + longitude_string
+            else:
+                result = self.value
+            return result
 
     def getValue(self,part=None):
         return self.value

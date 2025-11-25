@@ -55,9 +55,6 @@ class MemoryQueue(QObject):
                 for index, queue_entry in enumerate(self.queue):
                     passed_find_filter = True
                     for find_key, find_value in find.items():
-                        dummy = queue_entry.get(find_key)
-                        print(dummy)
-                        print(find_value)
                         if not queue_entry.get(find_key) == find_value:
                             passed_find_filter = False
                             break

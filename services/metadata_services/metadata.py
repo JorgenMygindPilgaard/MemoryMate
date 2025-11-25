@@ -1,3 +1,4 @@
+import copy
 import os
 import time
 from PyQt6.QtCore import QObject, QMutex, QMutexLocker
@@ -15,7 +16,8 @@ from services.utility_services.hash import hashCode
 from services.utility_services.rreplace import rreplace
 from services.metadata_services.metadata_value_classes import *
 from services.file_services.file_get_original import fileGetOriginal
-
+from services.integration_services.garmin_integration import GarminIntegration
+from repository.gps_location_repo.gps_location_api import GpsApi
 
 class FileMetadata(QObject):
 #   app_path = sys.argv[0]
@@ -25,6 +27,7 @@ class FileMetadata(QObject):
 
     exif_executable = os.path.join(Paths.get('resources'), 'exiftool_memory_mate.exe')
     exif_configuration = os.path.join(Paths.get('resources'), 'exiftool_memory_mate.cfg')
+    service_users = {}    # Contains buffered values for service_name, user_name, user_id. Service could be garmin_connect. It is populated at first use
     get_instance_mutex = QMutex()
 
 
@@ -64,6 +67,7 @@ class FileMetadata(QObject):
         self.is_virgin=False                                       # "Virgin means memory_mate never wrote metadata to file before. Assume not virgin tll metadata has been read
         self.date_time_change = None
         self.delay = 1
+
 
     @staticmethod
     def getInstance(file_name):
@@ -172,6 +176,10 @@ class FileMetadata(QObject):
         # Remove all non-writable tags. these should not be a part of hash
         for tag in write_tag_values:
             value = tag_values.get(tag)
+            if isinstance(value,str):
+                value = value.strip(' ')
+                if value == '':
+                    value = None
             if value is None:
                 tag_values.pop(tag, None)
                 continue
@@ -182,7 +190,8 @@ class FileMetadata(QObject):
                 if not 'Write' in access:
                     tag_values.pop(tag, None)
 
-
+        if tag_values == {}:
+            return None
         hash_code = hashCode(tag_values)
         return hash_code
 
@@ -194,11 +203,14 @@ class FileMetadata(QObject):
             raise Exception('Metadata not yet read. status is '+ self.metadata_status)
         return self.type
 
-    def getLogicalTagValues(self):
+    def getLogicalTagValues(self,filter_writable_only=False):
         if self.metadata_status != '':
             raise Exception('Metadata not yet read. status is ' + self.metadata_status)
         logical_tag_values = {}
         for logical_tag in self.logical_tag_instances:
+            if filter_writable_only:
+                if not 'Write' in Settings.get('logical_tags').get(logical_tag).get("access"):
+                    continue
             logical_tag_values[logical_tag] = self.logical_tag_instances.get(logical_tag).getValue()
             if Settings.get('logical_tags').get(logical_tag).get("value_parts") is not None:
                 for logical_tag_part in Settings.get('logical_tags').get(logical_tag).get("value_parts"):
@@ -206,11 +218,14 @@ class FileMetadata(QObject):
                     logical_tag).getValue(logical_tag_part)
         return logical_tag_values
 
-    def getSavedLogicalTagValues(self):
+    def getSavedLogicalTagValues(self,filter_writable_only=False):
         if self.metadata_status != '':
             raise Exception('Metadata not yet read. status is ' + self.metadata_status)
         logical_tag_values = {}
         for logical_tag in self.saved_logical_tag_instances:
+            if filter_writable_only:
+                if not 'Write' in Settings.get('logical_tags').get(logical_tag).get("access"):
+                    continue
             logical_tag_values[logical_tag] = self.saved_logical_tag_instances.get(logical_tag).getValue()
             if Settings.get('logical_tags').get(logical_tag).get("value_parts") is not None:
                 for logical_tag_part in Settings.get('logical_tags').get(logical_tag).get("value_parts"):
@@ -231,7 +246,9 @@ class FileMetadata(QObject):
         if self.metadata_status != 'PENDING_READ':   # Means that some other thread is reading or writing to metadata-variables
             return 'NOTHING DONE'
         self.metadata_status = 'READING'
+        # print("Reading Metadata for "+ self.file_name)
         self.__readFileType()
+
         #Get names of tags in tags for the filetype from settings
         logical_tags_tags = Settings.get('file_type_tags').get(self.type.lower())  #Logical_tags for filetype with corresponding tags
         if logical_tags_tags is None:    # Filename blank or unknown filetype
@@ -242,22 +259,59 @@ class FileMetadata(QObject):
             FileMetadataReadyEmitter.getInstance().emit(self.file_name)
             return 'DATA READ'
 
-        file_names_tags = {}                                 #A dictionary with imate-file-name and it's tags plus sidecar file-name(s) and it's/their tags
-
+        # Initialize result-variables
         self.tag_values = {}
-        for logical_tag in logical_tags_tags:
-            logical_tag_tags = logical_tags_tags[logical_tag]
+        self.logical_tag_instances = {}
+        self.saved_logical_tag_instances = {}
+        self.logical_tags_missing_value = []
+
+        # Prepare list of pending tags (will be used in while-iteration below
+        pending_tags = [tag for tags in logical_tags_tags.values() for tag in tags]  # A complete list of tags to be read
+        pending_logical_tags = list(logical_tags_tags.keys())   # All logical tags are pending
+        old_pending_tags = []
+        old_pending_logical_tags = []
+
+        while len(pending_tags) != 0 or len(pending_logical_tags) != 0:
+            if pending_tags==old_pending_tags and pending_logical_tags==old_pending_logical_tags:
+                break   # Prevent eternal while loop if same tags keeps being pending
+
+            old_pending_tags = copy.deepcopy(pending_tags)
+            old_pending_logical_tags = copy.deepcopy(pending_logical_tags)
+
+            tags = copy.deepcopy(pending_tags)
+            logical_tags = copy.deepcopy(pending_logical_tags)
+
+            pending_tags = []
+            pending_logical_tags = []
+
+            file_names_tags = {}  # A dictionary with image-file-name and it's tags plus sidecar file-name(s) and it's/their tags
+            api_tags = {}  # A dictionary with tags to be read from api, with corresponding source_id (e.g. GpsApi)
             sidecar_file_names = {}
-            for tag in logical_tag_tags:
-                self.tag_values[tag]=None
-                sidecar_file_name = None
+            for tag in tags:
                 tag_attributes = Settings.get('tags').get(tag)
                 if tag_attributes is not None:
-                    sidecar_tag_group = tag_attributes.get('sidecar_tag_group')
-                    if sidecar_tag_group is not None:
-                        sidecar_file_name_pattern = Settings.get('sidecar_tag_groups').get(sidecar_tag_group).get('file_name_pattern')
-                        sidecar_file_name_pri_1 = self.path + sidecar_file_name_pattern.replace('<file_name>',self.name).replace('<ext>',self.extension)   # c:\pictures\image-Enhanced-NR-SAI.jpg.json
-                        sidecar_file_name_pri_2  = self.path + sidecar_file_name_pattern.replace('<file_name>',self.name_alone).replace('<ext>',self.extension)   # c:\pictures\image-Enhanced-NR-SAI.jpg.json
+
+                    # If tag is switched off, set value to None
+                    active_switch = tag_attributes.get("active_switch")  # E.g. garmin_integration_active
+                    if active_switch is not None:
+                        tag_active = Settings.get(active_switch)
+                        if tag_active is not True:  # E.g.  garmin_integration_active is False
+                            self.tag_values[tag] = None
+                            continue
+
+                    source_type = tag_attributes.get("source_type")  # "sidecar_file" or "api" or None (if data read from metadata of file itself)
+                    source_id = tag_attributes.get(                        "source_id")  # "JSON" (sidecar file type) or "GpsApi" (api-name) or None
+                    source_parameters = tag_attributes.get("source_parameters")
+
+                    if source_type == "sidecar_file":
+                        sidecar_file_name_pattern = Settings.get('sidecar_file_source_ids').get(source_id).get(
+                            'file_name_pattern')
+                        sidecar_file_name_pri_1 = self.path + sidecar_file_name_pattern.replace('<file_name>',
+                                                                                                self.name).replace(
+                            '<ext>', self.extension)  # c:\pictures\image-Enhanced-NR-SAI.jpg.json
+                        sidecar_file_name_pri_2 = self.path + sidecar_file_name_pattern.replace('<file_name>',
+                                                                                                self.name_alone).replace(
+                            '<ext>', self.extension)  # c:\pictures\image-Enhanced-NR-SAI.jpg.json
                         if sidecar_file_names.get(sidecar_file_name_pri_1) is None:
                             if os.path.isfile(sidecar_file_name_pri_1):
                                 sidecar_file_names[sidecar_file_name_pri_1] = 'EXISTING'
@@ -276,72 +330,134 @@ class FileMetadata(QObject):
                         else:
                             sidecar_file_name = None
 
-                        if sidecar_file_name is not None:       # Sidecar file exist
+                        if sidecar_file_name is not None:  # Sidecar file exist
                             file_name_tags = file_names_tags.get(sidecar_file_name)
                             if file_name_tags is None:
                                 file_names_tags[sidecar_file_name] = [tag]
                             else:
                                 file_name_tags.append(tag)
-                    else:
+                        else:
+                            self.tag_values[tag] = None  # No sidecar file
+                    elif source_type == "api":
+                        api_tags[tag] = {"source_id": source_id,
+                                         "source_parameters": source_parameters}  # e.g { "Garmin:GPSPosition": {"source_id: "GpsApi", "source_parameters": {"service_name": "garmin_connect"}}
+                    else:  # Source is files own metadata
                         file_name_tags = file_names_tags.get(self.file_name)
                         if file_name_tags is None:
                             file_names_tags[self.file_name] = [tag]
                         else:
                             file_name_tags.append(tag)
 
-        # Now get values for these tags using exif-tool
-        for file_name in file_names_tags:
-            tags = file_names_tags.get(file_name)
-            with ExifTool(executable=self.exif_executable,configuration=self.exif_configuration) as ex:
-                exif_data = ex.getTags(file_name, tags,process_id='READ')
-            for tag in tags:
-                tag_alone = tag.rstrip('#')               #Remove #-character, as it is not a part of tag-name, it is a control-character telling exiftool to deliver/recieve tag in nummeric format
-                tag_value = exif_data[0].get(tag_alone)
-                if tag_value is not None and tag_value != "" and tag_value != []:
-                    if isinstance(tag_value,list):
-                        tag_value = list(map(str, tag_value))
-                    self.tag_values[tag] = tag_value    # These are the physical tag name-value pairs (tag-name includes # where relevant)
+            # Get values for tags in files and sidecar files  using exif-tool
+            for file_name in file_names_tags:
+                file_name_tags = file_names_tags.get(file_name)
+                if file_name == self.file_name:
+                    file_name_tags.append('XMP:MemoryMateSaveDateTime')
+                    file_name_tags.append('XMP:MemoryMateSaveVersion')
+                    file_name_tags.append('XMP:MemoryMateTagsHash')
+                with ExifTool(executable=self.exif_executable, configuration=self.exif_configuration) as ex:
+                    exif_data = ex.getTags(file_name, file_name_tags, process_id='READ')
+                for tag in file_name_tags:
+                    tag_alone = tag.rstrip('#')  # Remove #-character, as it is not a part of tag-name, it is a control-character telling exiftool to deliver/recieve tag in nummeric format
+                    tag_value = exif_data[0].get(tag_alone)
+                    if tag_value is None or tag_value == "" or tag_value == []:
+                        tag_value = None
+                    else:
+                        if isinstance(tag_value, list):
+                            tag_value = list(map(str, tag_value))
+                    self.tag_values[tag] = tag_value  # These are the physical tag name-value pairs (tag-name includes # where relevant)
+
+            # Get values for tags with api as source
+            for tag, tag_attributes in api_tags.items():
+                source_id = tag_attributes.get("source_id")
+                source_parameters = tag_attributes.get("source_parameters")
+                if source_id == "GpsApi":
+                    service_name = source_parameters.get("service_name")
+                    if service_name == "garmin_connect":
+                        user_name = None
+                        user_id = None
+                        service_user = FileMetadata.service_users.get(
+                            "garmin_connect")  # Look for buffered user_name and user_id
+                        if service_user is None:
+                            user_name = GarminIntegration.getInstance().user_name
+                            if user_name is not None:
+                                user_id = GpsApi.getInstance().get_user_id("garmin_connect", user_name)
+                                if user_id is not None:
+                                    FileMetadata.service_users["garmin_connect"] = {"user_name": user_name,"user_id": user_id}
+                        else:
+                            user_name = service_user.get("user_name")
+                            user_id = service_user.get("user_id")
+
+                        if user_id is not None:
+                            if 'date' in self.logical_tag_instances:
+                                time_utc = self.logical_tag_instances['date'].getValue(part='utc_date_time')
+                                location = GpsApi.getInstance().get_location(user_id=user_id,time_utc=time_utc)
+                                if location is not None:
+                                    latitude,longitude = location
+                                    self.tag_values[tag] = f"{latitude:.8f},{longitude:.8f}"
+                            else:
+                                pending_tags.append(tag)
+
+
+
+        # Finally map tag_values to logical_tag_instances
+            for logical_tag in logical_tags:
+                logical_tag_value_found = False
+                logical_tag_pending = False   # Logical tag becomes pending if the under-laying tags are not all precent yet
+
+
+                # Get instance of value-class for the logical tag
+                logical_tag_class_name = (Settings.get('logical_tags') or {}).get(logical_tag, {}).get("value_class")
+                if logical_tag_class_name is None:   # in case of tag assigned to logical tag nemed -unassigned-
+                    continue
+                logical_tag_class = globals().get(logical_tag_class_name) if logical_tag_class_name is not None else None
+                logical_tag_instance = logical_tag_class(logical_tag=logical_tag) if logical_tag_class is not None else None
+                saved_logical_tag_instance = logical_tag_class(logical_tag=logical_tag) if logical_tag_class is not None else None # Holds only what is written to file-tags, not external values (sidecar or api)
+
+                if logical_tag_instance is None:
+                    print('Logical tag Class not found: ' + logical_tag)
+                    continue
+
+                # Get physical tags for the logical tag
+                logical_tag_tags = logical_tags_tags.get(logical_tag)
+
+                # Set value of logical tag inside instance of logical tag value-instance
+                for tag in logical_tag_tags:
+                    tag_attrib = Settings.get('tags').get(tag)
+                    if tag_attrib is None:
+                        print('Physical tag attributes not found: ' + tag)
+                        continue
+                    tag_access = tag_attrib.get('access')   # Some tags are only written, not read
+                    source_type = tag_attrib.get('source_type')
+                    if tag_access is not None:
+                        if 'Read' not in tag_access:
+                            continue
+                    if tag in self.tag_values:
+                        logical_tag_instance.setValueFromExif(value=self.tag_values[tag],exif_tag=tag)
+                        if source_type is None:  # Source-type None: From file metadata itself
+                            saved_logical_tag_instance.setValueFromExif(value=self.tag_values[tag],exif_tag=tag)
+                    else:
+                        pending_logical_tags.append(logical_tag)   # Will be found in next loop pass of while-condition
+                        logical_tag_pending = True
+                        break
+
+                if logical_tag_pending:
+                    continue
+
+                if logical_tag_instance.getValue() is not None:
+                    logical_tag_value_found = True
+
+                self.logical_tag_instances[logical_tag] = logical_tag_instance  # Save logical tag value-instance in dictionary
+                self.saved_logical_tag_instances[logical_tag] = saved_logical_tag_instance
+
+                if not logical_tag_value_found:
+                    self.logical_tags_missing_value.append(logical_tag)
+
+
+
         if not self.tag_values.get('XMP:MemoryMateSaveDateTime'):     #Memory Mate never wrote to file before. Get fall-back tag-values for missing logical tags that has fall-back tag assigned
             self.is_virgin=True
 
-        # Finally map tag_values to logical_tag_instances
-        self.logical_tag_instances = {}
-        self.logical_tags_missing_value = []
-        for logical_tag in logical_tags_tags:
-            logical_tag_value_found = False
-
-            # Get instance of value-class for the logical tag
-            logical_tag_class_name = Settings.get('logical_tags').get(logical_tag).get("value_class")
-            logical_tag_class = globals().get(logical_tag_class_name) if logical_tag_class_name is not None else None
-            logical_tag_instance = logical_tag_class(logical_tag=logical_tag ) if logical_tag_class is not None else None
-
-            if logical_tag_instance is None:
-                print('Logical tag Class not found: ' + logical_tag)
-                continue
-
-            # Get physical tags for the logical tag
-            logical_tag_tags = logical_tags_tags.get(logical_tag)
-
-            # Set value of logical tag inside instance of logical tag value-instance
-            for tag in logical_tag_tags:
-                tag_attrib = Settings.get('tags').get(tag)
-                if tag_attrib is None:
-                    print('Physical tag attributes not found: ' + tag)
-                    continue
-                tag_access = Settings.get('tags').get(tag).get('access')   # Some tags are only written, not read
-                if tag_access is not None:
-                    if 'Read' not in tag_access:
-                        continue
-                logical_tag_instance.setValueFromExif(value=self.tag_values.get(tag),exif_tag=tag)
-            if logical_tag_instance.getValue() is not None:
-                logical_tag_value_found = True
-
-            self.logical_tag_instances[logical_tag] = logical_tag_instance  # Save logical tag value-instance in dictionary
-
-            if not logical_tag_value_found:
-                self.logical_tags_missing_value.append(logical_tag)
-
-        self.saved_logical_tag_instances = copy.deepcopy(self.logical_tag_instances)
 
 #        self.__patchLogicalTagValuesFromOriginals()    # If a new Lightroom-export has overwritten jpg, the custom XMP-tags (MemoryMate version, save-date/time, description_only) are lost. These are recreated from original
         self.__updateLogicalTagValuesFromQueue()   #Sets self.is_virgin to False, if file found in Queue
@@ -405,7 +521,7 @@ class FileMetadata(QObject):
         if logical_tags_tags is None:
             pass
         for logical_tag in logical_tags_tags:
-            if not Settings.get('logical_tags')[logical_tag].get("reference_tag"):    #Continue if not a reference tag
+            if not (Settings.get('logical_tags') or {}).get(logical_tag, {}).get("reference_tag"):    #Continue if not a reference tag
                 continue
 
             logical_tag_value = ''

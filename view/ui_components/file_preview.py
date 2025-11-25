@@ -4,6 +4,7 @@ from configuration.paths import Paths
 
 import cv2
 import pillow_heif
+from PIL import ImageQt
 import rawpy
 from PIL import Image
 from PyQt6.QtCore import QObject, Qt, QMutex, QMutexLocker
@@ -59,7 +60,6 @@ class FilePreview(QObject):
             time.sleep(self.sleep)
 
         file_type = FileMetadata.getInstance(self.file_name).getFileType()
-
         # Read image from file
         if self.image == None:     # Only read image from file once
             if file_type == 'heic':
@@ -76,7 +76,11 @@ class FilePreview(QObject):
                 self.original_image_rotated = False  # Conversion does not takes rotation-metadata into account. Returned QImage is not rotated
             if self.image != None:
                 if self.image.height()>1500 or self.image.width()>1500:
-                    self.image = self.image.scaled(1500,1500,Qt.AspectRatioMode.KeepAspectRatio)
+                    try:
+                        scaled_image = self.image.scaled(1500,1500,Qt.AspectRatioMode.KeepAspectRatio)
+                        self.image = scaled_image
+                    except Exception as e:
+                        print(f"An error offurred: {e}")
         if FilePreview.latest_panel_width != 0:
             self.__setPixmap(FilePreview.latest_panel_width)
         self.status = ''
@@ -165,10 +169,7 @@ class FilePreview(QObject):
                 pil_image = Image.open(file_name)
                 if pil_image.mode != "RGB":
                     pil_image = pil_image.convert("RGB")
-                image_data = pil_image.tobytes()
-                width, height = pil_image.size
-                image_format = QImage.Format.Format_RGB888
-                image = QImage(image_data, width, height, image_format)
+                image = ImageQt.toqimage(pil_image)
             else:
                 image = None
         else:

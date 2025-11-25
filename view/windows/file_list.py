@@ -1,9 +1,10 @@
 import copy
 import os
 
+from PyQt6 import QtGui
 from PyQt6.QtCore import QDir, Qt, QModelIndex, QItemSelectionModel, QTimer
 from PyQt6.QtGui import QFileSystemModel, QAction
-from PyQt6.QtWidgets import QTreeView, QAbstractItemView, QMenu, QDialog
+from PyQt6.QtWidgets import QTreeView, QAbstractItemView, QMenu, QDialog, QCheckBox, QWidgetAction
 
 from configuration.language import Texts
 from configuration.settings import Settings
@@ -58,12 +59,28 @@ class FileList(QTreeView):
             self.pending_folders.add(dir_path)
         self.model.directoryLoaded.connect(self.onDirectoryLoaded)
 
-    def createMenu(self, position):
+    def addCheckboxToMenu(self, menu, text, checked=False):
+        checkbox = QCheckBox(text)
+        checkbox.setChecked(checked)
+
+        widget_action = QWidgetAction(menu)
+        widget_action.setDefaultWidget(checkbox)
+        menu.addAction(widget_action)
+        return widget_action
+
+    def createMenu(self):
 
         self.actions = {}   # {action: id}
         self.menues = {"file_context_menu": QMenu()}
+        self.position = None
+        self.submenu = None
+        self.submenu_pos = None
 
         for file_context_menu_entry in Settings.get('file_context_menu'):
+            active_switch = file_context_menu_entry.get('active_switch')
+            if active_switch is not None:
+                if Settings.get(active_switch) is not True:
+                    continue
             parent_menu_id = file_context_menu_entry.get('parent_id')
             entry_type = file_context_menu_entry.get("type")
             parent_menu = self.menues.get(parent_menu_id)
@@ -71,23 +88,34 @@ class FileList(QTreeView):
             if entry_type == "menu":
                 menu = QMenu(Texts.get(file_context_menu_entry.get("text_key")))
                 self.menues[file_context_menu_entry.get("id")]=menu
-                parent_menu.addMenu(menu)
+                action = parent_menu.addMenu(menu)    # The menu is represented as an action in the parent_menu
+                self.actions[file_context_menu_entry.get("id")]=action
             elif entry_type == 'action':   #action
                 action = QAction(Texts.get(file_context_menu_entry.get("text_key")))
                 self.actions[file_context_menu_entry.get("id")] = action
                 parent_menu.addAction(action)
             elif entry_type == 'text':
                 action = QAction(Texts.get(file_context_menu_entry.get("text_key")),self,enabled=False)
+                self.actions[file_context_menu_entry.get("id")] = action
                 parent_menu.addAction(action)  # Just a textline in menu saying "Choose what to paste"
             elif entry_type == 'separator':
-                parent_menu.addSeparator()
+                action = parent_menu.addSeparator()
+                self.actions[file_context_menu_entry.get("id")]=action
+            elif entry_type == 'checkbox':
+                action = self.addCheckboxToMenu(parent_menu,Texts.get(file_context_menu_entry.get("text_key")),True)
+                self.actions[file_context_menu_entry.get("id")] = action
+                parent_menu.addAction(action)
+
 
 
         # Ad checkable actions for each logical tag
-        parent_menu = self.menues.get("file_context_menu")
-        self.logical_tag_actions = {}
+        self.logical_tag_paste_actions = {}
+        self.logical_tag_patch_actions = {}
+        self.logical_tag_delete_actions = {}
         for logical_tag in Settings.get('logical_tags'):
             if Settings.get('logical_tags').get(logical_tag).get("reference_tag"):  # Can't copy-paste a reference tag. It is derrived from the other tags
+                continue
+            if not 'Write' in str(Settings.get('logical_tags').get(logical_tag).get("access")):  # Cant paste to read-only logical tags
                 continue
             if Settings.get('logical_tags').get(logical_tag).get('disable_in_context_menu') == True:   # Disable in context-menu
                 continue
@@ -97,14 +125,16 @@ class FileList(QTreeView):
             tag_label_text_key = Settings.get('logical_tags').get(logical_tag).get("label_text_key")
             if tag_label_text_key:
                 tag_label = Texts.get(tag_label_text_key)
-                tag_action = QAction(tag_label, self, checkable=True)
-                if Settings.get('logical_tags').get(logical_tag).get("default_paste_select") == False:
-                    tag_action.setChecked(False)
-                else:
-                    tag_action.setChecked(True)
-                self.logical_tag_actions[logical_tag] = tag_action
-                parent_menu.addAction(tag_action)
-                tag_action.triggered.connect(self.toggleAction)
+                tag_paste_action = self.addCheckboxToMenu(self.menues.get("paste"),tag_label, False)
+                tag_patch_action = self.addCheckboxToMenu(self.menues.get("patch"),tag_label, False)
+                tag_delete_action = self.addCheckboxToMenu(self.menues.get("delete"),tag_label, False)
+                # if Settings.get('logical_tags').get(logical_tag).get("default_paste_select") == False:
+                #     tag_paste_action.setChecked(False)
+                # else:
+                #     tag_paste_action.setChecked(True)
+                self.logical_tag_paste_actions[logical_tag] = tag_paste_action
+                self.logical_tag_patch_actions[logical_tag] = tag_patch_action
+                self.logical_tag_delete_actions[logical_tag] = tag_delete_action
 
                 if Settings.get('logical_tags').get(logical_tag).get("value_parts") is not None:
                     for value_part in Settings.get('logical_tags').get(logical_tag).get("value_parts"):
@@ -113,41 +143,107 @@ class FileList(QTreeView):
                         tag_label_text_key = Settings.get('logical_tags').get(logical_tag).get("value_parts").get(value_part).get("label_text_key")
                         if tag_label_text_key:
                             tag_label = Texts.get(tag_label_text_key)
-                            tag_action = QAction(tag_label, self, checkable=True)
-                            if Settings.get('logical_tags').get(logical_tag).get("value_parts").get(value_part).get("default_paste_select") == False:
-                                tag_action.setChecked(False)
-                            else:
-                                tag_action.setChecked(True)
-                            self.logical_tag_actions[logical_tag+'.'+value_part] = tag_action
-                            parent_menu.addAction(tag_action)
-                            tag_action.triggered.connect(self.toggleAction)
+                            tag_paste_action = self.addCheckboxToMenu(self.menues.get("paste"),tag_label, False)
+                            # if Settings.get('logical_tags').get(logical_tag).get("value_parts").get(value_part).get("default_paste_select") == False:
+                            #     tag_paste_action.setChecked(False)
+                            # else:
+                            #     tag_paste_action.setChecked(True)
+                            self.logical_tag_paste_actions[logical_tag+'.'+value_part] = tag_paste_action
+
+
 
     def openMenu(self, position=None):
+        def __setVisible(action_key,visible:bool):
+            action = self.actions.get(action_key)
+            if action is not None:
+                action.setVisible(visible)
+
         if not hasattr(self, 'menues'):
-            self.createMenu(position)
+            self.createMenu()
 
         if not hasattr(self, 'source'):
             self.source = []
             self.source_is_single_file = False
 
         if self.source_is_single_file and len(self.source) == 1:  # Exactly one file selected
-            self.actions.get('paste_metadata').setEnabled(True)
-            self.actions.get('patch_metadata').setEnabled(True)
-            self.actions.get('paste_by_filename').setEnabled(True)
-            self.actions.get('patch_by_filename').setEnabled(True)
-        elif len(self.source) >= 1:
-            self.actions.get('paste_metadata').setEnabled(False)
-            self.actions.get('patch_metadata').setEnabled(False)
-            self.actions.get('paste_by_filename').setEnabled(True)
-            self.actions.get('patch_by_filename').setEnabled(True)
-        else:
-            self.actions.get('paste_metadata').setEnabled(False)
-            self.actions.get('patch_metadata').setEnabled(False)
-            self.actions.get('paste_by_filename').setEnabled(False)
-            self.actions.get('patch_by_filename').setEnabled(False)
+            __setVisible('file_management', False)
+            __setVisible('consolidate_metadata', False)
+            __setVisible('copy_metadata', False)
+            __setVisible('paste', True)
+            __setVisible('patch', True)
+            __setVisible('delete', False)
+            __setVisible('paste_metadata', True)
+            __setVisible('patch_metadata', True)
+            __setVisible('paste_by_filename', False)
+            __setVisible('patch_by_filename', False)
+            __setVisible('empty_clipboard', True)
+            __setVisible('paste_geo_location_from_garmin', False)
+            __setVisible('patch_geo_location_from_garmin', False)
+            __setVisible('paste_original_filename_from_filename', False)
+            __setVisible('patch_original_filename_from_filename', False)
+            __setVisible("separator",True)
+            __setVisible("choose_tags_to_paste",True)
+            __setVisible("choose_tags_to_patch",True)
+            __setVisible("choose_tags_to_delete",True)
+
+        elif len(self.source) >= 1:  # More than one file selected
+            __setVisible('file_management', False)
+            __setVisible('consolidate_metadata', False)
+            __setVisible('copy_metadata', False)
+            __setVisible('paste', True)
+            __setVisible('patch', True)
+            __setVisible('delete', False)
+            __setVisible('paste_metadata', False)
+            __setVisible('patch_metadata', False)
+            __setVisible('paste_by_filename', True)
+            __setVisible('patch_by_filename', True)
+            __setVisible('empty_clipboard', True)
+            __setVisible('paste_geo_location_from_garmin', False)
+            __setVisible('patch_geo_location_from_garmin', False)
+            __setVisible('paste_original_filename_from_filename', False)
+            __setVisible('patch_original_filename_from_filename', False)
+            __setVisible("separator",True)
+            __setVisible("choose_tags_to_paste",True)
+            __setVisible("choose_tags_to_patch",True)
+            __setVisible("choose_tags_to_delete",True)
+
+        else:  # No source file selected
+            __setVisible('file_management', True)
+            __setVisible('consolidate_metadata', True)
+            __setVisible('copy_metadata', True)
+            __setVisible('paste', True)
+            __setVisible('patch', True)
+            __setVisible('delete', True)
+            __setVisible('paste_metadata', False)
+            __setVisible('patch_metadata', False)
+            __setVisible('paste_by_filename', False)
+            __setVisible('patch_by_filename', False)
+            __setVisible('empty_clipboard', False)
+            __setVisible('paste_geo_location_from_garmin', True)
+            __setVisible('patch_geo_location_from_garmin', True)
+            __setVisible('paste_original_filename_from_filename', True)
+            __setVisible('patch_original_filename_from_filename', True)
+            __setVisible("separator",True)
+            __setVisible("choose_tags_to_paste",False)
+            __setVisible("choose_tags_to_patch",False)
+            __setVisible("choose_tags_to_delete",True)
+
+        for logical_tag in self.logical_tag_paste_actions:
+            if self.source == []:
+                self.logical_tag_paste_actions.get(logical_tag).setVisible(False)
+            else:
+                self.logical_tag_paste_actions.get(logical_tag).setVisible(True)
+        for logical_tag in self.logical_tag_patch_actions:
+            if self.source == []:
+                self.logical_tag_patch_actions.get(logical_tag).setVisible(False)
+            else:
+                self.logical_tag_patch_actions.get(logical_tag).setVisible(True)
+
 
         if position:
             self.position = copy.deepcopy(position)
+
+
 
         action = self.menues.get("file_context_menu").exec(self.viewport().mapToGlobal(self.position))
         action_id = next((k for k, v in self.actions.items() if v == action), None)  # Reverse lookup action_id from action
@@ -162,7 +258,169 @@ class FileList(QTreeView):
 
                 self.consolidator = ConsolidateMetadata(target, await_start_signal=True)
                 self.progress_bar = ProgressBarWidget(Texts.get('progress_bar_title_consolidate_metadata'),self.consolidator)  # Progress-bar will start worker
+        elif action_id == 'copy_metadata':
+            self.source_is_single_file = False
+            index = self.indexAt(self.position)  # Get index in File-list
+            # Check if an item was clicked
+            if index.isValid():  # A valid file was right-clicked
+                self.source = []
+                for index in self.selectedIndexes():
+                    self.source.append(self.model.filePath(index))
+                self.source = list(set(self.source))  # Remove duplicate filenames. Row contains one index per column
 
+                if len(self.source) == 1:
+                    if os.path.isfile(self.source[0]):
+                        self.source_is_single_file = True
+            else:
+                self.source = []  # No item was clicked
+            for source_file_name in self.source:
+                onMetadataCopied(source_file_name)
+        elif action_id == 'paste_geo_location_from_garmin':
+            index = self.indexAt(self.position)  # Get index in File-list
+            # Check if an item was clicked
+            if index.isValid():  # A valid file was right-clicked
+                target = []
+                for index in self.selectedIndexes():
+                    target.append(self.model.filePath(index))
+                target = list(set(target))  # Remove duplicate filenames. Row contains one index per column
+                self.clearSelection()
+                target_logical_tags = ["geo_location"]
+                self.copier = CopyLogicalTags(("tag", "Garmin:GPSPosition"), target, target_logical_tags, await_start_signal=True)
+                self.progress_bar = ProgressBarWidget(Texts.get('progress_bar_title_paste_metadata'), self.copier)  # Progress-bar will start worker
+                self.source = []
+        elif action_id == 'patch_geo_location_from_garmin':
+            index = self.indexAt(self.position)  # Get index in File-list
+            # Check if an item was clicked
+            if index.isValid():  # A valid file was right-clicked
+                target = []
+                for index in self.selectedIndexes():
+                    target.append(self.model.filePath(index))
+                target = list(set(target))  # Remove duplicate filenames. Row contains one index per column
+                self.clearSelection()
+                target_logical_tags = ["geo_location"]
+                self.copier = CopyLogicalTags(("tag", "Garmin:GPSPosition"), target, target_logical_tags, overwrite=False, await_start_signal=True)
+                self.progress_bar = ProgressBarWidget(Texts.get('progress_bar_title_paste_metadata'), self.copier)  # Progress-bar will start worker
+                self.source = []
+        elif action_id == 'paste_original_filename_from_filename':
+            index = self.indexAt(self.position)  # Get index in File-list
+            # Check if an item was clicked
+            if index.isValid():  # A valid file was right-clicked
+                target = []
+                for index in self.selectedIndexes():
+                    target.append(self.model.filePath(index))
+                target = list(set(target))  # Remove duplicate filenames. Row contains one index per column
+                self.clearSelection()
+                target_logical_tags = ["original_filename"]
+                self.copier = CopyLogicalTags(("file_info", "original_file_base_name"), target, target_logical_tags, await_start_signal=True)
+                self.progress_bar = ProgressBarWidget(Texts.get('progress_bar_title_paste_metadata'), self.copier)  # Progress-bar will start worker
+                self.source = []
+        elif action_id == 'patch_original_filename_from_filename':
+            index = self.indexAt(self.position)  # Get index in File-list
+            # Check if an item was clicked
+            if index.isValid():  # A valid file was right-clicked
+                target = []
+                for index in self.selectedIndexes():
+                    target.append(self.model.filePath(index))
+                target = list(set(target))  # Remove duplicate filenames. Row contains one index per column
+                self.clearSelection()
+                target_logical_tags = ["original_filename"]
+                self.copier = CopyLogicalTags(("file_info", "original_file_base_name"), target, target_logical_tags, overwrite=False, await_start_signal=True)
+                self.progress_bar = ProgressBarWidget(Texts.get('progress_bar_title_paste_metadata'), self.copier)  # Progress-bar will start worker
+                self.source = []
+        elif action_id == 'paste_metadata':
+            index = self.indexAt(self.position)  # Get index in File-list
+            # Check if an item was clicked
+            if index.isValid():  # A valid file was right-clicked
+                target = []
+                for index in self.selectedIndexes():
+                    target.append(self.model.filePath(index))
+                target = list(set(target))  # Remove duplicate filenames. Row contains one index per column
+                self.clearSelection()
+                target_logical_tags = []
+                for logical_tag in self.logical_tag_paste_actions:
+                    if self.logical_tag_paste_actions[logical_tag].defaultWidget().isChecked():
+                        target_logical_tags.append(logical_tag)
+
+                self.copier = CopyLogicalTags(("file_path_list", self.source),target, target_logical_tags, await_start_signal=True)
+                self.progress_bar = ProgressBarWidget(Texts.get('progress_bar_title_paste_metadata'), self.copier)  # Progress-bar will start worker
+                self.source = []
+        elif action_id == 'paste_by_filename':
+            index = self.indexAt(self.position)  # Get index in File-list
+            # Check if an item was clicked
+            if index.isValid():  # A valid file was right-clicked
+                target = []
+                for index in self.selectedIndexes():
+                    target.append(self.model.filePath(index))
+                target = list(set(target))  # Remove duplicate filenames. Row contains one index per column
+
+                target_logical_tags = []
+                for logical_tag in self.logical_tag_paste_actions:
+                    if self.logical_tag_paste_actions[logical_tag].defaultWidget().isChecked():
+                        target_logical_tags.append(logical_tag)
+
+                self.copier = CopyLogicalTags(("file_path_list",self.source), target, target_logical_tags, match_file_name=True,
+                                              await_start_signal=True)
+                self.progress_bar = ProgressBarWidget(Texts.get('progress_bar_title_paste_metadata'), self.copier)  # Progress-bar will start worker
+                self.source = []
+
+        elif action_id == 'patch_metadata':
+            index = self.indexAt(self.position)  # Get index in File-list
+            # Check if an item was clicked
+            if index.isValid():  # A valid file was right-clicked
+                target = []
+                for index in self.selectedIndexes():
+                    target.append(self.model.filePath(index))
+                target = list(set(target))  # Remove duplicate filenames. Row contains one index per column
+
+                target_logical_tags = []
+                for logical_tag in self.logical_tag_patch_actions:
+                    if self.logical_tag_patch_actions[logical_tag].defaultWidget().isChecked():
+                        target_logical_tags.append(logical_tag)
+                self.copier = CopyLogicalTags(("file_path_list",self.source), target, target_logical_tags, overwrite=False,
+                                              await_start_signal=True)
+                self.progress_bar = ProgressBarWidget(Texts.get('progress_bar_title_paste_metadata'), self.copier)  # Progress-bar will start worker
+                self.source = []
+        elif action_id == 'patch_by_filename':
+            index = self.indexAt(self.position)  # Get index in File-list
+            # Check if an item was clicked
+            if index.isValid():  # A valid file was right-clicked
+                target = []
+                for index in self.selectedIndexes():
+                    target.append(self.model.filePath(index))
+                target = list(set(target))  # Remove duplicate filenames. Row contains one index per column
+
+                target_logical_tags = []
+                for logical_tag in self.logical_tag_patch_actions:
+                    if self.logical_tag_patch_actions[logical_tag].defaultWidget().isChecked():
+                        target_logical_tags.append(logical_tag)
+
+                self.copier = CopyLogicalTags(("file_path_list",self.source), target, target_logical_tags, overwrite=False,
+                                              match_file_name=True, await_start_signal=True)
+                self.progress_bar = ProgressBarWidget(Texts.get('progress_bar_title_paste_metadata'), self.copier)  # Progress-bar will start worker
+                self.source = []
+
+            else:
+                self.menu.target_file_name = None  # No item was clicked
+        elif action_id == 'delete_metadata':
+            index = self.indexAt(self.position)  # Get index in File-list
+            # Check if an item was clicked
+            if index.isValid():  # A valid file was right-clicked
+                target = []
+                for index in self.selectedIndexes():
+                    target.append(self.model.filePath(index))
+                target = list(set(target))  # Remove duplicate filenames. Row contains one index per column
+
+                target_logical_tags = []
+                for logical_tag in self.logical_tag_delete_actions:
+                    if self.logical_tag_delete_actions[logical_tag].defaultWidget().isChecked():
+                        target_logical_tags.append(logical_tag)
+
+                self.copier = CopyLogicalTags(("value",None), target, target_logical_tags, match_file_name=True,
+                                              await_start_signal=True)
+                self.progress_bar = ProgressBarWidget(Texts.get('progress_bar_title_paste_metadata'), self.copier)  # Progress-bar will start worker
+                self.source = []
+        elif action_id == 'empty_clipboard':
+            self.source = []
         elif action_id == 'standardize_filenames':
             index = self.indexAt(self.position)  # Get index in File-list
             if index.isValid():
@@ -183,118 +441,6 @@ class FileList(QTreeView):
                     self.standardizer = StandardizeFilenames(target, prefix, num_pattern, suffix,
                                                              await_start_signal=True)  # worker-instance
                     self.progress_bar = ProgressBarWidget(Texts.get('progress_bar_title_standardize_filenames'),self.standardizer)  # Progress-bar will start worker
-
-        elif action_id == 'copy_metadata':
-            self.source_is_single_file = False
-            index = self.indexAt(self.position)  # Get index in File-list
-            # Check if an item was clicked
-            if index.isValid():  # A valid file was right-clicked
-                self.source = []
-                for index in self.selectedIndexes():
-                    self.source.append(self.model.filePath(index))
-                self.source = list(set(self.source))  # Remove duplicate filenames. Row contains one index per column
-
-                if len(self.source) == 1:
-                    if os.path.isfile(self.source[0]):
-                        self.source_is_single_file = True
-            else:
-                self.source = []  # No item was clicked
-            for source_file_name in self.source:
-                onMetadataCopied(source_file_name)
-
-        elif action_id == 'paste_metadata':
-            index = self.indexAt(self.position)  # Get index in File-list
-            # Check if an item was clicked
-            if index.isValid():  # A valid file was right-clicked
-                target = []
-                for index in self.selectedIndexes():
-                    target.append(self.model.filePath(index))
-                target = list(set(target))  # Remove duplicate filenames. Row contains one index per column
-                self.clearSelection()
-                target_logical_tags = []
-                for logical_tag in self.logical_tag_actions:
-                    if self.logical_tag_actions[logical_tag].isChecked():
-                        target_logical_tags.append(logical_tag)
-
-                self.copier = CopyLogicalTags(self.source, target, target_logical_tags, await_start_signal=True)
-                self.progress_bar = ProgressBarWidget(Texts.get('progress_bar_title_paste_metadata'), self.copier)  # Progress-bar will start worker
-                self.source = []
-
-
-
-        elif action_id == 'paste_by_filename':
-            index = self.indexAt(self.position)  # Get index in File-list
-            # Check if an item was clicked
-            if index.isValid():  # A valid file was right-clicked
-                target = []
-                for index in self.selectedIndexes():
-                    target.append(self.model.filePath(index))
-                target = list(set(target))  # Remove duplicate filenames. Row contains one index per column
-
-                target_logical_tags = []
-                for logical_tag in self.logical_tag_actions:
-                    if self.logical_tag_actions[logical_tag].isChecked():
-                        target_logical_tags.append(logical_tag)
-
-                self.copier = CopyLogicalTags(self.source, target, target_logical_tags, match_file_name=True,
-                                              await_start_signal=True)
-                self.progress_bar = ProgressBarWidget(Texts.get('progress_bar_title_paste_metadata'), self.copier)  # Progress-bar will start worker
-                self.source = []
-
-        elif action_id == 'patch_metadata':
-            index = self.indexAt(self.position)  # Get index in File-list
-            # Check if an item was clicked
-            if index.isValid():  # A valid file was right-clicked
-                target = []
-                for index in self.selectedIndexes():
-                    target.append(self.model.filePath(index))
-                target = list(set(target))  # Remove duplicate filenames. Row contains one index per column
-
-                target_logical_tags = []
-                for logical_tag in self.logical_tag_actions:
-                    if self.logical_tag_actions[logical_tag].isChecked():
-                        target_logical_tags.append(logical_tag)
-                self.copier = CopyLogicalTags(self.source, target, target_logical_tags, overwrite=False,
-                                              await_start_signal=True)
-                self.progress_bar = ProgressBarWidget(Texts.get('progress_bar_title_paste_metadata'), self.copier)  # Progress-bar will start worker
-                self.source = []
-
-
-        elif action_id == 'patch_by_filename':
-            index = self.indexAt(self.position)  # Get index in File-list
-            # Check if an item was clicked
-            if index.isValid():  # A valid file was right-clicked
-                target = []
-                for index in self.selectedIndexes():
-                    target.append(self.model.filePath(index))
-                target = list(set(target))  # Remove duplicate filenames. Row contains one index per column
-
-                target_logical_tags = []
-                for logical_tag in self.logical_tag_actions:
-                    if self.logical_tag_actions[logical_tag].isChecked():
-                        target_logical_tags.append(logical_tag)
-
-                self.copier = CopyLogicalTags(self.source, target, target_logical_tags, overwrite=False,
-                                              match_file_name=True, await_start_signal=True)
-                self.progress_bar = ProgressBarWidget(Texts.get('progress_bar_title_paste_metadata'), self.copier)  # Progress-bar will start worker
-                self.source = []
-
-            else:
-                self.menu.target_file_name = None  # No item was clicked
-        elif action_id == 'preserve_originals':
-            index = self.indexAt(self.position)  # Get index in File-list
-            if index.isValid():
-                target = self.model.filePath(index)
-                self.preserver = PreserveOriginals(target)
-                self.progress_bar = ProgressBarWidget(Texts.get('progress_bar_title_preserve_originals'), self.preserver)  # Progress-bar will start worker
-
-        elif action_id == 'delete_unused_originals':
-            index = self.indexAt(self.position)  # Get index in File-list
-            if index.isValid():
-                target = self.model.filePath(index)
-                self.deleter = DeleteUnusedOriginals(target,await_start_signal=True)
-                self.progress_bar = ProgressBarWidget(Texts.get('progress_bar_title_delete_unused_originals'), self.deleter)  # Progress-bar will start worker
-
         elif action_id == 'fetch_originals':
             index = self.indexAt(self.position)  # Get index in File-list
             if index.isValid():
@@ -309,7 +455,19 @@ class FileList(QTreeView):
                     ui_status.setParameters({'originals_fetch_folder': source})  # Save last used originals location
                     self.fetcher = FetchOriginals(source=source,target=target,await_start_signal=True)
                     self.progress_bar = ProgressBarWidget(Texts.get('progress_bar_title_fetch_originals'), self.fetcher)  # Progress-bar will start worker
+        elif action_id == 'preserve_originals':
+            index = self.indexAt(self.position)  # Get index in File-list
+            if index.isValid():
+                target = self.model.filePath(index)
+                self.preserver = PreserveOriginals(target)
+                self.progress_bar = ProgressBarWidget(Texts.get('progress_bar_title_preserve_originals'), self.preserver)  # Progress-bar will start worker
 
+        elif action_id == 'delete_unused_originals':
+            index = self.indexAt(self.position)  # Get index in File-list
+            if index.isValid():
+                target = self.model.filePath(index)
+                self.deleter = DeleteUnusedOriginals(target,await_start_signal=True)
+                self.progress_bar = ProgressBarWidget(Texts.get('progress_bar_title_delete_unused_originals'), self.deleter)  # Progress-bar will start worker
 
         elif action == None:
             pass
@@ -321,14 +479,9 @@ class FileList(QTreeView):
         self.setCurrentIndex(QModelIndex())
         # self.selection_model.setCurrentIndex(QModelIndex(), QTreeView.NoIndex)
 
-    def toggleAction(self):
-        # Get the action that triggered the signal
-        action = self.sender()
-        is_checked = not action.isChecked()
-        if is_checked:
-            action.setChecked(False)
-        else:
-            action.setChecked(True)
+    def onAction(self):
+        # Triggers on any action that is not a checkbox
+        pass
 
     def setRootPath(self, dir_path):
         self.model.setRootPath(dir_path)
@@ -353,6 +506,47 @@ class FileList(QTreeView):
         if chosen_path != previous_path:
             if os.path.isfile(chosen_path):
                 CurrentFileChangedEmitter.getInstance().emit(chosen_path)
+
+    def getLogicalTagCheckboxStatuses(self):
+        # Create menu, if not yet created. That way checkbox tag-entries are generated
+        if not hasattr(self, 'menues'):
+            self.createMenu()
+
+        # Find statuses of all logical tag checkboxes
+        logical_tag_checkbox_statuses = {"paste":{},"patch":{},"delete":{}}
+        for logical_tag in self.logical_tag_paste_actions:
+            logical_tag_checkbox_statuses["paste"][logical_tag] = self.logical_tag_paste_actions[logical_tag].defaultWidget().isChecked()
+        for logical_tag in self.logical_tag_patch_actions:
+            logical_tag_checkbox_statuses["patch"][logical_tag]  = self.logical_tag_patch_actions[logical_tag].defaultWidget().isChecked()
+        for logical_tag in self.logical_tag_delete_actions:
+            logical_tag_checkbox_statuses["delete"][logical_tag]  = self.logical_tag_delete_actions[logical_tag].defaultWidget().isChecked()
+
+        return logical_tag_checkbox_statuses
+
+    def setLogicalTagCheckboxStatuses(self,logical_tag_checkbox_statuses):
+        # Create menu, if not yet created. That way checkbox tag-entries are generated
+        if not hasattr(self, 'menues'):
+            self.createMenu()
+
+        if not logical_tag_checkbox_statuses:
+            return
+
+        # Set statuses of all logical tag checkboxes
+        statuses = logical_tag_checkbox_statuses.get("paste")
+        if statuses:
+            for logical_tag in statuses:
+                self.logical_tag_paste_actions[logical_tag].defaultWidget().setChecked(statuses[logical_tag])
+
+        statuses = logical_tag_checkbox_statuses.get("patch")
+        if statuses:
+            for logical_tag in statuses:
+                self.logical_tag_patch_actions[logical_tag].defaultWidget().setChecked(statuses[logical_tag])
+
+        statuses = logical_tag_checkbox_statuses.get("delete")
+        if statuses:
+            for logical_tag in statuses:
+                self.logical_tag_delete_actions[logical_tag].defaultWidget().setChecked(statuses[logical_tag])
+
 
     def getOpenFolders(self):
         open_folders = []
@@ -435,9 +629,9 @@ class FileList(QTreeView):
             self.verticalScrollBar().setValue(scroll_position)
 
     def onDirectoryLoaded(self, path: str):
-        # This is called whe a folder is expanded. It keeps track of when the last folder has been expanded.
+        # This is called when a folder is expanded. It keeps track of when the last folder has been expanded.
         # When that happens, it sets the correct scroll-position from last time program was loaded, but only at program-load,
-        # where the pendig-folder list gets populated from last program run.
+        # where the pending-folder list gets populated from last program run.
         if not self.pending_folders:
             return   # Pending folders from last program run has already been loaded. Now user just navigates the tree.
         self.pending_folders.discard(path)

@@ -711,7 +711,8 @@ class GeoLocation(MapView):
     def logicalTagValue(self):
         # Collect the entry in autocomplete-list
         if self.marker_location is not None:
-            logical_tag_value = str(self.marker_location[0])+','+str(self.marker_location[1])
+            logical_tag_value = f"{self.marker_location[0]:.8f},{self.marker_location[1]:.8f}"
+#            logical_tag_value = str(self.marker_location[0])+','+str(self.marker_location[1])
         else:
             logical_tag_value = None
         if self.auto_complete_list is not None and logical_tag_value != '' and logical_tag_value is not None:    # Collect value in autocomplete-list

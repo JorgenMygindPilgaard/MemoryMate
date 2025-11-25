@@ -1,3 +1,9 @@
+import os
+# os.environ["QT_DEBUG_PLUGINS"] = "1"
+# os.environ["QT_FATAL_WARNINGS"] = "1"
+import faulthandler
+faulthandler.enable()
+
 import sys
 import qdarkstyle
 from PyQt6.QtCore import QTimer
@@ -16,6 +22,8 @@ from services.stack_services.stack import Stack
 from view.windows.initial_settings_window import InitialSettingsWindow
 from view.windows.main_window import MainWindow
 from services.utility_services.parameter_manager import ParameterManager
+from services.integration_services.garmin_integration import GarminIntegration
+
 
 # Prepare application
 app = QApplication(sys.argv)
@@ -51,7 +59,13 @@ Stack.getInstance('preview.read',FilePreview,'processReadStackEntry').start()
 if Settings.get('lr_integration_active') is True:
     processLightroomQueue(Settings.get('lr_db_path'), Paths.get('lr_queue'), True)
 
+
 window = MainWindow()
 window.show()
-app.exec()
 
+# # Start Garmin-connect synchronization
+# if Settings.get("garmin_integration_active"):
+#     GarminIntegration.getInstance().start()
+
+
+app.exec()
