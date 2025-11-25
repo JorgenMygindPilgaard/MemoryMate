@@ -33,6 +33,8 @@ class Paths:
         Paths.paths['lr_queue']=os.path.join(Paths.paths['data'], "lr_queue.json")   # Path to settings-file
         Paths.paths['ui_status']=os.path.join(Paths.paths['data'], "ui_status.json")
         Paths.paths['current_image']=os.path.join(Paths.paths['data'], "current_image.html")
+        Paths.paths['gps_location_db']=os.path.join(Paths.paths['data'], "gps_location.db")
+        Paths.paths['garmin_token']=os.path.join(os.path.expanduser("~"),"memorymate_garmin_token")
 
 
 Paths._initialize()

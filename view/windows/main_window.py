@@ -7,15 +7,18 @@ from PyQt6.QtWidgets import QDialog, QVBoxLayout, QLabel, QComboBox, QHBoxLayout
     QApplication
 
 from configuration.settings import Settings
+from services.integration_services.garmin_integration import GarminIntegration
 from view.ui_components.file_preview import FilePreview
 from services.metadata_services.exiftool_wrapper import ExifTool
 from services.metadata_services.metadata import FileMetadata
 from services.queue_services.queue import Queue
 from view.ui_components.file_metadata_update_queue_status import QueueStatusMonitor
+from view.ui_components.garmin_integration_status import GarminIntegrationStatusMonitor
 from view.windows.file_list import FileList
 from view.windows.file_panel import FilePanel
 from view.ui_components.settings_wheel import SettingsWheeel
 from services.utility_services.parameter_manager import ParameterManager
+from controller.events.handlers.on_current_file_changed import StackCoordinator
 
 
 class MainWindow(QMainWindow):
@@ -25,9 +28,24 @@ class MainWindow(QMainWindow):
         # Get UI-status from last run from UI-status file
         self.ui_status = ParameterManager.getInstance(Paths.get('ui_status'))
 
+        # Window title
         self.setWindowTitle("Memory Mate " + Settings.get('version'))
         self.setWindowIcon(QIcon(os.path.join(Paths.get('resources'), 'memory_mate.ico')))
 
+        # Get metadata write queue instance (prepared in memory_mate.py)
+        self.metadata_write_queue = Queue.getInstance('metadata.write', FileMetadata, 'processWriteQueueEntry',
+                                                      Paths.get('queue'))  # Instanciate Queue for updating metadata
+
+        # Status of file-processing (Top line of main-window)
+        self.metadata_write_queue_status_monitor = QueueStatusMonitor(self.metadata_write_queue)  # This is a QHBoxLayout
+
+        # Status of garmin integration
+        # Start Garmin-connect synchronization
+        self.garmin_integration_status_monitor = GarminIntegrationStatusMonitor.getInstance()   # This is a QHBoxLayout
+        if Settings.get("garmin_integration_active"):
+            GarminIntegration.getInstance().start()
+
+        # Read current file or default image into file-panel
         current_file = self.ui_status.getParameter('current_file')
         show_sample_photo = False
 
@@ -49,6 +67,7 @@ class MainWindow(QMainWindow):
         else:
             FileMetadata.getInstance(current_file).readLogicalTagValues()
             FilePreview.getInstance(current_file).readImage()
+            StackCoordinator.getInstance().doStacking(current_file)
         # CurrentFileChangedEmitter.getInstance().emit(current_file)
         # FileMetadata.getInstance(current_file).readLogicalTagValues()
         # FilePreview.getInstance(current_file).readImage()
@@ -60,24 +79,31 @@ class MainWindow(QMainWindow):
         # File (Right part of MainWindow)
         self.file_panel = FilePanel.getInstance(current_file)
 
-        # Prepare metadata write queue
-        self.metadata_write_queue = Queue.getInstance('metadata.write', FileMetadata, 'processWriteQueueEntry',
-                                                      Paths.get('queue'))  # Instanciate Queue for updating metadata
-        if self.ui_status.getParameter('is_paused'):
-            self.metadata_write_queue.pause()
-        self.metadata_write_queue.start()  # Måske ikke nødvendigt
-
-        # Status of file-processing (Top line of main-window)
-        self.metadata_write_queue_status_monitor = QueueStatusMonitor(self.metadata_write_queue)
+        # # Get metadata write queue instance (prepared in memory_mate.py)
+        # self.metadata_write_queue = Queue.getInstance('metadata.write', FileMetadata, 'processWriteQueueEntry',
+        #                                               Paths.get('queue'))  # Instanciate Queue for updating metadata
+        #
+        # # Status of file-processing (Top line of main-window)
+        # self.metadata_write_queue_status_monitor = QueueStatusMonitor(self.metadata_write_queue)  # This is a QHBoxLayout
+        #
+        # # Status of garmin integration
+        # # Start Garmin-connect synchronization
+        # self.garmin_integration_status_monitor = GarminIntegrationStatusMonitor.getInstance()   # This is a QHBoxLayout
+        # if Settings.get("garmin_integration_active"):
+        #     GarminIntegration.getInstance().start()
 
         # Clickable settings-wheel in top line of main window
-        self.settings_wheel = SettingsWheeel()
+        self.settings_wheel_layout = QHBoxLayout()
+        self.settings_wheel_layout.addWidget(SettingsWheeel())
+        self.settings_wheel_layout.setAlignment(Qt.AlignmentFlag.AlignRight)
 
         # File list (Left part of MainWindow)
         self.file_list = FileList(dir_path='')
         self.file_list.setOpenFolders(self.ui_status.getParameter('open_folders'))
         self.file_list.setSelectedItems(self.ui_status.getParameter('selected_items'))
         self.file_list.setCurrentItem(self.ui_status.getParameter('current_file'))
+        self.file_list.setLogicalTagCheckboxStatuses(self.ui_status.getParameter('logical_tag_checkbox_statuses'))
+        self.file_list.setVerticalScrollPosition(self.ui_status.getParameter('vertical_scroll_position'))
 
         # Main-widget (Central widget of MainWindow)
         main_widget = QWidget()
@@ -95,7 +121,8 @@ class MainWindow(QMainWindow):
         file_section_layout.addLayout(file_panel_layout)
         file_panel_layout.addWidget(self.file_panel)
         controll_line_layout.addLayout(self.metadata_write_queue_status_monitor)
-        controll_line_layout.addWidget(self.settings_wheel)
+        controll_line_layout.addLayout(self.garmin_integration_status_monitor)
+        controll_line_layout.addLayout(self.settings_wheel_layout)
         main_widget.setLayout(main_layout)
         self.setGeometry(100, 100, 1600, 800)
         is_maximized = self.ui_status.getParameter('is_maximized')
@@ -103,10 +130,6 @@ class MainWindow(QMainWindow):
             is_maximized = True
         if is_maximized:
             self.showMaximized()
-
-        self.file_list.setVerticalScrollPosition(self.ui_status.getParameter('vertical_scroll_position'))
-        # if self.ui_status.getParameter('geometry'):
-        #     self.setGeometry(self.ui_status.getParameter('geometry').toVariang())
 
         self.file_panel.installEventFilter(self)
 
@@ -124,6 +147,7 @@ class MainWindow(QMainWindow):
         self.ui_status.setParameters({'current_file': self.file_panel.file_name,
                                       'open_folders': self.file_list.getOpenFolders(),
                                       'selected_items': self.file_list.getSelectedItems(),
+                                      'logical_tag_checkbox_statuses': self.file_list.getLogicalTagCheckboxStatuses(),
                                       'vertical_scroll_position': self.file_list.getVerticalScrollPosition(),
                                       'is_maximized': self.isMaximized(),
                                       'is_paused': self.metadata_write_queue.queue_worker_paused})

@@ -36,14 +36,19 @@ class TextLine(QLineEdit):
         file_metadata = FileMetadata.getInstance(self.file_name)
         if file_metadata:
             text_line = file_metadata.getLogicalTagValues().get(self.logical_tag)
+            if isinstance(text_line,str):
+                if text_line.isspace():
+                    text_line = ''
             if text_line is None:
                 return
             self.setText(text_line)
             if self.auto_complete_list is not None and self.text() != '':
                 self.auto_complete_list.collectItem(self.text())    # Collect new entry in auto_complete_list
-    def logical_tag_value(self):
+    def logicalTagValue(self):
         logical_tag_value = self.text()
-        if self.auto_complete_list is not None and logical_tag_value != '':  # Collect in autocomplete-list
+        if logical_tag_value == '':
+            logical_tag_value = None   # Empty string corresponds to None-value
+        if self.auto_complete_list is not None and logical_tag_value is not None:  # Collect in autocomplete-list
             self.auto_complete_list.collectItem(logical_tag_value)
         return logical_tag_value
 
@@ -75,7 +80,7 @@ class Text(QPlainTextEdit):
     def resizeEvent(self, event):
         super().resizeEvent(event)
         if event.oldSize().width()!=event.size().width():
-            self.setFixedHeight(self.widgetHeight(event.size().width()))   #Calculates new height from new width
+            self.setFixedHeight(self.__widgetHeight(event.size().width()))   #Calculates new height from new width
     def wheelEvent(self, event):
         # Ignore the wheel event
         event.ignore()
@@ -89,17 +94,19 @@ class Text(QPlainTextEdit):
             if text is None:
                 return
             self.setPlainText(text)
-            self.setFixedHeight(self.widgetHeight(self.width()))      #Calculates needed height from width and text
+            self.setFixedHeight(self.__widgetHeight(self.width()))      #Calculates needed height from width and text
             if self.auto_complete_list is not None and self.toPlainText() != '':
                 self.auto_complete_list.collectItem(self.toPlainText())    # Collect new entry in auto_complete_list
 
-    def logical_tag_value(self):
+    def logicalTagValue(self):
         logical_tag_value = self.toPlainText()
-        if self.auto_complete_list is not None and logical_tag_value != '':   # Collect value in autocomplete-list
+        if logical_tag_value == '':
+            logical_tag_value = None
+        if self.auto_complete_list is not None and logical_tag_value is not None:   # Collect value in autocomplete-list
             self.auto_complete_list.collectItem(logical_tag_value)
         return logical_tag_value
 
-    def widgetHeight(self, new_widget_width=-1):
+    def __widgetHeight(self, new_widget_width=-1):
         # Get text from document
         text=self.toPlainText()
         text_length = len(text)
@@ -184,8 +191,8 @@ class DateTime(QWidget):
 
         # Icon for locking/unlocking date/time edit
         self.padlock = self.Padlock('closed')
-        self.setEditMode('closed')
-        self.padlock.toggled.connect(self.setEditMode)
+        self.__setEditMode('closed')
+        self.padlock.toggled.connect(self.__setEditMode)
 
         # Space between fields
         self.space = QSpacerItem(0,0,QSizePolicy.Policy.Expanding,QSizePolicy.Policy.Minimum)
@@ -225,7 +232,7 @@ class DateTime(QWidget):
                 self.parent_widget.atFocusOutEvent()
             super().focusOutEvent(event)  # Ensure default behavior is preserved
 
-    def setEditMode(self,state):
+    def __setEditMode(self,state):
         if state == 'open':
             self.date_time_edit.setDisabled(False)
             self.offset_edit.setDisabled(False)
@@ -304,7 +311,7 @@ class DateTime(QWidget):
             self.date_time_edit = self.__fillDateTimeEdit(self.date_time_edit,self.date_time)
 
             # Fill offset edit
-            # if self.date_time!= "" and self.date_timeis not None:  # Data was found
+            # if self.date_time!= "" and self.date_time is not None:  # Data was found
             #     self.offset_edit.setStyleSheet("color: black")
             # else:
             #     self.offset_edit.setStyleSheet("color: #D3D3D3;")
@@ -328,7 +335,7 @@ class DateTime(QWidget):
                 if self.auto_complete_list is not None:
                     self.auto_complete_list.collectItem(self.date_time)    # Collect new entry in auto_complete_list
 
-    def logical_tag_value(self):
+    def logicalTagValue(self):
         if self.date_time_edit.dateTime()==self.date_time_edit.blank_date_time:
             logical_tag_value = ''
         else:
@@ -339,13 +346,15 @@ class DateTime(QWidget):
             logical_tag_value = logical_tag_value + 'Z'
         else:
             logical_tag_value = logical_tag_value + self.offset_edit.text()
-        if self.auto_complete_list is not None and logical_tag_value != '':  # Collect value in autocomplete-list
+        if logical_tag_value == '':
+            logical_tag_value = None
+        if self.auto_complete_list is not None and logical_tag_value is not None:  # Collect value in autocomplete-list
             self.auto_complete_list.collectItem(logical_tag_value)
         return logical_tag_value
 
     def atFocusOutEvent(self):
         next_old_date_time = self.date_time
-        self.date_time = self.logical_tag_value()
+        self.date_time = self.logicalTagValue()
 
         if next_old_date_time is None or next_old_date_time == "":   # Adding date for the first time
             self.old_date_time = next_old_date_time
@@ -451,9 +460,9 @@ class DateTime(QWidget):
 
 
             # Enable click event
-            self.mousePressEvent = self.togglePadlock
+            self.mousePressEvent = self.__togglePadlock
 
-        def togglePadlock(self, event):
+        def __togglePadlock(self, event):
             # Toggle the image on click
             if self.current_state == "closed":
                 self.setPixmap(self.open_padlock)
@@ -466,6 +475,7 @@ class DateTime(QWidget):
 class Date(QDateEdit):
     def __init__(self, file_name, logical_tag):
         super().__init__()
+        self.blank_date = QDate(1753, 1, 1)
         self.file_name = file_name
         self.logical_tag = logical_tag                                    #Widget should remember who it serves
         self.setCalendarPopup(True)
@@ -487,12 +497,12 @@ class Date(QDateEdit):
         event.ignore()
 
     def readFromImage(self):
+        self.setDate(self.blank_date)
         file_metadata = FileMetadata.getInstance(self.file_name)
         if file_metadata:
             date = file_metadata.getLogicalTagValues().get(self.logical_tag)
             if date is None:
                 return
-            self.setDate(QDate(1752,1,1))
             if date !="":
                 date = date.replace("/", ":")          # 2022/12/24 --> 2022:12:24
                 date_parts = date.split(":")           # 2022:12:24 --> ["2022", "12", "24"]
@@ -501,10 +511,13 @@ class Date(QDateEdit):
                 self.setDate(QDate(int(date_parts[0]), int(date_parts[1]), int(date_parts[2])))
                 if self.auto_complete_list is not None:
                     self.auto_complete_list.collectItem(date)  # Collect new entry in auto_complete_list
-    def logical_tag_value(self):
-        logical_tag_value = self.date().toString("yyyy:MM:dd")
-        if self.auto_complete_list is not None and logical_tag_value != '':   # Collect value in autocomplete-list
-            self.auto_complete_list.collectItem(logical_tag_value)
+    def logicalTagValue(self):
+        if self.date() == self.blank_date:
+            logical_tag_value = None
+        else:
+            logical_tag_value = self.date().toString("yyyy:MM:dd")
+            if self.auto_complete_list is not None:  # Collect value in autocomplete-list
+                self.auto_complete_list.collectItem(logical_tag_value)
         return logical_tag_value
 
 class TextSet(QWidget):
@@ -564,7 +577,7 @@ class TextSet(QWidget):
                 self.text_list.addItem(tag)
             self.text_list.setFixedHeight(self.text_list.widgetHeight())  # Calculates needed height for the number of items
 
-    def logical_tag_value(self):
+    def logicalTagValue(self):
         # Collect the entry in autocomplete-list
         logical_tag_value = []
         count = self.text_list.count()
@@ -574,6 +587,8 @@ class TextSet(QWidget):
             logical_tag_value.append(text)
         if self.auto_complete_list is not None:                             # Collect value in autocomplete-list
             self.auto_complete_list.collectItems(logical_tag_value)
+        if logical_tag_value == []:
+            logical_tag_value = None
         return logical_tag_value
 
     def __clearTextInput(self):
@@ -651,18 +666,18 @@ class GeoLocation(MapView):
         self.setLocationZoom(location=self.marker_location, zoom=15)
         self.setMarkerLocation(self.marker_location)
 
-        self.enterEvent = self.onEnter
-        self.leaveEvent = self.onLeave
+        self.enterEvent = self.__onEnter
+        self.leaveEvent = self.__onLeave
 
-    def onEnter(self,event):
+    def __onEnter(self,event):
         self.setCursor(Qt.CursorShape.PointingHandCursor)  # Change cursor to pointing hand when mouse enters
 
-    def onLeave(self,event):
+    def __onLeave(self,event):
         self.setCursor(Qt.CursorShape.ArrowCursor)  # Change cursor back tor arrow
 
 
 
-    def onMarkerLocationChanged(self, marker_location=[]):
+    def __onMarkerLocationChanged(self, marker_location=[]):
         self.marker_location = marker_location
         self.setLocationZoom(location=self.marker_location, zoom=15)
         self.setMarkerLocation(self.marker_location)
@@ -672,7 +687,7 @@ class GeoLocation(MapView):
             self.map_location_selector = MapLocationSelector(location=self.marker_location,marker_location=self.marker_location)
         else:
             self.map_location_selector = MapLocationSelector(location=[0,0], zoom=1)
-        self.map_location_selector.marker_location_changed.connect(self.onMarkerLocationChanged)
+        self.map_location_selector.marker_location_changed.connect(self.__onMarkerLocationChanged)
         self.map_location_selector.show()
 
     def readFromImage(self):
@@ -680,8 +695,9 @@ class GeoLocation(MapView):
         if file_metadata:
             gps_position_string = file_metadata.getLogicalTagValues().get(self.logical_tag)    # "50.454545 -0.959595"
             if gps_position_string is None:
+                self.marker_location = None
                 return
-            if gps_position_string != "" and gps_position_string is not None:
+            if gps_position_string != '' and gps_position_string is not None:
                 if ',' in gps_position_string:
                     gps_position_parts = gps_position_string.split(",")
                 else:
@@ -692,10 +708,11 @@ class GeoLocation(MapView):
             else:
                 self.marker_location = None
 
-    def logical_tag_value(self):
+    def logicalTagValue(self):
         # Collect the entry in autocomplete-list
-        if self.marker_location:
-            logical_tag_value = str(self.marker_location[0])+','+str(self.marker_location[1])
+        if self.marker_location is not None:
+            logical_tag_value = f"{self.marker_location[0]:.8f},{self.marker_location[1]:.8f}"
+#            logical_tag_value = str(self.marker_location[0])+','+str(self.marker_location[1])
         else:
             logical_tag_value = None
         if self.auto_complete_list is not None and logical_tag_value != '' and logical_tag_value is not None:    # Collect value in autocomplete-list
@@ -708,26 +725,26 @@ class Rotation(QWidget):
         self.file_name = file_name
         self.logical_tag = logical_tag
         self.rotation = None
-        self.initUI()
+        self.__initUI()
 
-    def initUI(self):
+    def __initUI(self):
         self.layout = QHBoxLayout()
 
         # Create a QLabel for "rotate_left" image
         self.left_image_label = QLabel()
         rotate_left_pixmap = QPixmap(os.path.join(Paths.get('resources'), 'rotate_left.png')).scaled(25, 25, Qt.AspectRatioMode.IgnoreAspectRatio, Qt.TransformationMode.SmoothTransformation)
         self.left_image_label.setPixmap(rotate_left_pixmap)  # Replace with your image file
-        self.left_image_label.mousePressEvent = self.onRotateLeft
+        self.left_image_label.mousePressEvent = self.__onRotateLeft
 
         # Create a QLabel for "rotate_right" image
         self.right_image_label = QLabel()
         rotate_right_pixmap = QPixmap(os.path.join(Paths.get('resources'), 'rotate_right.png')).scaled(25, 25, Qt.AspectRatioMode.IgnoreAspectRatio, Qt.TransformationMode.SmoothTransformation)
         self.right_image_label.setPixmap(rotate_right_pixmap)  # Replace with your image file
-        self.right_image_label.mousePressEvent = self.onRotateRight
-        self.left_image_label.enterEvent = self.onEnterLeft
-        self.left_image_label.leaveEvent = self.onLeaveLeft
-        self.right_image_label.enterEvent = self.onEnterRight
-        self.right_image_label.leaveEvent = self.onLeaveRight
+        self.right_image_label.mousePressEvent = self.__onRotateRight
+        self.left_image_label.enterEvent = self.__onEnterLeft
+        self.left_image_label.leaveEvent = self.__onLeaveLeft
+        self.right_image_label.enterEvent = self.__onEnterRight
+        self.right_image_label.leaveEvent = self.__onLeaveRight
 
 
         self.layout.addStretch(1)
@@ -745,10 +762,10 @@ class Rotation(QWidget):
                 return
             self.rotation = rotation
 
-    def logical_tag_value(self):
+    def logicalTagValue(self):
         return self.rotation
 
-    def onRotateLeft(self, event):
+    def __onRotateLeft(self, event):
         if self.rotation == 0 or self.rotation is None:
             self.rotation = 90        #  90° CCW
         elif self.rotation == 90:     #  90° CCW
@@ -763,7 +780,7 @@ class Rotation(QWidget):
         image_rotated_emitter.emit(self.file_name)
 
 
-    def onRotateRight(self, event):
+    def __onRotateRight(self, event):
         if self.rotation == 0 or self.rotation is None:
             self.rotation = 270      # 270° CCW
         elif self.rotation == 270:   # 270° CCW
@@ -777,15 +794,15 @@ class Rotation(QWidget):
         image_rotated_emitter = ImageRotatedEmitter.getInstance()
         image_rotated_emitter.emit(self.file_name)
 
-    def onEnterLeft(self,event):
+    def __onEnterLeft(self,event):
         self.left_image_label.setCursor(Qt.CursorShape.PointingHandCursor)  # Change cursor to pointing hand when mouse enters
 
-    def onLeaveLeft(self,event):
+    def __onLeaveLeft(self,event):
         self.left_image_label.setCursor(Qt.CursorShape.ArrowCursor)  # Change cursor back tor arrow
-    def onEnterRight(self,event):
+    def __onEnterRight(self,event):
         self.right_image_label.setCursor(Qt.CursorShape.PointingHandCursor)  # Change cursor to pointing hand when mouse enters
 
-    def onLeaveRight(self,event):
+    def __onLeaveRight(self,event):
         self.right_image_label.setCursor(Qt.CursorShape.ArrowCursor)  # Change cursor back tor arrow
 
 class Rating(QWidget):
@@ -797,16 +814,17 @@ class Rating(QWidget):
         self.auto_complete_list = None
         self.rating = 0
         self.icon_grey_star = QIcon(os.path.join(Paths.get('resources'), 'grey_star.png'))
+        self.icon_grey_star_outline = QIcon(os.path.join(Paths.get('resources'), 'grey_star_outline.png'))
         self.icon_yellow_star = QIcon(os.path.join(Paths.get('resources'), 'yellow_star.png'))
         self.icon_reset = QIcon(os.path.join(Paths.get('resources'), 'reset_icon.png'))
 
         #Get attributes of tag
         tag_attributes = Settings.get('logical_tags').get(self.logical_tag)
 
-        self.initUI()
+        self.__initUI()
         self.readFromImage()
 
-    def initUI(self):
+    def __initUI(self):
         self.stars = []
         self.layout = QHBoxLayout()
 
@@ -821,9 +839,9 @@ class Rating(QWidget):
 
         for i in range(5):
             star = QPushButton()
-            star.setIcon(self.icon_grey_star)  # Load a grey star icon
+            star.setIcon(self.icon_grey_star_outline)  # Load a grey star icon
             star.setIconSize(QSize(star_size, star_size))
-            star.clicked.connect(self.onStarClick)
+            star.clicked.connect(self.__onStarClick)
             star.setStyleSheet(button_and_star_style)
             self.stars.append(star)
             self.layout.addWidget(star)
@@ -834,57 +852,64 @@ class Rating(QWidget):
         self.reset_button = QPushButton()
         self.reset_button.setIcon(self.icon_reset)  # Load a reset icon
         self.reset_button.setIconSize(QSize(button_size, button_size))
-        self.reset_button.clicked.connect(self.resetStars)
+        self.reset_button.clicked.connect(self.__resetStars)
         self.reset_button.setStyleSheet(button_and_star_style)
         self.layout.addWidget(self.reset_button)
 
         self.setLayout(self.layout)
 
-        self.enterEvent = self.onEnter
-        self.leaveEvent = self.onLeave
+        self.enterEvent = self.__onEnter
+        self.leaveEvent = self.__onLeave
 
-    def onEnter(self,event):
+    def __onEnter(self,event):
         self.setCursor(Qt.CursorShape.PointingHandCursor)  # Change cursor to pointing hand when mouse enters
 
-    def onLeave(self,event):
+    def __onLeave(self,event):
         self.setCursor(Qt.CursorShape.ArrowCursor)  # Change cursor back tor arrow
 
 
 
-    def onStarClick(self):
+    def __onStarClick(self):
         sender = self.sender()
         star_index = self.stars.index(sender)
 
-        for i, star in enumerate(self.stars):
-            if i <= star_index:
-                star.setIcon(self.icon_yellow_star)  # Load a yellow star icon
-                self.rating = i + 1
-            else:
-                star.setIcon(self.icon_grey_star)  # Load a grey star icon
-
-    def resetStars(self):
-        for star in self.stars:
-            star.setIcon(self.icon_grey_star)  # Load a grey star icon
-        self.rating = 0
-
-    def setYellowStars(self, value):
-        if value is None:
-            self.yellow_stars = 0.
+        if self.rating is None:     # If rating was not set before, set the start rating to clicked star
+            self.rating = star_index + 1
         else:
-            self.yellow_stars = min(max(value, 0), 5)  # Ensure value is between 0 and 5
-        for i, star in enumerate(self.stars):
-            if i < self.yellow_stars:
-                star.setIcon(self.icon_yellow_star)  # Load a yellow star icon
+            # Last yellow star can toggle. That enables setting zero stars
+            if star_index == self.rating - 1:   #Last yellow star clicked
+                self.rating = self.rating - 1   #Toggles to grey
             else:
-                star.setIcon(self.icon_grey_star)  # Load a grey star icon
+                self.rating = star_index + 1
+
+        # Set colour on all stars
+        self.__setStarColour(self.rating)
+
+
+
+    def __resetStars(self):
+        self.rating = None
+        self.__setStarColour(self.rating)
+
+    def __setStarColour(self, value):
+        if value is None:
+            for star in self.stars:
+                star.setIcon(self.icon_grey_star_outline)  # Load a grey star icon
+        else:
+            yellow_stars = min(max(value, 0), 5)  # Ensure value is between 0 and 5
+            for i, star in enumerate(self.stars):
+                if i < yellow_stars:
+                    star.setIcon(self.icon_yellow_star)  # Load a yellow star icon
+                else:
+                    star.setIcon(self.icon_grey_star)  # Load a grey star icon
 
     def readFromImage(self):
         file_metadata = FileMetadata.getInstance(self.file_name)
         if file_metadata:
             self.rating = file_metadata.getLogicalTagValues().get(self.logical_tag)
-            self.setYellowStars(self.rating)
+            self.__setStarColour(self.rating)
 
-    def logical_tag_value(self):
+    def logicalTagValue(self):
         logical_tag_value = self.rating
         return logical_tag_value
 

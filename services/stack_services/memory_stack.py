@@ -44,9 +44,6 @@ class MemoryStack(QObject):
             for index, stack_entry in enumerate(self.stack):
                 passed_find_filter = True
                 for find_key, find_value in find.items():
-                    dummy = stack_entry.get(find_key)
-                    print(dummy)
-                    print(find_value)
                     if not stack_entry.get(find_key) == find_value:
                         passed_find_filter = False
                         break

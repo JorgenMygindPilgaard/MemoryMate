@@ -33,16 +33,3 @@ def onFileRenameDone(files,update_original_filename_tag=False):
         if file_metadata is not None:
             file_metadata.updateFilename(file.get('new_name'))
 
-# Set original filename tag in all files
-    if update_original_filename_tag==True and Settings.get('logical_tags').get('original_filename') is not None:
-        for file in files:
-            new_file_name = file.get('new_name')
-            if 'tmp' in new_file_name:
-                continue
-            file_metadata = FileMetadata.getInstance(new_file_name)
-            new_name_alone = splitFileName(new_file_name)[1]
-            if new_name_alone != '' and new_name_alone is not None:
-                logical_tags = {'original_filename': new_name_alone}
-                file_metadata.setLogicalTagValues(logical_tags)
-                file_metadata_pasted_emitter = FileMetadataPastedEmitter.getInstance()
-                file_metadata_pasted_emitter.emit(new_file_name)

@@ -37,6 +37,7 @@ class ExifTool(object):
 
     def __exit__(self, exc_type, exc_value, traceback):
         pass
+
     @staticmethod
     def getProcess(process_id):
         if ExifTool.processes.get(process_id)!=None:                      #Process created
@@ -80,10 +81,10 @@ class ExifTool(object):
         for id in closed_processes:
             del ExifTool.processes[id]
 
-
-    def execute(self, args,process_id):
+    @staticmethod
+    def execute(args,process_id):
         args.append('-charset')                        # This and the next line tells exiftool which encoding to expect
-        args.append('filename='+self.sys_encoding)     # in tags. Windows cmd recodes everything to sys-encoding before passing to exiftool.
+        args.append('filename='+ExifTool.sys_encoding)     # in tags. Windows cmd recodes everything to sys-encoding before passing to exiftool.
         args.append('-charset')
         args.append('exif=UTF8')
         args.append('-charset')
@@ -97,7 +98,7 @@ class ExifTool(object):
         args.append('-charset')
         args.append('riff=UTF8')
         args.append('-charset')
-        args.append(self.sys_encoding)
+        args.append(ExifTool.sys_encoding)
         args.append('-overwrite_original')
         args.append('-api')
         args.append('largefilesupport=1')
@@ -137,30 +138,36 @@ class ExifTool(object):
             #         output += chunk
             # return output, message
 
-            while not output.endswith(self.sentinel):
+            while not output.endswith(ExifTool.sentinel):
                 output += os.read(fd, 4096).decode('utf-8', errors='replace')
 
             process.stdin.flush()    #Don't know if it is needed
-            return output[:-len(self.sentinel)]
+            return output[:-len(ExifTool.sentinel)]
+
+    @staticmethod
+    def waitUntillReady(process_id):
+        process_mutex = ExifTool.process_mutexes.get(process_id)
+        with QMutexLocker(process_mutex):
+            pass
+
 
     def getTags(self, filenames, tags=[],process_id='READ'):           #Gets all metadata of files if tags is empty or not supplied
         args = []
-        tags.append('XMP:MemoryMateSaveDateTime')
-        tags.append('XMP:MemoryMateSaveVersion')
         for tag in tags:
             if tag[0]!='-':
                 tag='-'+tag
             args.append(tag)
         args.append('-G')
         args.append('-j')
-#        args.append('-n')
+        args.append('-c')   # Floats..
+        args.append('%.8f') # ..with 8 decimals
         if type(filenames)==str:
             args.append(filenames)
             file_to_return=filenames
         else:
             for filename in filenames:
                 args.append(filename)
-        output = self.execute((args),process_id)
+        output = ExifTool.execute((args),process_id)
         if output == '':    #Sidecar file not found
             return [{}]
         else:
@@ -206,7 +213,7 @@ class ExifTool(object):
             except OSError as e:
                 pass
 
-        output = self.execute(args,process_id)
+        output = ExifTool.execute(args,process_id)
         return output
 
 

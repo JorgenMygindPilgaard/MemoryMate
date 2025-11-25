@@ -12,7 +12,7 @@ class QueueProcessor(QObject):
 
     @staticmethod
     def processQueueEntry(queue_entry):
-        print(queue_entry)
+        pass
 
 
 queue = Queue.getInstance('test_queue', QueueProcessor,'processQueueEntry','C:\\Users\\jorge\\Documents\\midlertidig\\queue.json')

@@ -30,10 +30,24 @@ class StackCoordinator(QObject):    # Remembers what has been read already
         if not path in self.read_folders_done:
             self.read_folders_done.append(path)
             file_names = getFileList(path, False, pattern=self.file_pattern)
-            for file_name in file_names:
+            if new_file_name in file_names:
+                new_file_index = file_names.index(new_file_name)
+            else:
+                new_file_index = -1
+
+            # Stack the files leading up to new_file_name
+            for file_name in reversed(file_names[:new_file_index]):
                 if not file_name == new_file_name:   # Wait stacking new filename as last one, to process first
                     metadata_read_stack.push(file_name)
                     preview_read_stack.push(file_name)
+
+
+            # Stack the files following new_file_name
+            for file_name in reversed(file_names[new_file_index+1:]):
+                if not file_name == new_file_name:   # Wait stacking new filename as last one, to process first
+                    metadata_read_stack.push(file_name)
+                    preview_read_stack.push(file_name)
+
         metadata_read_stack.push(new_file_name)
         entries = metadata_read_stack.entries()
         preview_read_stack.push(new_file_name)
