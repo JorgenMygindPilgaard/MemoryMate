@@ -1,9 +1,6 @@
 import os
 # os.environ["QT_DEBUG_PLUGINS"] = "1"
 # os.environ["QT_FATAL_WARNINGS"] = "1"
-import faulthandler
-faulthandler.enable()
-
 import sys
 import qdarkstyle
 from PyQt6.QtCore import QTimer
