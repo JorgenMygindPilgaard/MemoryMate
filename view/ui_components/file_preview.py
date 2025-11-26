@@ -1,5 +1,7 @@
 import os
 import time
+
+from configuration.language import Texts
 from configuration.paths import Paths
 
 import cv2
@@ -7,8 +9,8 @@ import pillow_heif
 from PIL import ImageQt
 import rawpy
 from PIL import Image
-from PyQt6.QtCore import QObject, Qt, QMutex, QMutexLocker
-from PyQt6.QtGui import QPixmap, QTransform, QImage, QImageReader
+from PyQt6.QtCore import QObject, Qt, QMutex, QMutexLocker, QRect
+from PyQt6.QtGui import QPixmap, QTransform, QImage, QImageReader, QPainter, QFont, QFontMetrics, QColor
 from controller.events.emitters.file_preview_ready_emitter import FilePreviewReadyEmitter
 from services.metadata_services.metadata import FileMetadata
 
@@ -74,6 +76,8 @@ class FilePreview(QObject):
             else:
                 self.image = self.__default_to_qimage(self.file_name)
                 self.original_image_rotated = False  # Conversion does not takes rotation-metadata into account. Returned QImage is not rotated
+            if self.image is None:
+                self.image = self.__textToQimage("⚠️\t\t\t\t"+Texts.get("file_preview_file_corrupted")+":\n\t\t\t\t\t\t\t\t\t"+self.file_name)
             if self.image != None:
                 if self.image.height()>1500 or self.image.width()>1500:
                     try:
@@ -95,6 +99,29 @@ class FilePreview(QObject):
         if panel_width != self.panel_width:
             self.__setPixmap(panel_width)
         return self.pixmap
+
+    def __textToQimage(self,text, width=1500, height=300, font_size=22):
+        img = QImage(width, height, QImage.Format.Format_RGB32)
+        img.fill(Qt.GlobalColor.white)
+
+        painter = QPainter(img)
+        painter.setRenderHint(QPainter.RenderHint.TextAntialiasing)
+
+        font = QFont("Arial", font_size)
+        painter.setFont(font)
+        painter.setPen(QColor("black"))
+
+        # Define drawing rectangle
+        rect = QRect(10, 10, width - 20, height - 20)
+
+        # Allow multiline + word wrap
+        flags = Qt.AlignmentFlag.AlignLeft | Qt.TextFlag.TextWordWrap
+
+        painter.drawText(rect, flags, text)
+        painter.end()
+
+        return img
+
 
     def __setPixmap(self,panel_width):
         self.panel_width = panel_width
@@ -162,125 +189,174 @@ class FilePreview(QObject):
             else:
                 return self.image
 
-    def __heic_to_qimage(self,file_name):
-        if self.image == None:
-            if pillow_heif.is_supported(file_name):
-                pillow_heif.register_heif_opener()
-                pil_image = Image.open(file_name)
-                if pil_image.mode != "RGB":
-                    pil_image = pil_image.convert("RGB")
-                image = ImageQt.toqimage(pil_image)
-            else:
-                image = None
-        else:
-            image = self.image
-        return image
+    def __heic_to_qimage(self, file_name):
+        # If the image is already set, just return it
+        if self.image is not None:
+            return self.image
 
-    def __raw_to_qimage(self,file_name):
-        if self.image == None:
+        try:
+            # Check if HEIC support exists for this file
+            if not pillow_heif.is_supported(file_name):
+                return None
+
+            pillow_heif.register_heif_opener()
+
+            # Try opening the image
+            pil_image = Image.open(file_name)
+
+            # Force full image decoding — *this is key*
+            pil_image.load()
+
+            # Ensure correct RGB format
+            if pil_image.mode != "RGB":
+                pil_image = pil_image.convert("RGB")
+
+            # Convert to QImage — safe now
+            qimage = ImageQt.toqimage(pil_image)
+            return qimage
+
+        except Exception as e:
+            return None  # or return a fallback image here
+
+    def __raw_to_qimage(self, file_name):
+        # If image already loaded, reuse it
+        if self.image is not None:
+            return self.image
+
+        # Default: no image
+        image = None
+
+        try:
+            # rawpy can throw exceptions on corrupt or unsupported files
             with rawpy.imread(file_name) as raw:
+
                 try:
                     thumb = raw.extract_thumb()
                 except rawpy.LibRawNoThumbnailError:
-                    print('no thumbnail found')
+                    print(f"No thumbnail found in RAW file: {file_name}")
+                    return None
+
+                # Thumbnail extracted, now decode based on format
+                if thumb.format == rawpy.ThumbFormat.JPEG:
+                    # QImage.fromData handles JPEG safely
+                    image = QImage.fromData(thumb.data)
+
+                elif thumb.format == rawpy.ThumbFormat.BITMAP:
+                    try:
+                        # Convert bitmap (numpy array) → PIL → bytes → QImage
+                        thumb_pil = Image.fromarray(thumb.data)
+                        rgb_image = thumb_pil.convert("RGB")  # ensure RGB888
+                        width, height = rgb_image.size
+                        data = rgb_image.tobytes("raw", "RGB")
+
+                        # QImage requires memory that stays alive, so copy it:
+                        image = QImage(data, width, height, QImage.Format.Format_RGB888).copy()
+
+                    except Exception as e:
+                        print(f"Error converting RAW bitmap thumbnail: {e}")
+                        return None
+
                 else:
-                    if thumb.format in [rawpy.ThumbFormat.JPEG, rawpy.ThumbFormat.BITMAP]:
-                        if thumb.format is rawpy.ThumbFormat.JPEG:
-                            image = QImage.fromData(thumb.data)
-                        else:
-                            thumb_pil = Image.fromarray(thumb.data)
-                            thumb_data = thumb_pil.tobytes()
-                            image = QImage(thumb_data, thumb_pil.width, thumb_pil.height, QImage.Format.Format_RGB888)
-        else:
-            image = self.image
+                    # Unknown / unsupported thumbnail format
+                    print(f"Unsupported RAW thumbnail format: {thumb.format}")
+                    return None
+
+        except Exception as e:
+            # rawpy.imread or extract may fail on corrupted files
+            print(f"Failed loading RAW file '{file_name}': {e}")
+            return None
 
         return image
 
-    def __movie_to_qimage(self,file_name):
-        if self.image == None:
+    def __movie_to_qimage(self, file_name):
+        # If already loaded, return existing result
+        if self.image is not None:
+            return self.image
+
+        try:
             video = cv2.VideoCapture(file_name)
 
             if not video.isOpened():
-                image = self.__default_to_qimage(os.path.join(Paths.get('resources'), "no_preview.png"))
-            else:
+                return None
 
-                # Get total frame count and FPS
-                total_frames = int(video.get(cv2.CAP_PROP_FRAME_COUNT))
-                fps = video.get(cv2.CAP_PROP_FPS)
-                duration = total_frames / fps  # Total duration in seconds
+            # Retrieve video metadata safely
+            total_frames = int(video.get(cv2.CAP_PROP_FRAME_COUNT))
+            fps = float(video.get(cv2.CAP_PROP_FPS))
 
-                # Calculate the time (in seconds) at the given percentage
-                frame_time = duration * (3.0 / 100.0)
+            if fps <= 0 or total_frames <= 0:
+                video.release()
+                return None
 
-                # Set the video position to that time
-                video.set(cv2.CAP_PROP_POS_MSEC, frame_time * 1000)
+            # Total duration
+            duration = total_frames / fps
 
-                # Read the frame
-                success, frame = video.read()
-                if not success:
-                    image = self.__default_to_qimage(os.path.join(Paths.get('resources'), "no_preview.png"))
-                    video.release()
-                else:
-                    # Convert the frame (BGR to RGB for QImage)
-                    rgb_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+            # Pick a frame at 3% of the video
+            frame_time = duration * 0.03
+            video.set(cv2.CAP_PROP_POS_MSEC, frame_time * 1000)
 
-                    # Get frame dimensions
-                    height, width, channel = rgb_frame.shape
+            # Read the frame
+            success, frame = video.read()
+            if not success or frame is None:
+                video.release()
+                return None
 
-                    # Create QImage
-                    image = QImage(rgb_frame.data, width, height, 3 * width, QImage.Format.Format_RGB888)
-                    video.release()
+            # Convert BGR → RGB
+            try:
+                rgb_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+            except Exception:
+                video.release()
+                return None
 
+            height, width, channels = rgb_frame.shape
+            if channels != 3:
+                video.release()
+                return None
 
-            # try:
-            #     # Attempt to create a VideoFileClip object
-            #     video_clip = VideoFileClip(file_name)
-            #     fps = video_clip.fps
-            #     duration = video_clip.duration
-            #     # Get frame 3% into the video. The first seconds are often black or blurry/shaked
-            #     frame = int(duration * 3 / 100 * fps)  # Frame
-            #     thumbnail = video_clip.get_frame(frame)  # Get the first frame as the thumbnail
-            #
-            #     # If recorded in portrait-mode, swap height and width
-            #     #            if hasattr(video_clip, 'rotation'):
-            #     #                rotation = video_clip.rotation
-            #     #                if rotation in [90, 270]:
-            #     #                    original_width, original_height = video_clip.size
-            #     #                    thumbnail = cv2.resize(thumbnail, (original_height, original_width))  # Swap hight and width
-            #     video_clip.close()
-            #
-            #     height, width, channel = thumbnail.shape
-            #     bytes_per_line = 3 * width
-            #
-            #     image = QImage(
-            #         thumbnail.data,
-            #         width,
-            #         height,
-            #         bytes_per_line,
-            #         QImage.Format.Format_RGB888,
-            #     )
-            #     video_clip.close()
-            # except OSError as e:
-            #     image = self.__default_to_qimage(os.path.join(Path.get('resources'), "no_preview.png"))
-            #     # Handle specific OSError from ffmpeg
-            #     print(f"Error loading video file {file_name}: {e}")
-            # except Exception as e:
-            #     image = self.__default_to_qimage(os.path.join(Path.get('resources'), "no_preview.png"))
-            #     # Catch all other exceptions
-            #     print(f"An unexpected error occurred with file {file_name}: {e}")
+            # Create QImage
+            # IMPORTANT: copy() ensures memory stays valid after function exits
+            image = QImage(rgb_frame.data, width, height, width * 3, QImage.Format.Format_RGB888).copy()
 
+            video.release()
+            return image
 
-        else:
-            image = self.image
-        return image
+        except Exception as e:
+            print(f"Error reading video preview from '{file_name}': {e}")
+            try:
+                video.release()
+            except:
+                pass
+            return None
 
-    def __default_to_qimage(self,file_name):
-        if self.image == None:
-            image_reader = QImageReader(file_name)
-            image = image_reader.read()
-        else:
-            image = self.image
-        return image
+    def __default_to_qimage(self, file_name):
+        # Reuse cached image if available
+        if self.image is not None:
+            return self.image
+
+        try:
+            reader = QImageReader(file_name)
+
+            # Optional safety: don't try reading unsupported types
+            if not reader.canRead():
+                return None
+
+            image = reader.read()
+
+            if image.isNull():
+                # Occurs on corrupt or unreadable images
+                return None  # empty fallback
+
+            return image
+
+        except Exception as e:
+            return None  # safe empty fallback
+
+    # def __default_to_qimage(self,file_name):
+    #     if self.image == None:
+    #         image_reader = QImageReader(file_name)
+    #         image = image_reader.read()
+    #     else:
+    #         image = self.image
+    #     return image
 
 
     def updatePixmap(self):
