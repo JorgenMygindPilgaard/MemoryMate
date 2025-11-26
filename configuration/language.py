@@ -209,6 +209,16 @@ class Texts:
                 "SV": "Ingen internetanslutning. Kontrollera din anslutning. \nHögerklicka för alternativ",
                 "IT": "Nessuna connessione a Internet. Controlla la tua connessione. \nFai clic con il tasto destro per le opzioni"
             },
+            "file_preview_file_corrupted": {
+                "DA": "Beklager. Memory Mate kan ikke åbne filen da filformatet ikke understøttes, eller filen er beskadiget",
+                "EN": "Sorry. Memory Mate can't open the file because the format is unsupported, or the file is corrupted",
+                "FR": "Désolé. Memory Mate ne peut pas ouvrir le fichier car le format n'est pas pris en charge ou le fichier est endommagé",
+                "ES": "Lo sentimos. Memory Mate no puede abrir el archivo porque el formato no es compatible o el archivo está dañado",
+                "DE": "Entschuldigung. Memory Mate kann die Datei nicht öffnen, da das Format nicht unterstützt wird oder die Datei beschädigt ist",
+                "FI": "Pahoittelut. Memory Mate ei voi avata tiedostoa, koska tiedostomuotoa ei tueta tai tiedosto on vioittunut",
+                "SV": "Tyvärr. Memory Mate kan inte öppna filen eftersom formatet inte stöds eller filen är skadad",
+                "IT": "Spiacenti. Memory Mate non può aprire il file perché il formato non è supportato o il file è danneggiato"
+            },
             "tag_label_rating": {
                 "DA": "Bedømmelse",
                 "EN": "Rating",
