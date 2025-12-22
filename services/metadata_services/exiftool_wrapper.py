@@ -47,16 +47,40 @@ class ExifTool(object):
             ExifTool.process_mutexes[process_id]=QMutex()   # Used later to prevent multiple accesses to same process
             if ExifTool.configuration!='':
                 ExifTool.processes[process_id] = subprocess.Popen([ExifTool.executable, "-config", ExifTool.configuration, "-stay_open", "True", "-@", "-"],
+                                                                  encoding="utf-8",   # Tells subprocess to pass all arguments as UTF-8
+                                                                  errors="strict",
                                                                   universal_newlines=True,
                                                                   stdin=subprocess.PIPE,
                                                                   stdout=subprocess.PIPE,
                                                                   creationflags=subprocess.CREATE_NO_WINDOW)
+
             else:
                 ExifTool.processes[process_id] = subprocess.Popen([ExifTool.executable, "-stay_open", "True",  "-@", "-"],
-                                                                   universal_newlines=True,
-                                                                   stdin=subprocess.PIPE,
-                                                                   stdout=subprocess.PIPE,
-                                                                   creationflags=subprocess.CREATE_NO_WINDOW)
+                                                                  encoding="utf-8",
+                                                                  errors="strict",
+                                                                  universal_newlines=True,
+                                                                  stdin=subprocess.PIPE,
+                                                                  stdout=subprocess.PIPE,
+                                                                  creationflags=subprocess.CREATE_NO_WINDOW)
+            args=[]
+            args.append('-charset')                        # This and the next line tells exiftool which encoding to expect
+            args.append('filename=UTF8')  #+ExifTool.sys_encoding)     # in tags. Windows cmd recodes everything to sys-encoding before passing to exiftool.
+            args.append('-charset')
+            args.append('exif=UTF8')
+            args.append('-charset')
+            args.append('iptc=UTF8')
+            args.append('-charset')
+            args.append('id3=UTF8')
+            args.append('-charset')
+            args.append('photoshop=UTF8')
+            args.append('-charset')
+            args.append('quicktime=UTF8')
+            args.append('-charset')
+            args.append('riff=UTF8')
+            args.append('-api')
+            args.append('largefilesupport=1')
+            ExifTool.execute(args,process_id)
+
         return ExifTool.processes.get(process_id)
 
     @staticmethod
@@ -83,28 +107,9 @@ class ExifTool(object):
 
     @staticmethod
     def execute(args,process_id):
-        args.append('-charset')                        # This and the next line tells exiftool which encoding to expect
-        args.append('filename='+ExifTool.sys_encoding)     # in tags. Windows cmd recodes everything to sys-encoding before passing to exiftool.
-        args.append('-charset')
-        args.append('exif=UTF8')
-        args.append('-charset')
-        args.append('iptc=UTF8')
-        args.append('-charset')
-        args.append('id3=UTF8')
-        args.append('-charset')
-        args.append('photoshop=UTF8')
-        args.append('-charset')
-        args.append('quicktime=UTF8')
-        args.append('-charset')
-        args.append('riff=UTF8')
-        args.append('-charset')
-        args.append(ExifTool.sys_encoding)
         args.append('-overwrite_original')
-        args.append('-api')
-        args.append('largefilesupport=1')
-        args.append("-execute\n")
-        args_tuple = tuple(args)
-        file_args = str.join("\n", args_tuple)
+        args.append("-execute")
+        file_args = "\n".join(map(str, args))+"\n"
 
         #---------------------------------------------------
         # This will remove combining "ring above a" characters with pre-composed å character in UTF.
@@ -123,20 +128,6 @@ class ExifTool(object):
             output = ""
             message = ""
             fd = process.stdout.fileno()
-
-            message_started = False
-            # while True:
-            #     chunk = os.read(fd, 4096).decode('utf-8', errors='replace')
-            #     if not chunk:
-            #         break
-            #     if message_started:
-            #         message += chunk
-            #     else:
-            #         if chunk.endswith(self.sentinel):
-            #             chunk = chunk[:-len(self.sentinel)]
-            #             message_started = True
-            #         output += chunk
-            # return output, message
 
             while not output.endswith(ExifTool.sentinel):
                 output += os.read(fd, 4096).decode('utf-8', errors='replace')
