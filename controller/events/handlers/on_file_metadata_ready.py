@@ -6,7 +6,8 @@ from controller.events.coordinators.coordinate_metadata_ready_preview_ready impo
 
 def onFileMetadataReady(file_name):
     file_meta_data = FileMetadata.getInstance(file_name)
-
+    if '11.ARW' in file_name:
+        pass
 # Keep metadata consolidated automatically at read
     due_for_consolidation = False
 
@@ -16,6 +17,8 @@ def onFileMetadataReady(file_name):
         tags_hash = file_meta_data.getTagsHash()
         if tags_hash_tag != tags_hash:                      # External program changed tags in file
             due_for_consolidation = True
+            tags_hash_tag = file_meta_data.getTagsHashTag()
+            tags_hash = file_meta_data.getTagsHash()
 
         # Skip consolidation if already in queue
         queue_entries=Queue.getInstance('metadata.write').entries()

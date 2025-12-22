@@ -6,6 +6,7 @@ class StringValue():
     def __init__(self,logical_tag=None):
         self.logical_tag = logical_tag
         self.value = None                # String
+        self.used_tags = []
 
     def setValueFromExif(self, value,exif_tag):
         if value is None:
@@ -15,6 +16,9 @@ class StringValue():
         self.value = str(value).strip()
         if self.value == '':
             self.value = None
+        else:
+            self.used_tags = [exif_tag]
+
 
     def setValue(self,value,part=None,overwrite=True):
         if not overwrite and self.value is not None:
@@ -37,10 +41,14 @@ class StringValue():
     def getValue(self,part=None):
         return self.value
 
+    def getUsedTags(self):
+        return self.used_tags
+
 class ListValue():
     def __init__(self,logical_tag=None):
         self.logical_tag = logical_tag
         self.value = None                # List of strings
+        self.used_tags = []
 
     def setValueFromExif(self, value,exif_tag):
         if value is None:
@@ -63,6 +71,8 @@ class ListValue():
                     self.value = None
                 else:
                     self.value = [cleaned_value]
+        if self.value is not None:
+            self.used_tags = [exif_tag]
 
     def setValue(self,value,part=None,overwrite=True):
         if not overwrite and self.value is not None:
@@ -100,11 +110,15 @@ class ListValue():
     def getValue(self,part=None):
         return self.value
 
+    def getUsedTags(self):
+        return self.used_tags
+
 class RotationValue():
     def __init__(self,logical_tag=None):
         self.logical_tag = logical_tag
         self.value = None                # Rotation 0, 90, 180, 270
         self.orientation = None          # 0°:1, 90°:8, 180°:3, 270°:6
+        self.used_tags = []
 
     def setValueFromExif(self, value,exif_tag):
         if value is None:
@@ -129,6 +143,8 @@ class RotationValue():
                 self.value -= 360
         else:
             self.value = value
+        if self.value is not None:
+            self.used_tags = [exif_tag]
 
     def setValue(self,value,part=None,overwrite=True):
         if not overwrite and self.value is not None:
@@ -161,10 +177,14 @@ class RotationValue():
     def getValue(self,part=None):
         return self.value
 
+    def getUsedTags(self):
+        return self.used_tags
+
 class RatingValue():
     def __init__(self,logical_tag=None):
         self.logical_tag = logical_tag
         self.value = None                # Rating between 0 and 5
+        self.used_tags = []
 
     def setValueFromExif(self, value,exif_tag):
         if value is None:
@@ -180,6 +200,9 @@ class RatingValue():
                 self.value = value / 25 + 1         # 25% --> Rating 2, 50% --> Rating 3, 75% -->Rating 4, 100% --> Rating 5
         else:
             self.value = value
+        if self.value is not None:
+            self.used_tags = [exif_tag]
+
 
     def setValue(self,value,part=None,overwrite=True):
         if not overwrite and self.value is not None:
@@ -202,10 +225,14 @@ class RatingValue():
     def getValue(self,part=None):
         return self.value
 
+    def getUsedTags(self):
+        return self.used_tags
+
 class DateTimeValue():
     def __init__(self,logical_tag=None):
         self.logical_tag = logical_tag
         self.value = None
+        self.used_tags = []
         self.date_time_change = None
         self.old_value = None
         # "2024-08-30T10:02:58"         Local date time known. Fraction of sec unknown. UTC-offset unknown.
@@ -418,6 +445,9 @@ class DateTimeValue():
             if number_value == zero_value:     # If value contains 0000:00:00 00:00:00 do nothing
                 return
 
+
+        old_value = self.value
+
         # Local date-time with fraction and offset
         if exif_tag in ['XMP:Date','XMP:DateCreated','IPTC:DateCreated','QuickTime:CreationDate','RIFF:DateTimeOriginal','File:FileCreateDate']:   # 2024:10:15 14:00:00.123+02:00
             # Convert 2024:10:15 14:00:00.123+02:00 --> 2024-10-15T14:00:00.123+02:00
@@ -428,7 +458,7 @@ class DateTimeValue():
             self.setValue(value=date_time,part=None,overwrite=False)
 
         # Local date-time without fraction and offset
-        elif exif_tag in ['EXIF:DateTimeOriginal', 'EXIF:CreateDate', 'EXIF:ModifyDate']: # 2024:10:15 14:00:00
+        elif exif_tag in ['EXIF:DateTimeOriginal', 'EXIF:CreateDate']: # 2024:10:15 14:00:00
             # Convert 2024:10:15 14:00:00 --> 2024-10-15T14:00:00
             date_time = value
             date_time = self.__replaceChar(date_time,4,'-')
@@ -461,9 +491,17 @@ class DateTimeValue():
             date_time = str(value)
             self.setValue(value=date_time,part='fraction_of_second',overwrite=False)
 
+        if self.value != old_value:
+            self.used_tags.append(exif_tag)
+
         test_value = self.value
 
+
     def setValue(self,value,part=None,overwrite=True):
+        if value is None and part is None and overwrite:    # Delete scenario
+            self.value = None
+            self.date_time_parts = self. __splitDateTime(self.value)
+            return
         if not overwrite:          # Don't overwrite existing values, if patching is chosen
             if part == 'latest_change':
                 return      # updating by a delta will always overwrite, so patching is not an option
@@ -532,8 +570,8 @@ class DateTimeValue():
 
 
         # Local date-time without fraction and offset
-        elif exif_tag in ['EXIF:DateTimeOriginal', 'EXIF:CreateDate', 'EXIF:ModifyDate']:  # 2024:10:15 14:00:00
-            if self.date_time_parts.get('local_date_time') is None and self.date_time_parts.get('utc_date_time') is None:
+        elif exif_tag in ['EXIF:DateTimeOriginal', 'EXIF:CreateDate']:  # 2024:10:15 14:00:00
+            if self.date_time_parts.get('local_date_time') is None:
                 return None
             else:
                 date_time = self.date_time_parts.get('local_date_time')
@@ -557,22 +595,28 @@ class DateTimeValue():
 
         # utc-offset
         elif exif_tag in ['EXIF:OffsetTimeOriginal', 'EXIF:OffsetTimeDigitized', 'EXIF:OffsetTime']:  # +02:00
-            utc_offset = self.date_time_parts.get('utc_offset')
-            if  utc_offset == 'Z':
-                return '+00:00'
+            if self.date_time_parts.get('local_date_time') is None:
+                return None
             else:
-                return utc_offset
+                utc_offset = self.date_time_parts.get('utc_offset')
+                if  utc_offset == 'Z':   # Means that only UTC-time is known
+                    return '+00:00'
+                else:
+                    return utc_offset
 
         elif exif_tag in ['EXIF:SubSecTimeOriginal', 'EXIF:SubSecTimeDigitized', 'EXIF:SubSecTime']:  # 123
-            fraction = None
-            fraction_str = self.date_time_parts.get('fraction_of_second')
-            if isinstance(fraction_str,str):
-                fraction_str = fraction_str.replace(".", "")
-            try:
-                fraction = int(fraction_str)
-            except:
-                pass
-            return fraction
+            if self.date_time_parts.get('local_date_time') is None:
+                return None
+            else:
+                fraction = None
+                fraction_str = self.date_time_parts.get('fraction_of_second')
+                if isinstance(fraction_str,str):
+                    fraction_str = fraction_str.replace(".", "")
+                try:
+                    fraction = int(fraction_str)
+                except:
+                    pass
+                return fraction
 
 
     def getValue(self,part=None):
@@ -589,12 +633,16 @@ class DateTimeValue():
         else:
             return None
 
+    def getUsedTags(self):
+        return self.used_tags
+
 class GeoLocationValue():
     def __init__(self,logical_tag=None):
         self.logical_tag = logical_tag
         self.value = None                # 37.7749,-122.4194
         self.latitude = None
         self.longitude = None
+        self.used_tags = []
 
     def setValueFromExif(self, value,exif_tag):
         if value is None:
@@ -605,9 +653,11 @@ class GeoLocationValue():
         if exif_tag in ['JSON:GeoDataExifLatitude','JSON:GeoDataLatitude']:
             if self.latitude is None and str(value) != '0.0':
                 self.latitude = value
+                self.used_tags.append(exif_tag)
         elif exif_tag in ['JSON:GeoDataExifLongitude','JSON:GeoDataLongitude']:
             if self.longitude is None and str(value) != '0.0':
                 self.longitude = value
+                self.used_tags.append(exif_tag)
         else:
             if ',' in value:
                 self.latitude, self.longitude = (value.split(",", 1))    # " 55.65656565 N,  "9.65656565 E"
@@ -621,6 +671,7 @@ class GeoLocationValue():
                 self.longitude = self.longitude.replace("E","")               # "9.65656565"
                 if "W" in self.longitude:                                     # "10.65656565W"
                     self.longitude = "-"+self.longitude.replace("W","")     # "-10.65656565"
+                self.used_tags.append(exif_tag)
 
         # Set missing values where possible
         if self.latitude is not None and self.latitude is not None:
@@ -656,6 +707,9 @@ class GeoLocationValue():
 
     def getValue(self,part=None):
         return self.value
+
+    def getUsedTags(self):
+        return self.used_tags
 
 
 

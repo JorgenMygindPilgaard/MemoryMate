@@ -51,10 +51,10 @@ class ConsolidateMetadata(QObject):
         for index, file_name in enumerate(reversed(file_names)):
             self.progress_signal.emit(index+1)
             file_metadata = FileMetadata.getInstance(file_name)
-            while file_metadata.getStatus() != '':
-                time.sleep(self.delay)
+#            while file_metadata.getStatus() != '':
+#                time.sleep(self.delay)
             file_metadata.setLogicalTagValues(logical_tag_values={},force_rewrite=True)
-            file_metadata_pasted_emitter = FileMetadataPastedEmitter.getInstance()
-            file_metadata_pasted_emitter.emit(file_name)
+#            file_metadata_pasted_emitter = FileMetadataPastedEmitter.getInstance()
+#            file_metadata_pasted_emitter.emit(file_name)
 
         self.done_signal.emit()

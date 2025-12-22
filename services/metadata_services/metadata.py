@@ -1,4 +1,3 @@
-import copy
 import os
 import time
 from PyQt6.QtCore import QObject, QMutex, QMutexLocker
@@ -55,6 +54,7 @@ class FileMetadata(QObject):
         self.metadata_status = 'PENDING_READ'   # A lock telling status of metadata-variables: PENDING_READ, READING, WRITING, <blank>
 
         self.file_name = file_name
+        self.working_copy_file_name = None       #
         self.split_file_name = splitFileName(file_name)       # ["c:\pictures\", "copy_of_my_picture-Enhanced-NR-SAI", "jpg"]
         self.path = self.split_file_name[0]                             # "c:\pictures\"
         self.name = self.split_file_name[1]                             # "copy_of_my_picture-Enhanced-NR-SAI"
@@ -88,11 +88,12 @@ class FileMetadata(QObject):
         force_rewrite = queue_entry.get('force_rewrite')
         try:
             file_metadata = FileMetadata.getInstance(file)
-            metadata_read_stack = Stack.getInstance('metadata.read')
-            metadata_read_stack.push(file)
-            while file_metadata.getStatus() != '':    # If instance being processed, wait for it to finalize
-                time.sleep(1)
-                status = file_metadata.getStatus()     # Line added to be able to see status during debugging
+            if file_metadata.getStatus() != '':  # If instance being processed, wait for it to finalize
+                metadata_read_stack = Stack.getInstance('metadata.read')
+                metadata_read_stack.push(file)
+                while file_metadata.getStatus() != '':    # If instance being processed, wait for it to finalize
+                    time.sleep(1)
+                    status = file_metadata.getStatus()     # Line added to be able to see status during debugging
             file_metadata.save(force_rewrite)
         except FileNotFoundError:
             pass
@@ -206,6 +207,9 @@ class FileMetadata(QObject):
     def getLogicalTagValues(self,filter_writable_only=False):
         if self.metadata_status != '':
             raise Exception('Metadata not yet read. status is ' + self.metadata_status)
+        return self.__logicalTagValues(filter_writable_only)
+
+    def __logicalTagValues(self,filter_writable_only=False):
         logical_tag_values = {}
         for logical_tag in self.logical_tag_instances:
             if filter_writable_only:
@@ -215,12 +219,15 @@ class FileMetadata(QObject):
             if Settings.get('logical_tags').get(logical_tag).get("value_parts") is not None:
                 for logical_tag_part in Settings.get('logical_tags').get(logical_tag).get("value_parts"):
                     logical_tag_values[logical_tag + '.' + logical_tag_part] = self.logical_tag_instances.get(
-                    logical_tag).getValue(logical_tag_part)
+                        logical_tag).getValue(logical_tag_part)
         return logical_tag_values
 
     def getSavedLogicalTagValues(self,filter_writable_only=False):
         if self.metadata_status != '':
             raise Exception('Metadata not yet read. status is ' + self.metadata_status)
+        return self.__savedLogicalTagValues(filter_writable_only)
+
+    def __savedLogicalTagValues(self,filter_writable_only=False):
         logical_tag_values = {}
         for logical_tag in self.saved_logical_tag_instances:
             if filter_writable_only:
@@ -283,6 +290,8 @@ class FileMetadata(QObject):
 
             pending_tags = []
             pending_logical_tags = []
+
+
 
             file_names_tags = {}  # A dictionary with image-file-name and it's tags plus sidecar file-name(s) and it's/their tags
             api_tags = {}  # A dictionary with tags to be read from api, with corresponding source_id (e.g. GpsApi)
@@ -446,6 +455,7 @@ class FileMetadata(QObject):
 
                 if logical_tag_instance.getValue() is not None:
                     logical_tag_value_found = True
+                    # print(logical_tag + " found its value in " + ",".join(map(str, logical_tag_instance.getUsedTags())))
 
                 self.logical_tag_instances[logical_tag] = logical_tag_instance  # Save logical tag value-instance in dictionary
                 self.saved_logical_tag_instances[logical_tag] = saved_logical_tag_instance
@@ -458,11 +468,13 @@ class FileMetadata(QObject):
         if not self.tag_values.get('XMP:MemoryMateSaveDateTime'):     #Memory Mate never wrote to file before. Get fall-back tag-values for missing logical tags that has fall-back tag assigned
             self.is_virgin=True
 
+        self.saved_tag_values = copy.deepcopy(self.tag_values)
 
 #        self.__patchLogicalTagValuesFromOriginals()    # If a new Lightroom-export has overwritten jpg, the custom XMP-tags (MemoryMate version, save-date/time, description_only) are lost. These are recreated from original
         self.__updateLogicalTagValuesFromQueue()   #Sets self.is_virgin to False, if file found in Queue
         self.__updateLogicalTagValuesFromFallbackTags()
         self.__updateReferenceTags()
+        self.__updateTagValuesFromLogicalTagValues()       # Find how tag-values would look like after save
 
         # Read fallback_tag (if assigned) into missing logical tags
         self.metadata_status = ''
@@ -513,7 +525,6 @@ class FileMetadata(QObject):
             original_file_metadata.readLogicalTagValues()
             original_logical_tag_values = original_file_metadata.getLogicalTagValues()
             self.__updateLogicalTagValues(original_logical_tag_values, overwrite=False)
-
 
     def __updateReferenceTags(self):
         new_line = False
@@ -575,6 +586,24 @@ class FileMetadata(QObject):
             if logical_tag_instance is not None:
                 logical_tag_instance.setValue(logical_tag_value)
 
+    def __updateTagValuesFromLogicalTagValues(self):
+        logical_tag_values = self.__logicalTagValues()
+        saved_logical_tag_values = self.__savedLogicalTagValues()
+        if logical_tag_values != saved_logical_tag_values:
+            logical_tags_tags = Settings.get('file_type_tags').get(self.type.lower())
+            tag_values = {}
+            for logical_tag in self.logical_tag_instances:
+                logical_tag_value = logical_tag_values.get(logical_tag)
+                saved_logical_tag_value = saved_logical_tag_values.get(logical_tag)
+                if logical_tag_value != saved_logical_tag_value:
+                    logical_tag_tags = logical_tags_tags.get(logical_tag)  # All physical tags for logical tag"
+                    if logical_tag_tags is None:
+                        print(logical_tag+" mangler tags")
+                        pass
+                    for tag in logical_tag_tags:
+                        tag_access = Settings.get('tags').get(tag).get('access')
+                        if 'Write' in tag_access:
+                            self.tag_values[tag] = self.logical_tag_instances[logical_tag].getExifValue(tag)
 
     def setLogicalTagValues(self,logical_tag_values,overwrite=True,force_rewrite = False):
         due_for_queuing=False
@@ -582,8 +611,13 @@ class FileMetadata(QObject):
         # Update tag-values in instance from queue
         if self.metadata_status == '':     # Metadata has already been read from file
             old_logical_tag_values = self.getLogicalTagValues()
+
+            # Update all logical tags and then tags
             self.__updateLogicalTagValues(logical_tag_values,overwrite)
             self.__updateReferenceTags()
+            self.__updateTagValuesFromLogicalTagValues()  # Find how tag-values would look like after save
+
+
             new_logical_tag_values = self.getLogicalTagValues()
             if new_logical_tag_values != old_logical_tag_values:
                 due_for_queuing=True
@@ -617,34 +651,31 @@ class FileMetadata(QObject):
         FileMetadata.instance_index[new_file_name] = self
         del FileMetadata.instance_index[old_file_name]
 
-
     def save(self,force_rewrite=False):
         logical_tag_values = self.getLogicalTagValues()
         saved_logical_tag_values = self.getSavedLogicalTagValues()
-        if self.is_virgin or force_rewrite or self.getLogicalTagValues() != self.getSavedLogicalTagValues():
+        if self.is_virgin or force_rewrite or logical_tag_values != saved_logical_tag_values:
+            print("Saving metadata to "+self.file_name)
             self.file_status = 'WRITING'
             logical_tags_tags = Settings.get('file_type_tags').get(self.type.lower())
             tag_values = {}
             for logical_tag in self.logical_tag_instances:
-                saved_logical_tag_instance = self.saved_logical_tag_instances.get(logical_tag)
-                saved_logical_tag_value = saved_logical_tag_instance.getValue() if saved_logical_tag_instance is not None else None
-                if self.logical_tag_instances[logical_tag].getValue() != saved_logical_tag_value or force_rewrite or self.is_virgin:  # New value to be saved
+                logical_tag_value = logical_tag_values.get(logical_tag)
+                saved_logical_tag_value = saved_logical_tag_values.get(logical_tag)
+                if logical_tag_value != saved_logical_tag_value or force_rewrite or self.is_virgin:  # New value to be saved
                     logical_tag_tags = logical_tags_tags.get(logical_tag)  # All physical tags for logical tag"
                     for tag in logical_tag_tags:
                         tag_access = Settings.get('tags').get(tag).get('access')
                         if 'Write' in tag_access:
-                            tag_values[tag] = self.logical_tag_instances[logical_tag].getExifValue(tag)
-
+                            if force_rewrite:
+                                tag_values[tag] = self.logical_tag_instances[logical_tag].getExifValue(tag)  # fix corruptions and consolidation
+                            else:
+                                tag_values[tag] = self.tag_values.get(tag)    # self.tag_values already updated with latest value
             if tag_values != {} and tag_values is not None:
-                for tag in tag_values:    # Update persisted tags in object
-                    tag_value = tag_values[tag]
-                    if tag_value != self.tag_values.get(tag):
-                        self.tag_values[tag] = tag_values[tag]     # Update or add real values
-
                 tag_values['XMP:MemoryMateTagsHash'] = self.tag_values['XMP:MemoryMateTagsHash'] = self.getTagsHash()   # Hashes only tags with value
-
                 with ExifTool(executable=self.exif_executable, configuration=self.exif_configuration) as ex:
                     ex.setTags(self.file_name, tag_values,'WRITE')
             self.saved_logical_tag_instances = copy.deepcopy(self.logical_tag_instances)
+            self.saved_tag_values = copy.deepcopy(self.tag_values)
             self.file_status = ''
             self.is_virgin=False
