@@ -36,6 +36,7 @@ class FileRenamer(QObject):
             old_name = file.get('old_name')
             new_name = file.get('new_name')
 
+
             if old_name is None or old_name == '':
                 if new_name is None or new_name == '':
                     self.__roll_back(renamed_files)

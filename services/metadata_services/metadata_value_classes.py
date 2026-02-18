@@ -534,7 +534,7 @@ class DateTimeValue():
         self.__enrichDateTime()   # Derrives missing parts if possible and value from parts
         date_time_change = self.__difference(old_date_time_parts.get('local_date_time'),self.date_time_parts.get('local_date_time'))
         if date_time_change is None:
-            date_time_change = self.__difference(old_date_time_parts.get('utc_date_time'),self.date_time_parts.get('uc_date_time'))
+            date_time_change = self.__difference(old_date_time_parts.get('utc_date_time'),self.date_time_parts.get('utc_date_time'))
         if date_time_change is not None:    # Change to date/time (not only change to UTC-offset)
             self.date_time_change = date_time_change
             self.old_value = next_old_value

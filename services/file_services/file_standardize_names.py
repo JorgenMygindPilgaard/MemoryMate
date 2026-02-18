@@ -149,7 +149,7 @@ class StandardizeFilenames(QObject):
             try:
                 metadata_write_queue = Queue.getInstance('metadata.write')
                 metadata_write_queue.pause()  # Make sure not to collide with update of metadata
-                ExifTool.waitUntillReady(process_id='WRITE')  # Wait untill write is ready
+#                ExifTool.waitUntillReady(process_id='WRITE')  # Wait untill write is ready
                 renamer.start()
                 metadata_write_queue.resume()  # Start Queue-worker again
             except Exception as e:
