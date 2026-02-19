@@ -45,8 +45,7 @@ For editing geo-location, click the window just below tag name "Geo-location". T
 For editing image orientation/rotation, use the rotation-buttons below the image.
 #### Consolidate metadata
 Do you have images with title, description etc. not written to all physical tags. No problem. Select the relevant file/files/folder/folders in the left hand side of the UI, right-click and select "Consolidate metadata". The program will then make sure to "spread" the logical tags to all corresponding physical tags in the selected images. First time you save metadata-changes to a file using, Memory Mate will make sure it is left consolidated. If you want, you can go to settings, and switch on auto-consolidation. Memory Mate will then automatically consolidate metadata in all files in a folder as soon as you select one file. Memory Mate will mark consolidated files in a custom metadata-tag. Going forward, the marked metadata of marked files will not be auto-consolidated, if it was already consolidated.
-![Settings-window...](docs/Settings.png)
-
+![Settings-window...](docs/SettingsAutoConsolidate.jpg)
 
 #### Copy metadata
 Mark the file/files/folder/folders. Then right-click the selection and select "Copy Metadata". Then select target file/files/filder/folders, right-click, tick the tags you want to paste (take care not pasting all tags. Can't be regretted), and select "Paste Metadata". If you have chosen more than one source-file, the "Paste Metadata" option is greyed out, and can't be used. You can in stead chose "Paste Metadata by Filename". When you paste using that option, Memory Mate will copy metadata from files in the selected source to metadata of files *with the same filename* in the target (ignoring the file type). That is very handy, if you store your original, raw files in a separate folder, and have edited metadata for all the corresponding jpg-files. You can then simply paste by filename to your original raw-files in one go.
@@ -57,6 +56,15 @@ Enter the prefix if needed, the numberpattern (a string of x n's) and if needed 
 The example above will name the first file "2023-F035-001.jpg", the next "2023-F035-002.jpg" etc. (jpg-files as example). Files with same name (ignoring filetype) will get the same name after renaming also. That way you make sure that original/editet filepairs having same name before standardizing filenames, will also have same name after renaming has taken place.
 
 ![Popup for filename pattern](docs/StandardizeFilenamesPopup.jpg)
+
+#### Update Metadata-tag with original Filename
+MemoryMate can set the tag holding the Original Filename. Normally you would perhaps like to update the original filename tag after standardizing the filenames as described above.
+That way, you will always be able to find the source of a copy of the file, even if renamed later.
+In stead of writing the original filename to each file, the application helps you in an easy way updating original filename from current filename:
+Mark the files/folder/folders containing files for which you want to update original filename tag from current file-name. Then right-click an chose "Paste-->Original Filename from Filename" or "Insert Missing-->Original filename from Filename". The first option overwrites tag in all files, whereas the latter only writes tag if it is empty.
+![PopupSaveOriginalFilename.jpg](docs/PopupSaveOriginalFilename.jpg)
+
+
 
 #### Preserve Originals
 If you have a folder with a mixture or raw-files and non-raw-files (usually jpg-files) from your camera, you can preserve all raw-files in a folder sub-called "Originals" easily. Right-click the folder and select "File Management-->Preserve Originals".
@@ -71,6 +79,25 @@ All files in the "Originals"-folder without a counterpart in the main-folder wil
 #### Integration to Adobe Lightroom Classic
 If you are using Lightroom Classic on the same computer as Memory Mate, you can have Memory Mate automatically update the filenames in you Lightroom catalouge, when you are using the "Standardize Filenames"-functionality in Memory Mate. By default the feature is switched off but is easily switched on in Memory Mate Settings (click the settings-wheel in top right corner). Just check the "Activate Integration"-checkbox, and enter path to your lightroom catalouge-file (.lrcat) in field below, and the integration will work.
 Notice, that Memory Mate utilizes an unofficial API for updating the filenames in the Lightroom Classic. Adobe does not offer an API for updating the catalouge. The integration has been tested with Lightroom Classic v. 13.5. The integration will most likely work with other versions, but there is no guarantee, so keep your lightroom catalouge backed up.
+MemoryMate will checks and give an error Lightroom is running at the same time as the integration tries to update filenames in Lightroom catalouge. This is a safety precaution build into MemoryMate. 
+![SettingsActivateLightroomIntegration.jpg](docs/SettingsActivateLightroomIntegration.jpg)
+
+#### Integration with Garmin
+Do you have a camera without GPS, but still want to geotag your photos, you can do it in an easy way with MemoryMate, if you own a Garmin-device.
+First time set-up is easy:
+1. Activate Garmin Integration
+![SettingsActivateGarminIntegration.jpg](docs/SettingsActivateGarminIntegration.jpg)
+2. At next startup of MemoryMate, you will be prompted user and password for your Garmin connect account.
+After logging in to Garmin Connect, you will see the Garmin-logo in the top left of the MemoryMate window. MemoryMate will start synchronizing _all_ your activities. While this happens, the Garmin-logo will blink. The initial sync will take some time, if your Garmin connect contains a lot of activities. Thel following sync at next start up, will only take a few seconds.
+
+![GarminSync.jpg](docs/GarminSync.jpg)
+
+Track your photo-hike as an activity with your Garmin-device, and sync it with your Garmin Connect account in the cloud (as you proberbly already do).
+Make sure your camera date, time and timezone is correct. 
+After your hike, mark your files and folders in MemoryMate, right-click and select "Paste-->Geo-location from Garmin" for overwriting or "Fill missing..-->Geo-location from Garmin" for only inserting location where missing.
+![PasteGarminLocation.jpg](docs/PasteGarminLocation.jpg)
+
+If you want to change to a different account or force sync, you can login, logout or force synchronization by right-clicking the Garmin logo in the top right corner of the screen.
 
 #### Automatic backup running in background
 Memory Mate updates image-files when you change logical tag values. Some backup-solutions lock files when doing automatic backup. If an image is locked, Memory Mate will not be able to update the metadata. It is therefore recommended that you pause your backup-program while using Memory Mate to update metadata.
