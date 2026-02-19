@@ -13,6 +13,7 @@ from PyQt6.QtCore import QObject, Qt, QMutex, QMutexLocker, QRect
 from PyQt6.QtGui import QPixmap, QTransform, QImage, QImageReader, QPainter, QFont, QFontMetrics, QColor
 from controller.events.emitters.file_preview_ready_emitter import FilePreviewReadyEmitter
 from services.metadata_services.metadata import FileMetadata
+from configuration.settings import Settings
 
 
 class FilePreview(QObject):
@@ -74,8 +75,12 @@ class FilePreview(QObject):
                 self.image = self.__movie_to_qimage(self.file_name)
                 self.original_image_rotated = False  # Conversion does not takes rotation-metadata into account. Returned QImage is not rotated
             else:
-                self.image = self.__default_to_qimage(self.file_name)
-                self.original_image_rotated = False  # Conversion does not takes rotation-metadata into account. Returned QImage is not rotated
+                if Settings.get("file_type_tags").get(file_type) is None:  # This happens if metadata tells that filetype is not the same as ending
+                    self.image = self.__textToQimage("⚠️\t\t\t\t" + Texts.get("file_preview_incorrect_type").replace("<file_type>",file_type) + ":\n\t\t\t\t\t\t\t\t\t" + self.file_name)
+                    self.original_image_rotated = False  # Conversion does not takes rotation-metadata into account. Returned QImage is not rotated
+                else:
+                    self.image = self.__default_to_qimage(self.file_name)
+                    self.original_image_rotated = False  # Conversion does not takes rotation-metadata into account. Returned QImage is not rotated
             if self.image is None:
                 self.image = self.__textToQimage("⚠️\t\t\t\t"+Texts.get("file_preview_file_corrupted")+":\n\t\t\t\t\t\t\t\t\t"+self.file_name)
             if self.image != None:

@@ -259,8 +259,9 @@ class FileMetadata(QObject):
         #Get names of tags in tags for the filetype from settings
         logical_tags_tags = Settings.get('file_type_tags').get(self.type.lower())  #Logical_tags for filetype with corresponding tags
         if logical_tags_tags is None:    # Filename blank or unknown filetype
+            self.tag_values = {}
             self.logical_tag_instances = {}
-            self.saved_logical_tag_instances = copy.deepcopy(self.logical_tag_instances)
+            self.saved_logical_tag_instances = {}
             self.logical_tags_missing_value = []
             self.metadata_status = ''
             FileMetadataReadyEmitter.getInstance().emit(self.file_name)
@@ -530,7 +531,7 @@ class FileMetadata(QObject):
         new_line = False
         logical_tags_tags = Settings.get('file_type_tags').get(self.type.lower())  #Logical_tags for filetype with corresponding tags
         if logical_tags_tags is None:
-            pass
+            return
         for logical_tag in logical_tags_tags:
             if not (Settings.get('logical_tags') or {}).get(logical_tag, {}).get("reference_tag"):    #Continue if not a reference tag
                 continue
@@ -591,6 +592,8 @@ class FileMetadata(QObject):
         saved_logical_tag_values = self.__savedLogicalTagValues()
         if logical_tag_values != saved_logical_tag_values:
             logical_tags_tags = Settings.get('file_type_tags').get(self.type.lower())
+            if logical_tags_tags is None:
+                return
             tag_values = {}
             for logical_tag in self.logical_tag_instances:
                 logical_tag_value = logical_tag_values.get(logical_tag)
@@ -655,7 +658,6 @@ class FileMetadata(QObject):
         logical_tag_values = self.getLogicalTagValues()
         saved_logical_tag_values = self.getSavedLogicalTagValues()
         if self.is_virgin or force_rewrite or logical_tag_values != saved_logical_tag_values:
-            print("Saving metadata to "+self.file_name)
             self.file_status = 'WRITING'
             logical_tags_tags = Settings.get('file_type_tags').get(self.type.lower())
             tag_values = {}

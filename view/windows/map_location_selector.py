@@ -4,7 +4,9 @@ from PyQt6.QtWidgets import QApplication, QWidget, QHBoxLayout, QVBoxLayout, QLi
 from PyQt6.QtWebEngineWidgets import QWebEngineView
 from PyQt6.QtCore import pyqtSlot, pyqtSignal
 from PyQt6.QtWebChannel import QWebChannel
-from geopy.geocoders import Nominatim
+from geopy.geocoders import ArcGIS
+
+
 
 html = '''
 <!DOCTYPE html>
@@ -224,11 +226,12 @@ class MapLocationSelector(QWidget):
         layout.addWidget(self.message_label)
 
     def search_location(self):
-        geolocator = Nominatim(user_agent='MemoryMate')
+        geolocator = ArcGIS()
         geolocation = geolocator.geocode(self.search_box.text())
         if geolocation:
             self.message_label.setText('')
             self.map_view.setLocationZoom([geolocation.latitude, geolocation.longitude])
+            self.map_view.setMarkerLocation([geolocation.latitude, geolocation.longitude])
         else:
             self.message_label.setText('Location not found')
 
