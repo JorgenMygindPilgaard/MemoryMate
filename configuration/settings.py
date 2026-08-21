@@ -212,7 +212,8 @@ class Settings():
                 "JSON:GeoDataLatitude": {"access": "Read", "source_type": "sidecar_file","source_id": "JSON"},
                 "JSON:GeoDataLongitude": {"access": "Read", "source_type": "sidecar_file","source_id": "JSON"},
                 "JSON:PhotoTakenTimeTimestamp": {"access": "Read","source_type": "sidecar_file","source_id": "JSON"},
-                "JSON:description": {"access": "Read", "source_type": "sidecar_file","source_id": "JSON"},
+                "JSON:Title": {"access": "Read","source_type": "sidecar_file","source_id": "JSON"},
+                "JSON:Description": {"access": "Read", "source_type": "sidecar_file","source_id": "JSON"}
                                          })
         if Settings.get("file_type_tags") is None:
             Settings.set("file_type_tags",{
@@ -226,7 +227,7 @@ class Settings():
                         "shutter_speed": ["Composite:ShutterSpeed"],
                         "iso": ["Composite:ISO", "EXIF:ISO"],
                         "rating": ["XMP:Rating", "XMP:RatingPercent"],
-                        "title": ["XMP:Title", "EXIF:XPTitle", "IPTC:ObjectName"],
+                        "title": ["XMP:Title", "EXIF:XPTitle", "IPTC:ObjectName","JSON:Title"],
                         "date": ["XMP:Date", "XMP:DateCreated",
                                  "EXIF:DateTimeOriginal", "EXIF:OffsetTimeOriginal", "EXIF:SubSecTimeOriginal",
                                  "EXIF:CreateDate", "EXIF:OffsetTimeDigitized", "EXIF:SubSecTimeDigitized",
@@ -243,7 +244,7 @@ class Settings():
                         "original_filename": ["XMP:PreservedFileName"],
                         "description": ["XMP:Description", "EXIF:XPComment", "EXIF:UserComment",
                                         "EXIF:ImageDescription",
-                                        "IPTC:Caption-Abstract", "JSON:description"],
+                                        "IPTC:Caption-Abstract", "JSON:Description"],
                         "-unassigned-": ["Garmin:GPSPosition"]
                         },
 
@@ -274,7 +275,7 @@ class Settings():
                          "original_filename": ["XMP:PreservedFileName"],
                          "description": ["XMP:Description", "EXIF:XPComment", "EXIF:UserComment",
                                          "EXIF:ImageDescription",
-                                         "IPTC:Caption-Abstract", "JSON:description"],
+                                         "IPTC:Caption-Abstract", "JSON:Description"],
                         "-unassigned-": ["Garmin:GPSPosition"]
                          },
                 "png": {"rotation": ["EXIF:Orientation#"],
@@ -304,7 +305,7 @@ class Settings():
                         "original_filename": ["XMP:PreservedFileName"],
                         "description": ["XMP:Description", "EXIF:XPComment", "EXIF:UserComment",
                                         "EXIF:ImageDescription",
-                                        "IPTC:Caption-Abstract", "JSON:description"],
+                                        "IPTC:Caption-Abstract", "JSON:Description"],
                         "-unassigned-": ["Garmin:GPSPosition"]
                         },
                 "bmp": {},
@@ -333,7 +334,7 @@ class Settings():
                         "source": ["XMP:Source"],
                         "original_filename": ["XMP:PreservedFileName"],
                         "description": ["XMP:Description", "EXIF:XPComment", "EXIF:UserComment",
-                                        "EXIF:ImageDescription", "JSON:description"],
+                                        "EXIF:ImageDescription", "JSON:Description"],
                         "-unassigned-": ["Garmin:GPSPosition"]
                         },
 
@@ -363,7 +364,7 @@ class Settings():
                         "source": ["XMP:Source"],
                         "original_filename": ["XMP:PreservedFileName"],
                         "description": ["XMP:Description", "EXIF:XPComment", "EXIF:UserComment",
-                                        "EXIF:ImageDescription", "JSON:description"],
+                                        "EXIF:ImageDescription", "JSON:Description"],
                         "-unassigned-": ["Garmin:GPSPosition"]
                         },
                 "nef": {"rotation": ["EXIF:Orientation#"],
@@ -392,7 +393,7 @@ class Settings():
                         "source": ["XMP:Source"],
                         "original_filename": ["XMP:PreservedFileName"],
                         "description": ["XMP:Description", "EXIF:XPComment", "EXIF:UserComment",
-                                        "EXIF:ImageDescription", "JSON:description"],
+                                        "EXIF:ImageDescription", "JSON:Description"],
                         "-unassigned-": ["Garmin:GPSPosition"]
                         },
                 "dng": {"rotation": ["EXIF:Orientation#"],
@@ -422,7 +423,7 @@ class Settings():
                         "original_filename": ["XMP:PreservedFileName"],
                         "description": ["XMP:Description", "EXIF:XPComment", "EXIF:UserComment",
                                         "EXIF:ImageDescription",
-                                        "IPTC:Caption-Abstract", "JSON:description"],
+                                        "IPTC:Caption-Abstract", "JSON:Description"],
                         "-unassigned-": ["Garmin:GPSPosition"]
                         },
                 "arw": {"rotation": ["EXIF:Orientation#"],
@@ -452,7 +453,7 @@ class Settings():
                         "original_filename": ["XMP:PreservedFileName"],
                         "description": ["XMP:Description", "EXIF:XPComment", "EXIF:UserComment",
                                         "EXIF:ImageDescription",
-                                        "IPTC:Caption-Abstract", "JSON:description"],
+                                        "IPTC:Caption-Abstract", "JSON:Description"],
                         "-unassigned-": ["Garmin:GPSPosition"]
                         },
                 "heic": {"rotation": ["QuickTime:Rotation#"],
@@ -480,7 +481,7 @@ class Settings():
                          "source": ["XMP:Source"],
                          "original_filename": ["XMP:PreservedFileName"],
                          "description": ["XMP:Description", "EXIF:XPComment", "EXIF:UserComment",
-                                         "EXIF:ImageDescription", "JSON:description"],
+                                         "EXIF:ImageDescription", "JSON:Description"],
                         "-unassigned-": ["Garmin:GPSPosition"]
                          },
                 "tif": {"rotation": ["EXIF:Orientation#"],
@@ -510,7 +511,7 @@ class Settings():
                         "original_filename": ["XMP:PreservedFileName"],
                         "description": ["XMP:Description", "EXIF:XPComment", "EXIF:UserComment",
                                         "EXIF:ImageDescription",
-                                        "IPTC:Caption-Abstract", "JSON:description"],
+                                        "IPTC:Caption-Abstract", "JSON:Description"],
                         "-unassigned-": ["Garmin:GPSPosition"]
                         },
                 "tiff": {"rotation": ["EXIF:Orientation#"],
@@ -540,7 +541,7 @@ class Settings():
                          "original_filename": ["XMP:PreservedFileName"],
                          "description": ["XMP:Description", "EXIF:XPComment", "EXIF:UserComment",
                                          "EXIF:ImageDescription",
-                                         "IPTC:Caption-Abstract", "JSON:description"],
+                                         "IPTC:Caption-Abstract", "JSON:Description"],
                         "-unassigned-": ["Garmin:GPSPosition"]
                          },
 
@@ -570,7 +571,7 @@ class Settings():
                         "source": ["XMP:Source"],
                         "original_filename": ["XMP:PreservedFileName"],
                         "description": ["XMP:Description", "EXIF:XPComment", "EXIF:UserComment",
-                                        "EXIF:ImageDescription", "JSON:description"],
+                                        "EXIF:ImageDescription", "JSON:Description"],
                         "-unassigned-": ["Garmin:GPSPosition"]
                         },
                 "mp4": {"rotation": ["Composite:Rotation"],
@@ -586,7 +587,7 @@ class Settings():
                         "title": ["XMP:Title", "QuickTime:Title"],
                         "date": ["QuickTime:CreationDate",
                                  "XMP:Date", "XMP:DateCreated",
-                                 "QuickTime:CreateDate", "QuickTime:TrackCreateDate", "JSON:PhotoTakenTimeTimestamp"],
+                                 "QuickTime:CreateDate", "JSON:PhotoTakenTimeTimestamp", "QuickTime:TrackCreateDate"],
                         "description_only": ["XMP:DescriptionOnly"],
                         "persons": ["XMP:Subject", "QuickTime:Category"],
                         "photographer": ["XMP:Creator", "QuickTime:Artist"],
@@ -595,7 +596,7 @@ class Settings():
                                          "JSON:GeoDataLatitude", "JSON:GeoDataLongitude"],
                         "source": ["XMP:Source"],
                         "original_filename": ["XMP:PreservedFileName"],
-                        "description": ["XMP:Description", "QuickTime:Comment", "JSON:description"],
+                        "description": ["XMP:Description", "QuickTime:Comment", "JSON:Description"],
                         "-unassigned-": ["Garmin:GPSPosition"]
                         },
                 "m4v": {"rotation": ["Composite:Rotation"],
@@ -620,7 +621,7 @@ class Settings():
                                          "JSON:GeoDataLatitude", "JSON:GeoDataLongitude"],
                         "source": ["XMP:Source"],
                         "original_filename": ["XMP:PreservedFileName"],
-                        "description": ["XMP:Description", "QuickTime:Comment", "JSON:description"],
+                        "description": ["XMP:Description", "QuickTime:Comment", "JSON:Description"],
                         "-unassigned-": ["Garmin:GPSPosition"]
                         },
                 "mov": {"rotation": ["Composite:Rotation"],
@@ -645,7 +646,7 @@ class Settings():
                                          "JSON:GeoDataLatitude", "JSON:GeoDataLongitude"],
                         "source": ["XMP:Source"],
                         "original_filename": ["XMP:PreservedFileName"],
-                        "description": ["XMP:Description", "QuickTime:Comment", "JSON:description"],
+                        "description": ["XMP:Description", "QuickTime:Comment", "JSON:Description"],
                         "-unassigned-": ["Garmin:GPSPosition"]
                         },
                 "avi": {"date": ["JSON:PhotoTakenTimeTimestamp", "RIFF:DateTimeOriginal"],
@@ -734,7 +735,7 @@ class Settings():
         Settings.set('old_version',Settings.get('version'))  # Old version from file. (might come in handy to know that version has changed)
 
 #---------------------------Correct version here when deploying a new version of Memory Mate----------------------------
-        Settings.set('version','4.0.0')
+        Settings.set('version','4.0.1')
 # ----------------------------------------------------------------------------------------------------------------------
 
         Settings.writeSettingsFile()

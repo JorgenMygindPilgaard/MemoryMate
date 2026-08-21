@@ -45,6 +45,7 @@ class MainWindow(QMainWindow):
         if Settings.get("garmin_integration_active"):
             GarminIntegration.getInstance().start()
 
+
         # Read current file or default image into file-panel
         current_file = self.ui_status.getParameter('current_file')
         show_sample_photo = False
@@ -62,12 +63,15 @@ class MainWindow(QMainWindow):
         if show_sample_photo:
             current_file = os.path.join(Paths.get('resources'),
                                         "Memory Mate Sample Photo.jpg")  # Show sample-photo at first launch
+            file_metadata = FileMetadata.getInstance(current_file)
             FileMetadata.getInstance(current_file).readLogicalTagValues()
             FilePreview.getInstance(current_file).readImage()
         else:
+            file_metadata = FileMetadata.getInstance(current_file)
             FileMetadata.getInstance(current_file).readLogicalTagValues()
             FilePreview.getInstance(current_file).readImage()
             StackCoordinator.getInstance().doStacking(current_file)
+
         # CurrentFileChangedEmitter.getInstance().emit(current_file)
         # FileMetadata.getInstance(current_file).readLogicalTagValues()
         # FilePreview.getInstance(current_file).readImage()
@@ -132,6 +136,7 @@ class MainWindow(QMainWindow):
             self.showMaximized()
 
         self.file_panel.installEventFilter(self)
+
 
     def eventFilter(self, source, event):
         if source == self.file_panel and event.type() == QEvent.Type.KeyPress:

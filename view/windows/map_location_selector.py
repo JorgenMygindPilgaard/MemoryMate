@@ -92,11 +92,10 @@ html = '''
                     keyboard: keyboard_enabled,
                 }
             );
-    
             var tile_layer_c6e2500ab5a73f09082935d0d8cbb24f = L.tileLayer(
-                "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",
-                {"attribution": "Data by \\u0026copy; \\u003ca target=\\"_blank\\" href=\\"http://openstreetmap.org\\"\\u003eOpenStreetMap\\u003c/a\\u003e, under \\u003ca target=\\"_blank\\" href=\\"http://www.openstreetmap.org/copyright\\"\\u003eODbL\\u003c/a\\u003e.", "detectRetina": false, "maxNativeZoom": 18, "maxZoom": 18, "minZoom": 0, "noWrap": false, "opacity": 1, "subdomains": "abc", "tms": false}
+                "https://tiles.stadiamaps.com/tiles/outdoors/{z}/{x}/{y}.png?api_key=89e6f177-a207-4ddf-9cc2-f165696800ca"
             ).addTo(map_10752484e8889439d742b34af4230171);
+            
             map_10752484e8889439d742b34af4230171.on('click',onClick);
         };
 

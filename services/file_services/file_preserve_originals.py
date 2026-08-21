@@ -1,12 +1,16 @@
 import os
 import shutil
+import time
 
 from PyQt6.QtCore import QObject, pyqtSignal
 
 from configuration.settings import Settings
 from configuration.language import Texts
+from services.file_services.file_get_sidecar_files import fileGetSidecarFiles
 from services.file_services.file_split_name import splitFileName
 from services.file_services.file_get_list import getFileList
+from services.metadata_services.metadata import FileMetadata
+from services.stack_services.stack import Stack
 
 
 class PreserveOriginals(QObject):
@@ -19,9 +23,21 @@ class PreserveOriginals(QObject):
         # target is a folder
         super().__init__()
         self.target=target
+        self.delay = 1
         if not await_start_signal:
             self.start()
 
+    def copySidecarFiles(self, source_file, destination_path):
+        """Copies all existing sidecar files of source_file into destination_path.
+           Skips any sidecar that already exists there."""
+        sidecar_files = fileGetSidecarFiles(source_file)
+        copied_sidecars = []
+        for source_id, sidecar_file_names in sidecar_files.items():
+            for sidecar_file_name in sidecar_file_names:
+                destination_file = destination_path + '/' + os.path.basename(sidecar_file_name)
+                if not os.path.isfile(destination_file):
+                    copied_sidecars.append(shutil.copy2(sidecar_file_name, destination_path).replace('\\', '/'))
+        return copied_sidecars
     def getRawNonRawByBaseName(self,files):
         # Returns lists of raw-files and list of non-raw files per basename
         raw_files = {}
@@ -66,22 +82,45 @@ class PreserveOriginals(QObject):
         count = 0
 
         # Copy raw-files from target to originals, if missing in originals
+        copied_files = {}
         for base_name in target_raw_files:
             count += 1
             self.progress_signal.emit(count)
             if original_raw_files.get(base_name) is None:   # Original-folder is missing the raw-file
                 target_raw_file = target_raw_files.get(base_name)[0]
-                original_raw_file = shutil.copy2(target_raw_file, originals_path)
+                original_raw_file = shutil.copy2(target_raw_file, originals_path).replace('\\', '/')
+                copied_files[target_raw_file] = original_raw_file
                 original_raw_files[base_name]=[original_raw_file]    # Keep track that the original now exists
-
+                self.copySidecarFiles(target_raw_file, originals_path)
+        #
         # Copy non-raw files from target to originals, if missing in originals both as non-raw and raw files
         for base_name in target_non_raw_files:
             count += 1
             self.progress_signal.emit(count)
             if original_raw_files.get(base_name) is None and original_non_raw_files.get(base_name) is None:   # Original-folder is missing the raw-file
                 target_non_raw_file = target_non_raw_files.get(base_name)[0]
-                original_non_raw_file = shutil.copy2(target_non_raw_file, originals_path)
+                original_non_raw_file = shutil.copy2(target_non_raw_file, originals_path).replace('\\', '/')
+                copied_files[target_non_raw_file] = original_non_raw_file
                 original_non_raw_files[base_name]=[original_non_raw_file]    # Keep track that the original now exists
+                self.copySidecarFiles(target_non_raw_file, originals_path)
+
+        # Stack all files for reading
+        for from_file, to_file in reversed(copied_files.items()):
+            if FileMetadata.getInstance(from_file).getStatus() == 'PENDING_READ':
+                Stack.getInstance('metadata.read').push(from_file)
+            if FileMetadata.getInstance(to_file).getStatus() == 'PENDING_READ':
+                Stack.getInstance('metadata.read').push(to_file)
+
+        # Write all tags to the created originals (To update from write queue)
+        for from_file, to_file in copied_files.items():
+            from_file_metadata = FileMetadata.getInstance(from_file)
+            while from_file_metadata.getStatus() != '':
+                time.sleep(self.delay)
+            to_file_metadata = FileMetadata.getInstance(to_file)
+            while to_file_metadata.getStatus() != '':
+                time.sleep(self.delay)
+            from_file_logical_tag_values=from_file_metadata.getLogicalTagValues(filter_writable_only=True)
+            to_file_metadata.setLogicalTagValues(from_file_logical_tag_values)
 
         # Delete originals from target-folder if non-original exists in target folder
         for base_name in target_raw_files:
@@ -89,6 +128,10 @@ class PreserveOriginals(QObject):
             self.progress_signal.emit(count)
             if target_non_raw_files.get(base_name) is not None:
                 for file in target_raw_files.get(base_name):
+                    sidecar_files = fileGetSidecarFiles(file)
+                    for source_id, sidecar_file_names in sidecar_files.items():
+                        for sidecar_file_name in sidecar_file_names:
+                            os.remove(sidecar_file_name)
                     os.remove(file)
 
         self.done_signal.emit()

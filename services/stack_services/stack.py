@@ -1,6 +1,6 @@
 import time
 
-from PyQt6.QtCore import QObject, pyqtSignal, QCoreApplication, QThread
+from PyQt6.QtCore import QObject, pyqtSignal, QCoreApplication, QThread, QMutex, QMutexLocker
 from services.stack_services.memory_stack import MemoryStack
 
 
@@ -8,7 +8,10 @@ class Stack(QObject):
     stack_size_changed = pyqtSignal(int)
     instance_index = {}
     get_instance_active = False
-    def __init__(self,id,processor_class,processor_method):
+    get_instance_mutex = QMutex()
+
+    def __init__(self,id,processor_class=None,processor_method=None):
+
         super().__init__()
 
         # Check that getInstance was called
@@ -24,14 +27,16 @@ class Stack(QObject):
         self.stack_worker_running = False
         self.stack_worker_processing = False
         self.stack_worker_paused = False
+        self.start_stop_mutex = QMutex()
 
     @staticmethod
     def getInstance(id,processor_class=None,processor_method=None):
-        stack = Stack.instance_index.get(id)
-        if stack is None:
-            Stack.get_instance_active = True
-            stack = Stack(id,processor_class,processor_method)
-            Stack.get_instance_active = False
+        with QMutexLocker(Stack.get_instance_mutex):
+            stack = Stack.instance_index.get(id)
+            if stack is None:
+                Stack.get_instance_active = True
+                stack = Stack(id,processor_class,processor_method)
+                Stack.get_instance_active = False
         return stack
 
     def onWorkerWaiting(self):
@@ -48,31 +53,38 @@ class Stack(QObject):
     def push(self,data):
         self.stack_manager.push(data)
 
+    def pop(self):
+        return self.stack_manager.pop()
+
     def start(self):
-        if not self.stack_worker_running:
-            self.stack_worker_running = True
-            self.stack_worker = StackWorker(stack=self)
-            self.stack_worker.waiting.connect(self.onWorkerWaiting)       # Stack-worker is waiting for something to process
-            self.stack_worker.processing.connect(self.onWorkerProcessing) # Stack is being processed. This can be used to show running-indicator in app.
-            self.stack_worker.stack_size_changed.connect(self.onStackSizeChanged)
-            self.stack_worker.start()
-            QCoreApplication.instance().aboutToQuit.connect(self.stack_worker.about_to_quit.emit)
+        with QMutexLocker(self.start_stop_mutex):
+            if not self.stack_worker_running:
+                self.stack_worker_running = True
+                self.stack_worker = StackWorker(stack=self)
+                self.stack_worker.waiting.connect(self.onWorkerWaiting)       # Stack-worker is waiting for something to process
+                self.stack_worker.processing.connect(self.onWorkerProcessing) # Stack is being processed. This can be used to show running-indicator in app.
+                self.stack_worker.stack_size_changed.connect(self.onStackSizeChanged)
+                self.stack_worker.start()
+                QCoreApplication.instance().aboutToQuit.connect(self.stack_worker.about_to_quit.emit)
 
     def stop(self):
-        if self.stack_worker_running:
-            self.stack_worker.terminate()
-            self.stack_worker_running = False
-            self.stack_worker_processing = False
+        with QMutexLocker(self.start_stop_mutex):
+            if self.stack_worker_running:
+                self.stack_worker.terminate()
+                self.stack_worker_running = False
+                self.stack_worker_processing = False
 
     def pause(self):
-        if self.stack_worker_paused:
-            return
-        self.stack_worker_paused = True
+        with QMutexLocker(self.start_stop_mutex):
+            if self.stack_worker_paused:
+                return
+            self.stack_worker_paused = True
 
     def resume(self):
-        if not self.stack_worker_paused:
-            return
-        self.stack_worker_paused = False
+        with QMutexLocker(self.start_stop_mutex):
+            if not self.stack_worker_paused:
+                return
+            self.stack_worker_paused = False
 
     def entries(self):
         return self.stack_manager.stack
@@ -100,7 +112,7 @@ class StackWorker(QThread):
             if self.stack.stack_worker_paused:
                 time.sleep(self.delay)
             else:
-                stack_entry = self.stack.stack_manager.pop()
+                stack_entry = self.stack.pop()
                 if stack_entry:
                     self.processing.emit()
                     getattr(self.stack.processor_class, self.stack.processor_method)(stack_entry)  # Calls processing-method in processing class, if it is there, else raises an exception

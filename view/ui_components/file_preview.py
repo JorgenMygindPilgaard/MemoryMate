@@ -29,6 +29,11 @@ class FilePreview(QObject):
             raise Exception('Please use getInstance method')
         self.sleep = 0.1
         self.file_name = file_name
+        file_exist = os.path.isfile(file_name)
+        if not file_exist:
+             FileMetadata.getInstance_active = False
+             print('FilePreview: File does not exist', file_name)
+             raise FileNotFoundError('File '+file_name+' does not exist')
         self.panel_width = 0
         self.image = None
         self.pixmap = None

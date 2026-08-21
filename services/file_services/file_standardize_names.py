@@ -4,6 +4,7 @@ from collections import OrderedDict
 from PyQt6.QtCore import QObject, pyqtSignal
 
 from configuration.settings import Settings
+from services.file_services.file_get_sidecar_files import fileGetSidecarFiles
 from services.file_services.file_rename import FileRenamer
 from services.file_services.file_get_list import getFileList
 from services.metadata_services.exiftool_wrapper import ExifTool
@@ -137,13 +138,49 @@ class StandardizeFilenames(QObject):
                     file['new_name_alone'] = new_name_alone
                     file['new_file_name'] = new_file_name
 
-        # Rename files
+        # Collect files for renaming
+        print("Debug: Collecting files for renaming")
         files_for_renaming = []
+        seen_old_sidecar_file_names = set()
+        print("Debug: -files = ",files)
         for file in files:
             file_name = file.get('file_name')
             new_file_name = file.get('new_file_name')
             if new_file_name != file_name:
                 files_for_renaming.append({'old_name': file_name, 'new_name': new_file_name})
+                print("Debug: -Appending sidecar files for "+file_name)
+                sidecar_files_dictionary = fileGetSidecarFiles(file_name,filename_only=True)
+                print("Debug: Found the following sidecar files:")
+                print(sidecar_files_dictionary)
+                if sidecar_files_dictionary:
+                    old_name_alone = file.get('name_alone')
+                    new_name_alone = file.get('new_name_alone')
+                    for sidecar_source_id,sidecar_files in sidecar_files_dictionary.items():
+                        print("Debug: Loop-pass for sidecar_source_id "+sidecar_source_id)
+                        print("Debug: -containing these files:")
+                        print(sidecar_files)
+                        if sidecar_files:
+                            for sidecar_file in sidecar_files:
+                                print("Debud: Loop-pass for sidecar "+sidecar_file)
+                                sidecar_file_name = file.get('path') + sidecar_file
+                                print("Debug: -sidecar_file_name is "+sidecar_file_name)
+                                if sidecar_file_name in seen_old_sidecar_file_names:
+                                    continue
+                                seen_old_sidecar_file_names.add(sidecar_file_name)
+                                print("Debug: Added "+sidecar_file_name+" in seen_old_sidecar_file_names")
+                                print("Debug: Ready to construct new_sidecar_filename from:")
+                                print("Debug: -path = " + file.get('path'))
+                                print("Debug: -sidecar_file = " + sidecar_file)
+                                print("Debug: -old_name_alone = " + old_name_alone)
+                                print("Debug: -new_name_alone = " + new_name_alone)
+                                new_sidecar_file_name = file.get('path') + sidecar_file.replace(old_name_alone,new_name_alone,1)
+                                print("Debug: Constructed new sidecar file "+new_sidecar_file_name)
+                                files_for_renaming.append({'old_name': sidecar_file_name, 'new_name': new_sidecar_file_name})
+        print("Debug: Done collecting files for renaming:")
+        print(files_for_renaming)
+
+        # Rename files
+
         if files_for_renaming != []:
             renamer= FileRenamer.getInstance(files_for_renaming)
             try:

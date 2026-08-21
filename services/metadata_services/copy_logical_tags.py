@@ -62,7 +62,7 @@ class CopyLogicalTags(QObject):
             if len(self.source_file_names)>1 and not self.match_file_name:
                 return
 
-        # Make a dummy-source_file entry in self.source_file_names, in source_type is not "file_path_list".
+        # Make a dummy-source_file entry in self.source_file_names, if source_type is not "file_path_list".
         if self.source_type != "file_path_list":
             self.source_file_names = ["dummy"]
 
@@ -80,16 +80,20 @@ class CopyLogicalTags(QObject):
         # Instanciate file metadata instances for all source-files
 
         # Stack all source-files with meta-data read pending, if they are used for copying from
+        seen = set()
         if self.source_type == "file_path_list":
             for source_target in source_targets:
                 source_file_name = source_target[0]
-                if FileMetadata.getInstance(source_file_name).getStatus() == 'PENDING_READ':
-                    Stack.getInstance('metadata.read').push(source_file_name)
+                if source_file_name not in seen:
+                    seen.add(source_file_name)
+                    if FileMetadata.getInstance(source_file_name).getStatus() == 'PENDING_READ':
+                        Stack.getInstance('metadata.read').push(source_file_name)
 
-        # Stack all target-files with meta-data read pending, if their tags are used for copying to logical tags
-        if self.source_type == "tag":
-            for source_target in source_targets:
-                target_file_name = source_target[1]
+        # Stack all target-files with meta-data read pending
+        for source_target in source_targets:
+            target_file_name = source_target[1]
+            if target_file_name not in seen:
+                seen.add(target_file_name)
                 if FileMetadata.getInstance(target_file_name).getStatus() == 'PENDING_READ':
                     Stack.getInstance('metadata.read').push(target_file_name)
 
