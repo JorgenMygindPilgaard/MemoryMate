@@ -44,13 +44,25 @@ else:
 initializeConnections()
 
 # Prepare queues and stacks
+Stack.getInstance('metadata.read',FileMetadata,'processReadStackEntry').start()
+Stack.getInstance('preview.read',FilePreview,'processReadStackEntry').start()
 metadata_write_queue = Queue.getInstance('metadata.write',FileMetadata,'processWriteQueueEntry',Paths.get('queue'))  # Queue will be started by main-window, if not paused
+
+# Stack all files in write-queue for reading. (This will increase performance by avoiding reading and waiting one by one)
+metadata_write_queue_files = list(dict.fromkeys(entry["file"] for entry in metadata_write_queue.entries()))
+metadata_read_stack = Stack.getInstance('metadata.read')
+
+reversed_metadata_write_queue_files = reversed(metadata_write_queue_files)
+for file_name in reversed_metadata_write_queue_files:
+# for file_name in reversed(metadata_write_queue_files):
+    file_exist = os.path.isfile(file_name)
+    if file_exist:
+        metadata_read_stack.push(file_name)
+
 ui_status = ParameterManager.getInstance(Paths.get('ui_status'))
 if ui_status.getParameter('is_paused'):
     metadata_write_queue.pause()
 metadata_write_queue.start()
-Stack.getInstance('metadata.read',FileMetadata,'processReadStackEntry').start()
-Stack.getInstance('preview.read',FilePreview,'processReadStackEntry').start()
 
 # Rename files in Lightroom if anything in queue
 if Settings.get('lr_integration_active') is True:

@@ -6,7 +6,8 @@ import os
 import threading
 import time
 
-from PyQt6.QtCore import QObject, pyqtSignal
+from PyQt6.QtCore import QObject, pyqtSignal, QMutex, QMutexLocker
+
 
 class MemoryStack(QObject):
     instances = {}
@@ -19,17 +20,21 @@ class MemoryStack(QObject):
         self.stack_size = 0
         self.stack_size = 0
         self.instance_just_created = True
+        self.push_pop_mutex = QMutex()
 
     def push(self, data):
-        self.stack.append(data)  # Append data in memory
-        self.stack_size = len(self.stack)
-        self.stack_size_changed.emit(self.stack_size)
+        with QMutexLocker(self.push_pop_mutex):
+            self.stack.append(data)  # Append data in memory
+            self.stack_size = len(self.stack)
+            self.stack_size_changed.emit(self.stack_size)
 
     def pop(self):
-        try:
-            return self.stack.pop()
-        except IndexError:
-            return None
+        with QMutexLocker(self.push_pop_mutex):
+            try:
+                popped = self.stack.pop()
+                return popped
+            except IndexError:
+                return None
 
     def quitPrepare(self):
         pass

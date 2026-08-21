@@ -674,8 +674,8 @@ class GeoLocationValue():
                 self.used_tags.append(exif_tag)
 
         # Set missing values where possible
-        if self.latitude is not None and self.latitude is not None:
-            self.value = self.latitude + "," + self.longitude
+        if self.latitude is not None and self.longitude is not None:
+            self.value = str(self.latitude) + "," + str(self.longitude)
 
     def setValue(self,value,part=None,overwrite=True):
         if not overwrite and self.value is not None:
@@ -692,14 +692,14 @@ class GeoLocationValue():
             return None
         else:
             if exif_tag == 'Composite:GPSPosition':
-                if "-" in self.latitude:
-                    latitude_string = self.latitude.replace("-","")+" S"
+                if "-" in str(self.latitude):
+                    latitude_string = str(self.latitude).replace("-","")+" S"
                 else:
-                    latitude_string = self.latitude + " N"
-                if "-" in self.longitude:
-                    longitude_string = self.longitude.replace("-","")+" W"
+                    latitude_string = str(self.latitude) + " N"
+                if "-" in str(self.longitude):
+                    longitude_string = str(self.longitude).replace("-","")+" W"
                 else:
-                    longitude_string = self.longitude+" E"
+                    longitude_string =str(self.longitude)+" E"
                 result = latitude_string+", " + longitude_string
             else:
                 result = self.value

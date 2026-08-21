@@ -8,7 +8,7 @@ from services.queue_services.json_queue_file import JsonQueueFile
 from services.metadata_services.metadata import FileMetadata
 
 
-def onFileRenameDone(files,update_original_filename_tag=False):
+def onFileRenameDone(files):
 # Update filenames in Lightroom Classic Catalog
     if Settings.get('lr_integration_active'):
         lightroom_integration.appendLightroomQueue(Paths.get('lr_queue'), files)

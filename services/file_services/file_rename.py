@@ -27,16 +27,30 @@ class FileRenamer(QObject):
             FileRenamer.__instance.files = copy.deepcopy(files)
         return FileRenamer.__instance
 
+    def _generate_tmp_name(self,old_name):
+        parts = splitFileName(old_name)
+        base_tmp = parts[0] + parts[1] + '_tmp.' + parts[2]
+
+        if not os.path.isfile(base_tmp):
+            return base_tmp
+
+        index = 1
+        while True:
+            candidate = parts[0] + parts[1] + f'_tmp({index:02d}).' + parts[2]
+            if not os.path.isfile(candidate):
+                return candidate
+            index += 1
+
     def start(self):
         index = 0
         renamed_files = []
 
-        # Check that entries all have filenames
-        for file in self.files:
+        # Check that entries all have filenames and files exist
+        for index, file in enumerate(self.files, start=1):
             old_name = file.get('old_name')
             new_name = file.get('new_name')
 
-
+            # Old filename missing?
             if old_name is None or old_name == '':
                 if new_name is None or new_name == '':
                     self.__roll_back(renamed_files)
@@ -44,15 +58,19 @@ class FileRenamer(QObject):
                 else:
                     self.__roll_back(renamed_files)
                     raise FileRenameError('old_name is missing in files-entry number ' + str(index))
+
+            # New filename missing
             if new_name is None or new_name == '':
                 self.__roll_back(renamed_files)
                 raise FileRenameError('new_name is missing in files-entry number ' + str(index))
 
+            # Old file missing on disk
+            if not os.path.isfile(file.get('old_name')):
+                self.__roll_back(renamed_files)
+                raise FileRenameError('File not found: ' + file.get('old_name'))
+
         # Remove entries where old and new filename are the same
-        files_tmp = copy.deepcopy(self.files)
-        for file in files_tmp:
-            if file.get('old_name') == file.get('new_name'):
-                self.files.remove(file)
+        self.files = [f for f in self.files if f.get('old_name') != f.get('new_name')]
 
         # Handle collisions by creating tmp-files if needed
         flag_create_tmp_files=False
@@ -66,9 +84,8 @@ class FileRenamer(QObject):
         if flag_create_tmp_files==True:
             for file in self.files:
                 old_name = file.get('old_name')
-                old_name_parts = splitFileName(old_name)
 
-                tmp_name = old_name_parts[0] + old_name_parts[1] + '_tmp.' + old_name_parts[2]
+                tmp_name = self._generate_tmp_name(old_name)
                 file['tmp_name'] = tmp_name
                 try:
                     os.rename(old_name, tmp_name)
@@ -98,15 +115,10 @@ class FileRenamer(QObject):
                     raise FileRenameError('Error renaming ' + old_name + ' to ' + new_name + ':\n'+str(e))
 
         # Send signal for renaming done
-        if flag_create_tmp_files:
-            old_new_files = [{"old_name": d["old_name"], "new_name": d["tmp_name"]} for d in self.files]
-            old_new_files.extend([{"old_name": d["tmp_name"], "new_name": d["new_name"]} for d in self.files])
-        else:
-            old_new_files = [{"old_name": d["old_name"], "new_name": d["new_name"]} for d in self.files]
-        self.done_signal.emit(old_new_files,True)
+        self.done_signal.emit(renamed_files)
 
     def __roll_back(self,files):
-        for file in files.reverse():
+        for file in reversed(files):
             old_name = file.get('old_name')
             new_name = file.get('new_name')
             os.rename(new_name, old_name)
